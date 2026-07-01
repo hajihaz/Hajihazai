@@ -122,6 +122,39 @@ export async function addMessage(input: {
 }
 
 /**
+ * Record 👍/👎 feedback on an assistant message the user owns. Merges into the
+ * existing message metadata (alongside retrieval provenance) so analytics can
+ * aggregate helpfulness by query/brain. Ownership enforced via the conversation.
+ */
+export async function setMessageFeedback(
+  userId: string,
+  messageId: string,
+  value: "helpful" | "not_helpful",
+) {
+  const [owned] = await db
+    .select({ id: messages.id, metadata: messages.metadata })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(
+      and(
+        eq(messages.id, messageId),
+        eq(conversations.userId, userId),
+        eq(messages.role, "assistant"),
+      ),
+    );
+  if (!owned) return false;
+  const meta =
+    owned.metadata && typeof owned.metadata === "object"
+      ? (owned.metadata as Record<string, unknown>)
+      : {};
+  await db
+    .update(messages)
+    .set({ metadata: { ...meta, feedback: value } })
+    .where(eq(messages.id, messageId));
+  return true;
+}
+
+/**
  * Delete a single message the user owns (message → conversation → user).
  * Returns false if the message doesn't exist or belongs to another user.
  */

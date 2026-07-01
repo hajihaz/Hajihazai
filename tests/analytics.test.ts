@@ -10,13 +10,18 @@ import {
   computeRetrievalAnalytics,
   eventFromMetadata,
   sanitizeQueryForLog,
+  aggregateFeedback,
+  leastHelpfulQueries,
+  aggregateLatency,
+  topFailedQueries,
   type RetrievalEvent,
 } from "@/lib/admin/analytics";
 
 const ev = (o: Partial<RetrievalEvent>): RetrievalEvent => ({
   brainSlug: null, brainMode: "smart", multiBrains: null, confidence: null,
   knowledgeCount: 0, memoryCount: 0, retrievalMethod: "none",
-  wasClarify: false, wasZeroResult: false, sources: [], query: "", ...o,
+  wasClarify: false, wasZeroResult: false, sources: [], query: "",
+  feedback: null, latencyMs: null, errorReason: null, day: null, ...o,
 });
 
 describe("retrieval analytics aggregators", () => {
@@ -104,10 +109,55 @@ describe("retrieval analytics aggregators", () => {
     expect(q[0]).toEqual({ query: "what is Article 21", count: 2 });
   });
 
+  it("aggregates feedback, least-helpful queries, latency, and failed queries (Phase 8)", () => {
+    const events = [
+      ev({ feedback: "helpful", latencyMs: 100, query: "who is haji" }),
+      ev({ feedback: "helpful", latencyMs: 200, query: "what is allbee" }),
+      ev({ feedback: "not_helpful", latencyMs: 300, query: "obscure thing" }),
+      ev({ wasZeroResult: true, query: "no such topic" }),
+      ev({ wasZeroResult: true, query: "no such topic" }),
+    ];
+    const fb = aggregateFeedback(events);
+    expect(fb).toMatchObject({ helpful: 2, notHelpful: 1, total: 3 });
+    expect(fb.helpfulRate).toBeCloseTo(2 / 3);
+    expect(leastHelpfulQueries(events)).toEqual(["obscure thing"]);
+    expect(aggregateLatency(events)).toEqual({ avgMs: 200, p50Ms: 200, count: 3 });
+    expect(topFailedQueries(events)[0]).toEqual({ query: "no such topic", count: 2 });
+  });
+
+  it("builds daily trend series from event days", () => {
+    const a = computeRetrievalAnalytics([
+      ev({ wasClarify: true, day: "2026-07-01", feedback: "helpful", latencyMs: 100 }),
+      ev({ wasClarify: true, day: "2026-07-02", feedback: "not_helpful", latencyMs: 300 }),
+    ]);
+    expect(a.trends.clarification).toEqual([
+      { date: "2026-07-01", count: 1 },
+      { date: "2026-07-02", count: 1 },
+    ]);
+    expect(a.trends.feedback[0]).toEqual({ date: "2026-07-01", helpful: 1, notHelpful: 0 });
+    expect(a.trends.latency).toEqual([
+      { date: "2026-07-01", avgMs: 100 },
+      { date: "2026-07-02", avgMs: 300 },
+    ]);
+  });
+
+  it("eventFromMetadata reads feedback + latency + day from createdAt", () => {
+    const e = eventFromMetadata(
+      { kind: "retrieval", feedback: "helpful", latencyMs: 250, errorReason: "timeout" },
+      new Date("2026-07-01T12:00:00Z"),
+    );
+    expect(e?.feedback).toBe("helpful");
+    expect(e?.latencyMs).toBe(250);
+    expect(e?.errorReason).toBe("timeout");
+    expect(e?.day).toBe("2026-07-01");
+  });
+
   it("handles an empty event set without throwing", () => {
     const a = computeRetrievalAnalytics([]);
     expect(a.totalTurns).toBe(0);
     expect(a.brainUsage).toEqual([]);
     expect(a.clarification.rate).toBe(0);
+    expect(a.feedback.total).toBe(0);
+    expect(a.latency.count).toBe(0);
   });
 });

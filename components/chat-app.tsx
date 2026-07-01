@@ -54,6 +54,10 @@ export type Msg = {
   meta?: MsgMeta | null;
   streaming?: boolean;
   isNew?: boolean;
+  /** Phase 7 — clarification quick-action entity options, when the reply is a clarify. */
+  clarify?: string[] | null;
+  /** Phase 5 — feedback the user gave on this assistant message. */
+  feedback?: "helpful" | "not_helpful" | null;
 };
 type User = { name?: string | null; email?: string | null; image?: string | null };
 
@@ -392,6 +396,25 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     void runChat(text, { userLocalId: localId });
   }
 
+  // Send an explicit prompt (empty-state example prompts + clarification chips).
+  function sendPrompt(text: string) {
+    const t = text.trim();
+    if (!t || generatingRef.current) return;
+    const localId = uuid();
+    setMessages((p) => [...p, { id: localId, role: "user", content: t, isNew: true }]);
+    void runChat(t, { userLocalId: localId });
+  }
+
+  // Phase 5 — record 👍/👎 on an assistant message (optimistic).
+  async function sendFeedback(msg: Msg, value: "helpful" | "not_helpful") {
+    if (!msg.dbId) return;
+    setMessages((p) => p.map((m) => (m.id === msg.id ? { ...m, feedback: value } : m)));
+    await fetch("/api/chat/feedback", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messageId: msg.dbId, value }),
+    }).catch(() => {});
+  }
+
   async function runChat(text: string, opts: { userLocalId?: string; regenerate?: boolean }) {
     if (generatingRef.current) return; // never run two generations at once
     generatingRef.current = true;
@@ -478,7 +501,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
               setMessages((p) =>
                 p.map((m) =>
                   m.id === streamMsgId
-                    ? { ...m, dbId: event.assistantMessageId ?? null, meta: event.meta ?? null, streaming: false }
+                    ? { ...m, dbId: event.assistantMessageId ?? null, meta: event.meta ?? null, streaming: false, clarify: event.clarify?.options ?? null }
                     : m,
                 ),
               );
@@ -667,6 +690,8 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           input={input}
           setInput={setInput}
           onSend={send}
+          onSendPrompt={sendPrompt}
+          onFeedback={sendFeedback}
           onCopy={copyMessage}
           onDelete={deleteMessage}
           onRetry={retryMessage}

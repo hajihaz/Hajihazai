@@ -348,7 +348,7 @@ export async function POST(req: Request) {
             role: "assistant",
             content: fullText.trimEnd() + "\n\n*[Response interrupted]*",
             modelId: streamResult.modelId,
-            metadata: retrievalMeta,
+            metadata: { ...retrievalMeta, errorReason: (err as { timedOut?: boolean }).timedOut ? "timeout" : "stream_error", latencyMs: Date.now() - startMs },
           }).catch(() => {});
         }
         const isTimeout = (err as { timedOut?: boolean }).timedOut === true;
@@ -371,7 +371,7 @@ export async function POST(req: Request) {
             role: "assistant",
             content: fullText,
             modelId: streamResult.modelId,
-            metadata: retrievalMeta,
+            metadata: { ...retrievalMeta, latencyMs },
           });
           assistantMsgId = assistantMsg.id;
           if (convo.title === "New chat") {
@@ -392,6 +392,12 @@ export async function POST(req: Request) {
           title,
           modelId: streamResult.modelId,
           requestedModelId: preferredModelId ?? null,
+          // Phase 7 — clarification quick-action options (non-admin safe). Business
+          // roles ("CEO", "ownership") apply only to the companies; "founder" and
+          // generic prompts also include Haji.
+          clarify: clarifyBlock
+            ? { options: /\b(ceo|ownership|owner)\b/i.test(message) ? ["AllBee", "Suplaykart"] : ["AllBee", "Suplaykart", "Haji"] }
+            : null,
           ...(admin
             ? {
                 meta: {

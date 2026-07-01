@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import { Copy, RotateCw, Send, Square, Trash2 } from "lucide-react";
+import { Copy, RotateCw, Send, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Msg } from "./chat-app";
@@ -18,6 +18,8 @@ const Chat = memo(function Chat({
   input,
   setInput,
   onSend,
+  onSendPrompt,
+  onFeedback,
   onCopy,
   onDelete,
   onRetry,
@@ -38,6 +40,8 @@ const Chat = memo(function Chat({
   input: string;
   setInput: (v: string) => void;
   onSend: () => void;
+  onSendPrompt: (text: string) => void;
+  onFeedback: (msg: Msg, value: "helpful" | "not_helpful") => void;
   onCopy: (text: string) => void;
   onDelete: (msg: Msg) => void;
   onRetry: (msg: Msg) => void;
@@ -131,11 +135,34 @@ const Chat = memo(function Chat({
           {loading ? (
             <MessagesSkeleton />
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center sm:py-24">
+            <div className="flex flex-col items-center py-16 text-center sm:py-20">
               <h2 className="text-2xl font-semibold">HajiHaz AI</h2>
-              <p className="mt-2 max-w-xs text-sm text-muted-foreground sm:text-base">
-                Ask anything — your conversations are saved automatically.
+              <p className="mt-2 max-w-md text-sm text-muted-foreground sm:text-base">
+                Ask anything — your conversations are saved automatically. Try one of these:
               </p>
+              <div className="mt-6 grid w-full max-w-2xl gap-4 text-left sm:grid-cols-2">
+                {[
+                  { area: "Personal", prompts: ["Who is Haji?", "What are Haji's goals?"] },
+                  { area: "AllBee", prompts: ["Who founded AllBee?", "What services does AllBee provide?"] },
+                  { area: "Legal", prompts: ["Explain Article 21.", "What is negligence?"] },
+                  { area: "Suplaykart", prompts: ["What is Suplaykart?", "Who founded Suplaykart?"] },
+                ].map(({ area, prompts }) => (
+                  <div key={area} className="rounded-xl border p-3">
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{area}</p>
+                    <div className="flex flex-col gap-2">
+                      {prompts.map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => onSendPrompt(p)}
+                          className="rounded-lg border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                        >
+                          {p}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           ) : (
             <div
@@ -181,6 +208,21 @@ const Chat = memo(function Chat({
                         )}
                       </div>
 
+                      {/* Clarification quick actions (Phase 7) — pick an area to disambiguate. */}
+                      {!isUser && !m.streaming && m.clarify && m.clarify.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {m.clarify.map((opt) => (
+                            <button
+                              key={opt}
+                              onClick={() => onSendPrompt(prevMsg?.role === "user" ? `${prevMsg.content} ${opt}` : opt)}
+                              className="rounded-full border bg-background px-3 py-1 text-xs font-medium transition-colors hover:bg-accent"
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
                       {/* Action bar — hover on desktop, always shown on mobile. */}
                       {!m.streaming && (
                         <div
@@ -199,6 +241,18 @@ const Chat = memo(function Chat({
                             >
                               <RotateCw className="size-3.5" />
                             </ActionButton>
+                          ) : null}
+
+                          {/* Feedback (Phase 5) — assistant replies only. */}
+                          {m.role === "assistant" && !m.error ? (
+                            <>
+                              <ActionButton label="Helpful" active={m.feedback === "helpful"} onClick={() => onFeedback(m, "helpful")}>
+                                <ThumbsUp className="size-3.5" />
+                              </ActionButton>
+                              <ActionButton label="Not helpful" active={m.feedback === "not_helpful"} onClick={() => onFeedback(m, "not_helpful")}>
+                                <ThumbsDown className="size-3.5" />
+                              </ActionButton>
+                            </>
                           ) : null}
 
                           <ActionButton label="Delete" onClick={() => onDelete(m)} danger>
@@ -302,11 +356,13 @@ function ActionButton({
   label,
   onClick,
   danger,
+  active,
   children,
 }: {
   label: string;
   onClick: () => void;
   danger?: boolean;
+  active?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -314,10 +370,11 @@ function ActionButton({
       type="button"
       onClick={onClick}
       aria-label={label}
+      aria-pressed={active}
       title={label}
-      className={`flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-accent md:size-7 ${
-        danger ? "hover:text-destructive" : "hover:text-foreground"
-      }`}
+      className={`flex size-11 items-center justify-center rounded-md hover:bg-accent md:size-7 ${
+        active ? "text-primary" : "text-muted-foreground"
+      } ${danger ? "hover:text-destructive" : "hover:text-foreground"}`}
     >
       {children}
     </button>

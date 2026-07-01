@@ -16,7 +16,9 @@ type DataTab =
   | "audit-log"
   | "notifications"
   | "maintenance"
-  | "health";
+  | "health"
+  | "knowledge-gaps"
+  | "query-tester";
 
 type NotificationRow = {
   id: string;
@@ -76,6 +78,16 @@ type Analytics = {
     failedRetrievals: number;
     topDocuments: Array<{ title: string; count: number }>;
     topQueries: Array<{ query: string; count: number }>;
+    feedback: { helpful: number; notHelpful: number; total: number; helpfulRate: number };
+    leastHelpfulQueries: string[];
+    latency: { avgMs: number; p50Ms: number; count: number };
+    errors: number;
+    topFailedQueries: Array<{ query: string; count: number }>;
+    trends: {
+      clarification: Array<{ date: string; count: number }>;
+      feedback: Array<{ date: string; helpful: number; notHelpful: number }>;
+      latency: Array<{ date: string; avgMs: number }>;
+    };
   };
 };
 
@@ -249,6 +261,26 @@ export default function AdminPortal() {
   /* analytics */
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
 
+  /* knowledge gaps (Phase 3) */
+  type Gaps = {
+    zeroResultQueries: Array<{ query: string; count: number }>;
+    clarificationQueries: Array<{ query: string; count: number }>;
+    lowConfidenceQueries: Array<{ query: string; count: number; confidence: number }>;
+    missingTopicSuggestions: string[];
+  };
+  const [gaps, setGaps] = useState<Gaps | null>(null);
+
+  /* query tester (Phase 4) */
+  type QueryTest = {
+    query: string; routedBrain: string | null; confidence: number; confidenceThreshold: number;
+    matchedKeywords: string[]; reason: string; multiBrains: string[] | null; wantRetrieval: boolean;
+    clarificationDecision: string; semanticThreshold: number;
+    retrieval: Array<{ brain: string; semantic: Array<{ title: string; score: number }>; keyword: Array<{ title: string; score: number }> }>;
+  };
+  const [qtInput, setQtInput] = useState("");
+  const [qtResult, setQtResult] = useState<QueryTest | null>(null);
+  const [qtLoading, setQtLoading] = useState(false);
+
   /* notifications */
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [notifTitle, setNotifTitle] = useState("");
@@ -384,9 +416,38 @@ export default function AdminPortal() {
     } finally { setMaintenanceSaving(false); }
   }
 
+  async function loadGaps() {
+    const res = await fetch("/api/admin/knowledge-gaps");
+    if (res.ok) { const d = await res.json(); setGaps(d.gaps ?? null); }
+  }
+
+  async function runQueryTest() {
+    const q = qtInput.trim();
+    if (!q) return;
+    setQtLoading(true);
+    try {
+      const res = await fetch("/api/admin/query-test", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query: q }),
+      });
+      if (res.ok) setQtResult(await res.json());
+      else setError(`Query test failed (HTTP ${res.status})`);
+    } finally { setQtLoading(false); }
+  }
+
+  /* Phase 3 — turn a gap query into a new knowledge document (prefills the form). */
+  async function createDocFromQuery(query: string) {
+    setDataTab("knowledge");
+    await loadKnowledge();
+    openAddForm();
+    setFTitle(query);
+    setFVisibility("global");
+  }
+
   async function loadTab(tab: DataTab) {
     setDataTab(tab);
     if (tab === "knowledge") { void loadKnowledge(); return; }
+    if (tab === "knowledge-gaps") { void loadGaps(); return; }
+    if (tab === "query-tester") { return; }
     if (tab === "brains") { void loadBrains(); return; }
     if (tab === "users") { void loadUsers(1, ""); setUserSearch(""); setUserSearchInput(""); return; }
     if (tab === "blocked-emails") { void loadBlockedEmails(); return; }
@@ -769,6 +830,10 @@ export default function AdminPortal() {
                   { label: "Failed / Zero-result", value: `${analytics.retrieval.failedRetrievals} (${Math.round(analytics.retrieval.zeroResults.rate * 100)}%)` },
                   { label: "Semantic hits", value: analytics.retrieval.retrievalMethods.semantic },
                   { label: "Keyword fallback", value: analytics.retrieval.retrievalMethods.keywordFallback },
+                  { label: "Helpful %", value: analytics.retrieval.feedback.total ? `${Math.round(analytics.retrieval.feedback.helpfulRate * 100)}% (${analytics.retrieval.feedback.total})` : "—" },
+                  { label: "👍 / 👎", value: `${analytics.retrieval.feedback.helpful} / ${analytics.retrieval.feedback.notHelpful}` },
+                  { label: "Avg latency", value: analytics.retrieval.latency.count ? `${analytics.retrieval.latency.avgMs} ms` : "—" },
+                  { label: "Errors", value: analytics.retrieval.errors },
                 ].map(({ label, value }) => (
                   <div key={label} className="rounded-xl border p-3 text-center">
                     <p className="text-lg font-semibold tabular-nums">{typeof value === "number" ? value.toLocaleString() : value}</p>
@@ -776,6 +841,13 @@ export default function AdminPortal() {
                   </div>
                 ))}
               </div>
+              {(analytics.retrieval.trends.clarification.length > 0 || analytics.retrieval.trends.latency.length > 0 || analytics.retrieval.trends.feedback.length > 0) && (
+                <div className="mb-4 grid gap-4 sm:grid-cols-3">
+                  <BarChart data={analytics.retrieval.trends.clarification} label="Clarification trend" />
+                  <BarChart data={analytics.retrieval.trends.latency.map((d) => ({ date: d.date, count: d.avgMs }))} label="Avg latency (ms)" />
+                  <BarChart data={analytics.retrieval.trends.feedback.map((d) => ({ date: d.date, count: d.helpful - d.notHelpful }))} label="Feedback (👍−👎)" />
+                </div>
+              )}
               <div className="grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Brain Usage</p>
@@ -834,6 +906,18 @@ export default function AdminPortal() {
                     </ul>
                   )}
                 </div>
+                <div>
+                  <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Least-helpful (👎) Queries</p>
+                  {analytics.retrieval.leastHelpfulQueries.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No 👎 feedback yet.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {analytics.retrieval.leastHelpfulQueries.map((q, i) => (
+                        <li key={`${q}-${i}`} className="truncate text-sm text-muted-foreground">{q}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </section>
           )}
@@ -865,9 +949,11 @@ export default function AdminPortal() {
 
       {/* Data tab bar */}
       <div className="mb-0 flex gap-0 overflow-x-auto border-b">
-        {(["users", "projects", "documents", "knowledge", "brains", "blocked-emails", "knowledge-permissions", "audit-log", "notifications", "maintenance", "health"] as DataTab[]).map((t) => (
+        {(["users", "projects", "documents", "knowledge", "knowledge-gaps", "query-tester", "brains", "blocked-emails", "knowledge-permissions", "audit-log", "notifications", "maintenance", "health"] as DataTab[]).map((t) => (
           <button key={t} onClick={() => loadTab(t)} className={tabBtn(dataTab === t)}>
             {t === "knowledge" ? "Knowledge Base"
+              : t === "knowledge-gaps" ? "Knowledge Gaps"
+              : t === "query-tester" ? "Query Tester"
               : t === "blocked-emails" ? "Blocked Emails"
               : t === "knowledge-permissions" ? "K. Permissions"
               : t === "audit-log" ? "Audit Log"
@@ -1363,6 +1449,136 @@ export default function AdminPortal() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Knowledge Gaps tab (Phase 3) ── */}
+      {dataTab === "knowledge-gaps" && (
+        <section className="mt-4 space-y-5">
+          <p className="text-sm text-muted-foreground">
+            Unmet demand from the last 30 days. Click any query to draft a document for it.
+          </p>
+          {!gaps ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : (
+            <>
+              {[
+                { title: "Zero-result queries", rows: gaps.zeroResultQueries, hint: "Wanted knowledge, retrieved nothing" },
+                { title: "Clarification queries", rows: gaps.clarificationQueries, hint: "Router asked which area they meant" },
+              ].map(({ title, rows, hint }) => (
+                <div key={title} className="rounded-xl border p-4">
+                  <h3 className="text-sm font-semibold">{title}</h3>
+                  <p className="mb-2 text-xs text-muted-foreground">{hint}</p>
+                  {rows.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">None.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {rows.map((r) => (
+                        <li key={r.query} className="flex items-center justify-between gap-2 text-sm">
+                          <button onClick={() => createDocFromQuery(r.query)} className="truncate text-left text-primary hover:underline">{r.query}</button>
+                          <span className="shrink-0 tabular-nums text-muted-foreground">×{r.count}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ))}
+              <div className="rounded-xl border p-4">
+                <h3 className="text-sm font-semibold">Low-confidence queries</h3>
+                <p className="mb-2 text-xs text-muted-foreground">Routed to a brain but with a weak margin</p>
+                {gaps.lowConfidenceQueries.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">None.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {gaps.lowConfidenceQueries.map((r) => (
+                      <li key={r.query} className="flex items-center justify-between gap-2 text-sm">
+                        <button onClick={() => createDocFromQuery(r.query)} className="truncate text-left text-primary hover:underline">{r.query}</button>
+                        <span className="shrink-0 tabular-nums text-muted-foreground">{r.confidence}% · ×{r.count}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+              <div className="rounded-xl border p-4">
+                <h3 className="mb-2 text-sm font-semibold">Missing-topic suggestions</h3>
+                {gaps.missingTopicSuggestions.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nothing outstanding.</p>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {gaps.missingTopicSuggestions.map((s) => (
+                      <button key={s} onClick={() => createDocFromQuery(s)} className="rounded-full border px-3 py-1 text-xs hover:bg-accent">+ {s}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {/* ── Query Tester tab (Phase 4) ── */}
+      {dataTab === "query-tester" && (
+        <section className="mt-4 space-y-4">
+          <p className="text-sm text-muted-foreground">
+            Run the live routing + retrieval decision path for a query. Read-only — no answer is generated.
+          </p>
+          <div className="flex gap-2">
+            <input
+              className={input}
+              placeholder="e.g. what is negligence"
+              value={qtInput}
+              onChange={(e) => setQtInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") void runQueryTest(); }}
+            />
+            <button onClick={() => void runQueryTest()} disabled={qtLoading} className="shrink-0 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50">
+              {qtLoading ? "Testing…" : "Test"}
+            </button>
+          </div>
+          {qtResult && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: "Routed brain", value: qtResult.multiBrains ? `multi: ${qtResult.multiBrains.join(", ")}` : (qtResult.routedBrain ?? "— none —") },
+                  { label: `Confidence (≥${qtResult.confidenceThreshold})`, value: `${qtResult.confidence}%` },
+                  { label: "Clarification", value: qtResult.clarificationDecision },
+                  { label: "Wants retrieval", value: qtResult.wantRetrieval ? "yes" : "no" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-xl border p-3">
+                    <p className="text-sm font-semibold">{value}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-xl border p-3 text-sm">
+                <p><span className="text-muted-foreground">Matched keywords:</span> {qtResult.matchedKeywords.length ? qtResult.matchedKeywords.join(", ") : "—"}</p>
+                <p className="mt-1"><span className="text-muted-foreground">Reason:</span> {qtResult.reason}</p>
+                <p className="mt-1 text-xs text-muted-foreground">Semantic threshold: {qtResult.semanticThreshold}</p>
+              </div>
+              {qtResult.retrieval.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No brain scoped → no retrieval (clarify or general answer).</p>
+              ) : (
+                qtResult.retrieval.map((b) => (
+                  <div key={b.brain} className="rounded-xl border p-3">
+                    <p className="mb-2 text-sm font-semibold capitalize">{b.brain}</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Semantic</p>
+                        {b.semantic.length === 0 ? <p className="text-xs text-muted-foreground">no hits ≥ threshold</p> : (
+                          <ul className="space-y-1">{b.semantic.map((h) => (<li key={h.title} className="flex justify-between gap-2 text-sm"><span className="truncate">{h.title}</span><span className="tabular-nums text-muted-foreground">{h.score.toFixed(2)}</span></li>))}</ul>
+                        )}
+                      </div>
+                      <div>
+                        <p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Keyword</p>
+                        {b.keyword.length === 0 ? <p className="text-xs text-muted-foreground">no hits</p> : (
+                          <ul className="space-y-1">{b.keyword.map((h) => (<li key={h.title} className="flex justify-between gap-2 text-sm"><span className="truncate">{h.title}</span><span className="tabular-nums text-muted-foreground">{h.score}</span></li>))}</ul>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </section>
