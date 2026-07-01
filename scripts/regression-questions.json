@@ -1,0 +1,731 @@
+[
+{
+"id": "P01",
+"cat": "Personal",
+"q": "Who is Haji?",
+"exp": "haji-core",
+"contains": "Syed Hasan Kuddos"
+},
+{
+"id": "P02",
+"cat": "Personal",
+"q": "What is Haji's date of birth?",
+"exp": "haji-core",
+"contains": "29 March 2004"
+},
+{
+"id": "P03",
+"cat": "Personal",
+"q": "Where was Haji born?",
+"exp": "haji-core",
+"contains": "Nagapattinam"
+},
+{
+"id": "P04",
+"cat": "Personal",
+"q": "What is Haji's native place?",
+"exp": "haji-core",
+"contains": "Nagore"
+},
+{
+"id": "P05",
+"cat": "Personal",
+"q": "What does Haji study now?",
+"exp": "haji-core",
+"contains": "LLB"
+},
+{
+"id": "P06",
+"cat": "Personal",
+"q": "What was Haji's undergraduate degree?",
+"exp": "haji-core",
+"contains": "BBA"
+},
+{
+"id": "P07",
+"cat": "Personal",
+"q": "What is Haji's career goal?",
+"exp": "haji-core",
+"contains": "Corporate Lawyer"
+},
+{
+"id": "P08",
+"cat": "Personal",
+"q": "What car does Haji like?",
+"exp": "haji-core",
+"contains": "Lexus"
+},
+{
+"id": "P09",
+"cat": "Personal",
+"q": "What are Haji's hobbies?",
+"exp": "haji-core",
+"contains": "Cricket"
+},
+{
+"id": "P10",
+"cat": "Personal",
+"q": "What religion does Haji follow?",
+"exp": "haji-core",
+"contains": "Islam"
+},
+{
+"id": "F01",
+"cat": "Family",
+"q": "Who is Haji's father?",
+"exp": "haji-core",
+"contains": "Hussain"
+},
+{
+"id": "F02",
+"cat": "Family",
+"q": "What does Haji's father do?",
+"exp": "haji-core",
+"contains": "RKN"
+},
+{
+"id": "F03",
+"cat": "Family",
+"q": "Who is Haji's mother?",
+"exp": "haji-core",
+"contains": "Shehnaz"
+},
+{
+"id": "F04",
+"cat": "Family",
+"q": "What is Haji's mother's occupation?",
+"exp": "haji-core",
+"contains": "Housewife"
+},
+{
+"id": "F05",
+"cat": "Family",
+"q": "Who is Haji's sister?",
+"exp": "haji-core",
+"contains": "Hidhayaa"
+},
+{
+"id": "F06",
+"cat": "Family",
+"q": "When did Haji's sister get married?",
+"exp": "haji-core",
+"contains": "06 June 2026"
+},
+{
+"id": "F07",
+"cat": "Family",
+"q": "Who is Sahabuddin?",
+"exp": "haji-core",
+"contains": "Sahabuddin"
+},
+{
+"id": "F08",
+"cat": "Family",
+"q": "Who is Safina Thangam?",
+"exp": "haji-core",
+"contains": "Safina"
+},
+{
+"id": "F09",
+"cat": "Family",
+"q": "Who is Haji named after?",
+"exp": "haji-core",
+"contains": "grandfather"
+},
+{
+"id": "FR01",
+"cat": "Friends",
+"q": "Who is Azees?",
+"exp": "haji-core",
+"contains": "Azees"
+},
+{
+"id": "FR02",
+"cat": "Friends",
+"q": "When is Azees's birthday?",
+"exp": "haji-core",
+"contains": "11 May 2003"
+},
+{
+"id": "FR03",
+"cat": "Friends",
+"q": "Who are Haji's roommates?",
+"exp": "haji-core",
+"contains": "Selva"
+},
+{
+"id": "FR04",
+"cat": "Friends",
+"q": "Who is Kaif?",
+"exp": "haji-core",
+"contains": "Kaif"
+},
+{
+"id": "FR05",
+"cat": "Friends",
+"q": "Who is Haji's business partner?",
+"exp": "haji-core|multi",
+"contains": "Alim"
+},
+{
+"id": "FR06",
+"cat": "Friends",
+"q": "Who is Abul?",
+"exp": "haji-core",
+"contains": "Abul"
+},
+{
+"id": "FR07",
+"cat": "Friends",
+"q": "Where do Haji's roommates live?",
+"exp": "haji-core",
+"contains": "VGN"
+},
+{
+"id": "A01",
+"cat": "AllBee",
+"q": "What is AllBee Solutions?",
+"exp": "allbee",
+"contains": "digital"
+},
+{
+"id": "A02",
+"cat": "AllBee",
+"q": "Who founded AllBee?",
+"exp": "allbee",
+"contains": "Alim"
+},
+{
+"id": "A03",
+"cat": "AllBee",
+"q": "Who is the CEO of AllBee?",
+"exp": "allbee",
+"contains": "Alim"
+},
+{
+"id": "A04",
+"cat": "AllBee",
+"q": "What is Haji's role at AllBee?",
+"exp": "allbee|multi",
+"contains": "CFO"
+},
+{
+"id": "A05",
+"cat": "AllBee",
+"q": "What is Haji's ownership in AllBee?",
+"exp": "allbee|multi",
+"contains": "30"
+},
+{
+"id": "A06",
+"cat": "AllBee",
+"q": "What services does AllBee offer?",
+"exp": "allbee",
+"contains": "Website"
+},
+{
+"id": "A07",
+"cat": "AllBee",
+"q": "What is AllBee's mission?",
+"exp": "allbee",
+"contains": "grow"
+},
+{
+"id": "A08",
+"cat": "AllBee",
+"q": "What projects has AllBee built?",
+"exp": "allbee",
+"contains": "HajiHaz"
+},
+{
+"id": "A09",
+"cat": "AllBee",
+"q": "When was AllBee founded?",
+"exp": "allbee",
+"contains": "2025"
+},
+{
+"id": "A10",
+"cat": "AllBee",
+"q": "Who is Alim?",
+"exp": "allbee",
+"contains": "Alim"
+},
+{
+"id": "S01",
+"cat": "Suplaykart",
+"q": "What is Suplaykart?",
+"exp": "suplaykart",
+"contains": "hyperlocal"
+},
+{
+"id": "S02",
+"cat": "Suplaykart",
+"q": "Who founded Suplaykart?",
+"exp": "suplaykart",
+"contains": "Haji"
+},
+{
+"id": "S03",
+"cat": "Suplaykart",
+"q": "When was Suplaykart founded?",
+"exp": "suplaykart",
+"contains": "01 January 2025"
+},
+{
+"id": "S04",
+"cat": "Suplaykart",
+"q": "Is Suplaykart currently open?",
+"exp": "suplaykart",
+"contains": "closed"
+},
+{
+"id": "S05",
+"cat": "Suplaykart",
+"q": "When will Suplaykart reopen?",
+"exp": "suplaykart",
+"contains": "2027"
+},
+{
+"id": "S06",
+"cat": "Suplaykart",
+"q": "What categories does Suplaykart deliver?",
+"exp": "suplaykart",
+"contains": "FMCG"
+},
+{
+"id": "S07",
+"cat": "Suplaykart",
+"q": "What area does Suplaykart serve?",
+"exp": "suplaykart",
+"contains": "Nagore"
+},
+{
+"id": "S08",
+"cat": "Suplaykart",
+"q": "What is Suplaykart's vision?",
+"exp": "suplaykart",
+"contains": "Tamil Nadu"
+},
+{
+"id": "S09",
+"cat": "Suplaykart",
+"q": "What is Suplaykart modelled on?",
+"exp": "suplaykart",
+"contains": "Blinkit"
+},
+{
+"id": "S10",
+"cat": "Suplaykart",
+"q": "Who is the CEO of Suplaykart?",
+"exp": "suplaykart",
+"contains": "Haji"
+},
+{
+"id": "L01",
+"cat": "Legal",
+"q": "What is Article 21?",
+"exp": "legal",
+"contains": "life"
+},
+{
+"id": "L02",
+"cat": "Legal",
+"q": "Explain Article 14.",
+"exp": "legal",
+"contains": "equality"
+},
+{
+"id": "L03",
+"cat": "Legal",
+"q": "What is Article 19?",
+"exp": "legal",
+"contains": "freedom"
+},
+{
+"id": "L04",
+"cat": "Legal",
+"q": "What does Article 32 provide?",
+"exp": "legal",
+"contains": "remed"
+},
+{
+"id": "L05",
+"cat": "Legal",
+"q": "What is Article 226?",
+"exp": "legal",
+"contains": "writ"
+},
+{
+"id": "L06",
+"cat": "Legal",
+"q": "What is the doctrine of basic structure?",
+"exp": "legal",
+"contains": "basic structure"
+},
+{
+"id": "L07",
+"cat": "Legal",
+"q": "What is judicial review?",
+"exp": "legal",
+"contains": "judicial review"
+},
+{
+"id": "L08",
+"cat": "Legal",
+"q": "What is consideration in contract law?",
+"exp": "legal",
+"contains": "consideration"
+},
+{
+"id": "L09",
+"cat": "Legal",
+"q": "What is the BNS 2023?",
+"exp": "legal",
+"contains": "Bharatiya Nyaya"
+},
+{
+"id": "L10",
+"cat": "Legal",
+"q": "What is a writ petition?",
+"exp": "legal",
+"contains": "writ"
+},
+{
+"id": "L11",
+"cat": "Legal",
+"q": "What is negligence?",
+"exp": "legal",
+"contains": "negligence"
+},
+{
+"id": "L12",
+"cat": "Legal",
+"q": "What are directive principles?",
+"exp": "legal",
+"contains": "Directive Principles"
+},
+{
+"id": "L13",
+"cat": "Legal",
+"q": "Explain tort law.",
+"exp": "legal",
+"contains": "civil wrong"
+},
+{
+"id": "L14",
+"cat": "Legal",
+"q": "IPC vs BNS",
+"exp": "legal",
+"contains": "Bharatiya Nyaya"
+},
+{
+"id": "M01",
+"cat": "Memory",
+"q": "What are Haji's goals?",
+"exp": "memory",
+"contains": "lawyer"
+},
+{
+"id": "M02",
+"cat": "Memory",
+"q": "What is Haji's one-year goal?",
+"exp": "memory",
+"contains": "Suplaykart"
+},
+{
+"id": "M03",
+"cat": "Memory",
+"q": "Is Haji in a relationship?",
+"exp": "memory",
+"contains": "relationship"
+},
+{
+"id": "M04",
+"cat": "Memory",
+"q": "What is Haji's favourite clothing brand?",
+"exp": "memory",
+"contains": "Andamen"
+},
+{
+"id": "M05",
+"cat": "Memory",
+"q": "What personality traits does Haji have?",
+"exp": "memory",
+"contains": "Ambitious"
+},
+{
+"id": "M06",
+"cat": "Memory",
+"q": "What is Haji's ten-year goal?",
+"exp": "memory",
+"contains": "legacy"
+},
+{
+"id": "M07",
+"cat": "Memory",
+"q": "What kind of investor is Haji?",
+"exp": "memory",
+"contains": "investor"
+},
+{
+"id": "M08",
+"cat": "Memory",
+"q": "What does Haji like to eat?",
+"exp": "memory",
+"contains": "Biryani"
+},
+{
+"id": "PR01",
+"cat": "Pronouns",
+"q": "Where does he study?",
+"exp": "haji-core",
+"contains": "LLB",
+"prior": [
+"who is haji"
+]
+},
+{
+"id": "PR02",
+"cat": "Pronouns",
+"q": "What is his goal?",
+"exp": "haji-core",
+"contains": "Lawyer",
+"prior": [
+"who is haji"
+]
+},
+{
+"id": "PR03",
+"cat": "Pronouns",
+"q": "Who founded it?",
+"exp": "allbee",
+"contains": "Alim",
+"prior": [
+"what is allbee"
+]
+},
+{
+"id": "PR04",
+"cat": "Pronouns",
+"q": "When did it reopen?",
+"exp": "suplaykart",
+"contains": "2027",
+"prior": [
+"is suplaykart open"
+]
+},
+{
+"id": "PR05",
+"cat": "Pronouns",
+"q": "What is his role?",
+"exp": "allbee",
+"contains": "CFO",
+"prior": [
+"who is haji",
+"tell me about alim"
+]
+},
+{
+"id": "PR06",
+"cat": "Pronouns",
+"q": "Who is his father?",
+"exp": "haji-core",
+"contains": "Hussain",
+"prior": [
+"who is haji"
+]
+},
+{
+"id": "PR07",
+"cat": "Pronouns",
+"q": "What does that company do?",
+"exp": "allbee",
+"contains": "digital",
+"prior": [
+"what is allbee"
+]
+},
+{
+"id": "PR08",
+"cat": "Pronouns",
+"q": "What does it deliver?",
+"exp": "suplaykart",
+"contains": "FMCG",
+"prior": [
+"what is suplaykart"
+]
+},
+{
+"id": "PR09",
+"cat": "Pronouns",
+"q": "What is her occupation?",
+"exp": "haji-core",
+"contains": "Housewife",
+"prior": [
+"who is shehnaz"
+]
+},
+{
+"id": "PR10",
+"cat": "Pronouns",
+"q": "When did she marry?",
+"exp": "haji-core",
+"contains": "2026",
+"prior": [
+"tell me about hidhayaa"
+]
+},
+{
+"id": "MB01",
+"cat": "Multi",
+"q": "Compare AllBee and Suplaykart.",
+"exp": "multi"
+},
+{
+"id": "MB02",
+"cat": "Multi",
+"q": "What businesses does Haji own?",
+"exp": "multi"
+},
+{
+"id": "MB03",
+"cat": "Multi",
+"q": "What companies does Haji own?",
+"exp": "multi"
+},
+{
+"id": "MB04",
+"cat": "Multi",
+"q": "What connects Haji and Alim?",
+"exp": "multi"
+},
+{
+"id": "MB05",
+"cat": "Multi",
+"q": "List Haji's startups.",
+"exp": "multi"
+},
+{
+"id": "MB06",
+"cat": "Multi",
+"q": "Tell me about Haji's ventures.",
+"exp": "multi"
+},
+{
+"id": "MB07",
+"cat": "Multi",
+"q": "How are Alim and Suplaykart related?",
+"exp": "multi"
+},
+{
+"id": "MB08",
+"cat": "Multi",
+"q": "Difference between AllBee and Suplaykart?",
+"exp": "multi"
+},
+{
+"id": "AM01",
+"cat": "Ambiguous",
+"q": "founder",
+"exp": "clarify"
+},
+{
+"id": "AM02",
+"cat": "Ambiguous",
+"q": "ceo",
+"exp": "clarify"
+},
+{
+"id": "AM03",
+"cat": "Ambiguous",
+"q": "ownership",
+"exp": "clarify"
+},
+{
+"id": "AM04",
+"cat": "Ambiguous",
+"q": "who is the founder",
+"exp": "clarify"
+},
+{
+"id": "AM05",
+"cat": "Ambiguous",
+"q": "what is the mission",
+"exp": "clarify"
+},
+{
+"id": "AM06",
+"cat": "Ambiguous",
+"q": "when was it founded",
+"exp": "clarify"
+},
+{
+"id": "AM07",
+"cat": "Ambiguous",
+"q": "what is the vision",
+"exp": "clarify"
+},
+{
+"id": "AM08",
+"cat": "Ambiguous",
+"q": "tell me about the company",
+"exp": "clarify"
+},
+{
+"id": "T01",
+"cat": "Typos",
+"q": "Who is hajij?",
+"exp": "haji-core",
+"contains": "Syed"
+},
+{
+"id": "T02",
+"cat": "Typos",
+"q": "Who is alimm?",
+"exp": "allbee",
+"contains": "Alim"
+},
+{
+"id": "T03",
+"cat": "Typos",
+"q": "Who is safna?",
+"exp": "haji-core",
+"contains": "Safina"
+},
+{
+"id": "T04",
+"cat": "Typos",
+"q": "What is suplaykrt?",
+"exp": "suplaykart",
+"contains": "hyperlocal"
+},
+{
+"id": "T05",
+"cat": "Typos",
+"q": "What is allbe?",
+"exp": "allbee",
+"contains": "digital"
+},
+{
+"id": "T06",
+"cat": "Typos",
+"q": "Who is shenaz?",
+"exp": "haji-core",
+"contains": "Shehnaz"
+},
+{
+"id": "T07",
+"cat": "Typos",
+"q": "What is artical 21?",
+"exp": "legal|clarify",
+"contains": "life"
+},
+{
+"id": "T08",
+"cat": "Typos",
+"q": "What is suplykart?",
+"exp": "suplaykart",
+"contains": "hyperlocal"
+}
+]
