@@ -14,7 +14,10 @@
     "db:studio": "drizzle-kit studio",
     "seed:admin": "node --env-file=.env.local scripts/seed-admin.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "predeploy-check": "bash scripts/predeploy.sh",
+    "quality:report": "tsx scripts/quality-report.mts",
+    "quality:report:monthly": "tsx scripts/quality-report.mts --monthly"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",

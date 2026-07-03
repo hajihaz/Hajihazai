@@ -286,13 +286,20 @@ export default function AdminPortal() {
   type QualityDash = {
     rangeDays: number;
     totalTurns: number;
-    overall: { helpfulPct: number | null; ratedCount: number; clarificationPct: number; zeroResultPct: number; avgLatencyMs: number | null };
-    weeks: Array<{ weekStart: string; turns: number; helpfulPct: number | null; ratedCount: number; clarificationPct: number; zeroResultPct: number; avgLatencyMs: number | null }>;
+    overall: { helpfulPct: number | null; ratedCount: number; clarificationPct: number; zeroResultPct: number; avgLatencyMs: number | null; qualityScore: number | null };
+    weeks: Array<{ weekStart: string; turns: number; helpfulPct: number | null; ratedCount: number; clarificationPct: number; zeroResultPct: number; avgLatencyMs: number | null; qualityScore: number | null }>;
     topDislikedQueries: string[];
     topMissingAreas: string[];
     mostUsedBrains: Array<{ brain: string; count: number }>;
   };
+  type QualityExtras = {
+    backlog: Array<{ query: string; frequency: number; suggestedBrain: string; suggestedTitle: string; priority: string }>;
+    recommendations: Array<{ topic: string; suggestedBrain: string; suggestedTitle: string; reason: string }>;
+    feedbackAnalysis: { totalDisliked: number; ranked: Array<{ category: string; count: number; examples: string[] }> };
+    brainHealth: Array<{ brain: string; docs: number; chunks: number; embeddedPct: number; retrievals: number; zeroResultPct: number; avgDocsRetrieved: number | null; status: string; statusReason: string }>;
+  };
   const [quality, setQuality] = useState<QualityDash | null>(null);
+  const [qualityExtras, setQualityExtras] = useState<QualityExtras | null>(null);
 
   /* notifications */
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
@@ -478,7 +485,11 @@ export default function AdminPortal() {
 
   async function loadQuality() {
     const res = await fetch("/api/admin/quality");
-    if (res.ok) { const d = await res.json().catch(() => null); setQuality(d?.dashboard ?? null); }
+    if (res.ok) {
+      const d = await res.json().catch(() => null);
+      setQuality(d?.dashboard ?? null);
+      setQualityExtras(d ? { backlog: d.backlog ?? [], recommendations: d.recommendations ?? [], feedbackAnalysis: d.feedbackAnalysis ?? { totalDisliked: 0, ranked: [] }, brainHealth: d.brainHealth ?? [] } : null);
+    }
   }
 
   async function loadTab(tab: DataTab) {
@@ -1619,8 +1630,9 @@ export default function AdminPortal() {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                 {[
+                  { label: "Quality score (0–100)", value: quality.overall.qualityScore != null ? `${quality.overall.qualityScore}` : "—" },
                   { label: `Helpful % (${quality.overall.ratedCount} rated)`, value: quality.overall.helpfulPct != null ? `${quality.overall.helpfulPct}%` : "—" },
                   { label: "Clarification rate", value: `${quality.overall.clarificationPct}%` },
                   { label: "Zero-result rate", value: `${quality.overall.zeroResultPct}%` },
@@ -1639,6 +1651,7 @@ export default function AdminPortal() {
                     <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
                       <th className="px-3 py-2">Week of</th>
                       <th className="px-3 py-2 text-right">Turns</th>
+                      <th className="px-3 py-2 text-right">Score</th>
                       <th className="px-3 py-2 text-right">Helpful %</th>
                       <th className="px-3 py-2 text-right">Clarify %</th>
                       <th className="px-3 py-2 text-right">Zero-result %</th>
@@ -1647,12 +1660,13 @@ export default function AdminPortal() {
                   </thead>
                   <tbody>
                     {quality.weeks.length === 0 ? (
-                      <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">No data yet — metrics appear as conversations happen.</td></tr>
+                      <tr><td colSpan={7} className="px-3 py-4 text-center text-muted-foreground">No data yet — metrics appear as conversations happen.</td></tr>
                     ) : (
                       quality.weeks.map((w) => (
                         <tr key={w.weekStart} className="border-b last:border-0">
                           <td className="px-3 py-2 font-medium">{w.weekStart}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{w.turns}</td>
+                          <td className="px-3 py-2 text-right font-semibold tabular-nums">{w.qualityScore ?? "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{w.helpfulPct != null ? `${w.helpfulPct}% (${w.ratedCount})` : "—"}</td>
                           <td className="px-3 py-2 text-right tabular-nums">{w.clarificationPct}%</td>
                           <td className="px-3 py-2 text-right tabular-nums">{w.zeroResultPct}%</td>
@@ -1705,6 +1719,86 @@ export default function AdminPortal() {
                   )}
                 </div>
               </div>
+
+              {/* Brain health (Phase 4) */}
+              {qualityExtras && (
+                <div className="overflow-x-auto rounded-xl border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                        <th className="px-3 py-2">Brain</th>
+                        <th className="px-3 py-2 text-right">Docs</th>
+                        <th className="px-3 py-2 text-right">Chunks</th>
+                        <th className="px-3 py-2 text-right">Embedded</th>
+                        <th className="px-3 py-2 text-right">Retrievals</th>
+                        <th className="px-3 py-2 text-right">Zero %</th>
+                        <th className="px-3 py-2 text-right">Avg docs/turn</th>
+                        <th className="px-3 py-2">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {qualityExtras.brainHealth.map((b) => (
+                        <tr key={b.brain} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-medium capitalize">{b.brain}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{b.docs}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{b.chunks}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{b.embeddedPct}%</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{b.retrievals}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{b.zeroResultPct}%</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{b.avgDocsRetrieved ?? "—"}</td>
+                          <td className="px-3 py-2">
+                            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${b.status === "healthy" ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : b.status === "warning" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400" : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400"}`}>
+                              {b.status === "healthy" ? "Healthy" : b.status === "warning" ? "Warning" : "Needs Review"}
+                            </span>
+                            <span className="ml-2 text-xs text-muted-foreground">{b.statusReason}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Knowledge backlog (Phase 2) + 👎 categorization (Phase 6) */}
+              {qualityExtras && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-xl border p-4">
+                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Knowledge backlog (3+ zero-result queries)</p>
+                    {qualityExtras.backlog.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Empty — no recurring unanswered query.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {qualityExtras.backlog.map((b) => (
+                          <li key={b.query} className="text-sm">
+                            <button onClick={() => createDocFromQuery(b.suggestedTitle)} className="text-left text-primary hover:underline">{b.suggestedTitle}</button>
+                            <p className="text-xs text-muted-foreground">
+                              &ldquo;{b.query}&rdquo; · {b.frequency}× · brain: {b.suggestedBrain} · <span className={b.priority === "high" ? "font-semibold text-destructive" : ""}>{b.priority}</span>
+                            </p>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="rounded-xl border p-4">
+                    <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">👎 categorization ({qualityExtras.feedbackAnalysis.totalDisliked} total)</p>
+                    {qualityExtras.feedbackAnalysis.ranked.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">No 👎 feedback yet.</p>
+                    ) : (
+                      <ul className="space-y-2">
+                        {qualityExtras.feedbackAnalysis.ranked.map((r) => (
+                          <li key={r.category} className="text-sm">
+                            <span className="font-medium">{r.category}</span>
+                            <span className="ml-2 tabular-nums text-muted-foreground">×{r.count}</span>
+                            {r.examples.length > 0 && (
+                              <p className="truncate text-xs text-muted-foreground">e.g. {r.examples.slice(0, 2).join(" · ")}</p>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              )}
             </>
           )}
         </section>

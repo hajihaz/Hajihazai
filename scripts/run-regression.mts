@@ -79,6 +79,12 @@ for (const t of Q) {
   }
   if (grade === "A") A++; else if (grade === "C") C++; else { D++; fails.push(`${t.id} [${t.cat}] "${t.q}" → ${note}`); }
 }
-console.log(`GRADES: A=${A} C=${C} D=${D} (of ${Q.length}); A%=${(100 * A / Q.length).toFixed(1)} — targets A>=95, D=0`);
-if (fails.length) { console.log("FAILURES:"); for (const f of fails) console.log("  " + f); process.exit(1); }
-console.log("PASS — no failures.");
+const aPct = (100 * A) / Q.length;
+console.log(`GRADES: A=${A} C=${C} D=${D} (of ${Q.length}); A%=${aPct.toFixed(1)} — gates: A>=95%, D=0`);
+if (fails.length) { console.log("FAILURES:"); for (const f of fails) console.log("  " + f); }
+// Deployment gate (Phase 7): block when A-grade < 95% OR any D-grade exists.
+if (D > 0 || aPct < 95) {
+  console.error(`\n❌ DEPLOYMENT GATE FAILED — ${D > 0 ? `${D} D-grade(s)` : ""}${D > 0 && aPct < 95 ? " and " : ""}${aPct < 95 ? `A=${aPct.toFixed(1)}% < 95%` : ""}. Do not deploy.`);
+  process.exit(1);
+}
+console.log("✅ DEPLOYMENT GATE PASSED (A>=95%, D=0).");
