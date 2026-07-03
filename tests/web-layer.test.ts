@@ -1,8 +1,9 @@
 /** Live-web layer — classification, trusted-source ranking, cache (pure). */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { classifyQuery } from "@/lib/web/classify";
 import { rankAndFilter, tierOf, hostOf, type WebResult } from "@/lib/web/sources";
 import { cacheKindFor, getCached, setCached, resetCache, TTL_MS } from "@/lib/web/cache";
+import { hasProductionGradeProvider, activeProvider } from "@/lib/web/search";
 
 describe("classifyQuery", () => {
   it("routes live/real-time questions to web", () => {
@@ -54,6 +55,25 @@ describe("trusted sources", () => {
   });
   it("hostOf strips www", () => {
     expect(hostOf("https://www.thehindu.com/a")).toBe("thehindu.com");
+  });
+});
+
+describe("production provider gate", () => {
+  const saved = { t: process.env.TAVILY_API_KEY, b: process.env.BRAVE_SEARCH_API_KEY, s: process.env.SERPER_API_KEY };
+  afterEach(() => {
+    if (saved.t === undefined) delete process.env.TAVILY_API_KEY; else process.env.TAVILY_API_KEY = saved.t;
+    if (saved.b === undefined) delete process.env.BRAVE_SEARCH_API_KEY; else process.env.BRAVE_SEARCH_API_KEY = saved.b;
+    if (saved.s === undefined) delete process.env.SERPER_API_KEY; else process.env.SERPER_API_KEY = saved.s;
+  });
+  it("keyless → not production-grade, provider is duckduckgo", () => {
+    delete process.env.TAVILY_API_KEY; delete process.env.BRAVE_SEARCH_API_KEY; delete process.env.SERPER_API_KEY;
+    expect(hasProductionGradeProvider()).toBe(false);
+    expect(activeProvider()).toBe("duckduckgo");
+  });
+  it("any API key → production-grade", () => {
+    process.env.TAVILY_API_KEY = "test-key";
+    expect(hasProductionGradeProvider()).toBe(true);
+    expect(activeProvider()).toBe("tavily");
   });
 });
 

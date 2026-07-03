@@ -295,7 +295,7 @@ export default function AdminPortal() {
 
   /* web search (Phase 7) */
   type WebStatus = {
-    enabled: boolean; provider: string; lastSearchAt: number | null;
+    enabled: boolean; provider: string; productionGrade?: boolean; active?: boolean; lastSearchAt: number | null;
     cache: { entries: number; hits: number; misses: number; hitRate: number; byKind: Record<string, number> };
   };
   const [webStatus, setWebStatus] = useState<WebStatus | null>(null);
@@ -1423,6 +1423,13 @@ export default function AdminPortal() {
                   </div>
                 ))}
               </div>
+            )}
+            {webStatus && webStatus.productionGrade === false && (
+              <p className="mt-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+                ⚠️ No search API key configured — live web search is <strong>inactive in production</strong> until
+                you add <code>TAVILY_API_KEY</code> (or <code>BRAVE_SEARCH_API_KEY</code> / <code>SERPER_API_KEY</code>)
+                to the environment. The keyless provider is used in development only.
+              </p>
             )}
           </div>
         </section>

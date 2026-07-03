@@ -14,7 +14,7 @@ import { isAdmin } from "@/lib/auth/admin";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { isMaintenanceMode, isWebSearchEnabled } from "@/lib/system-settings";
 import { classifyQuery } from "@/lib/web/classify";
-import { webSearch } from "@/lib/web/search";
+import { webSearch, isWebProviderReady } from "@/lib/web/search";
 import { renderWebContext, WEB_UNAVAILABLE_NOTE } from "@/lib/web/render";
 import { isKnowledgeWritePermitted } from "@/lib/admin/queries";
 import { routeToBrain, type BrainMode } from "@/lib/ai/brain-router";
@@ -182,7 +182,11 @@ export async function POST(req: Request) {
 
   // Live-web layer (additive) — classify intent. "internal" leaves every existing
   // path untouched; "web"/"hybrid" also fetch live results (Phase 2 below).
-  const webIntent = webEnabled && wantRetrieval ? classifyQuery(retrievalQuery) : "internal";
+  // isWebProviderReady(): production requires a real search API key (Tavily /
+  // Brave / Serper); the keyless DuckDuckGo scraper is dev-only. Without a key
+  // in production the layer is inert and every query stays internal.
+  const webIntent =
+    webEnabled && isWebProviderReady() && wantRetrieval ? classifyQuery(retrievalQuery) : "internal";
 
   if (!convo) {
     return new Response("Not found", { status: 404 });

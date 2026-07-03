@@ -22,6 +22,24 @@ export function activeProvider(): "tavily" | "brave" | "serper" | "duckduckgo" {
   return "duckduckgo";
 }
 
+/**
+ * True when a production-grade search API (Tavily / Brave / Serper) is
+ * configured. The keyless DuckDuckGo scraper is a dev/local convenience only —
+ * it rate-limits under real traffic and must NOT be production's sole provider.
+ */
+export function hasProductionGradeProvider(): boolean {
+  return !!(process.env.TAVILY_API_KEY || process.env.BRAVE_SEARCH_API_KEY || process.env.SERPER_API_KEY);
+}
+
+/**
+ * Whether the web layer may run in this environment: always in dev/preview
+ * (keyless fallback is fine for testing); in production ONLY with a real
+ * search API key. Without one, every query follows the existing internal path.
+ */
+export function isWebProviderReady(): boolean {
+  return hasProductionGradeProvider() || process.env.NODE_ENV !== "production";
+}
+
 async function fetchWithTimeout(url: string, init?: RequestInit): Promise<Response> {
   const ctrl = new AbortController();
   const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
