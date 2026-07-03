@@ -12,7 +12,10 @@ import { resolveLevel, isLevel, isLevelEnabled } from "@/lib/ai/levels";
 import { isModelUsable } from "@/lib/ai/health";
 import { isAdmin } from "@/lib/auth/admin";
 import { rateLimitResponse } from "@/lib/ratelimit";
-import { isMaintenanceMode } from "@/lib/system-settings";
+import { isMaintenanceMode, isWebSearchEnabled } from "@/lib/system-settings";
+import { classifyQuery } from "@/lib/web/classify";
+import { webSearch } from "@/lib/web/search";
+import { renderWebContext, WEB_UNAVAILABLE_NOTE } from "@/lib/web/render";
 import { isKnowledgeWritePermitted } from "@/lib/admin/queries";
 import { routeToBrain, type BrainMode } from "@/lib/ai/brain-router";
 import { getBrainBySlug } from "@/lib/db/brain-queries";
@@ -159,7 +162,7 @@ export async function POST(req: Request) {
     /\b(remember|save|update|store|add|don'?t forget)\b.{0,40}\b(this|that|it|knowledge|memory|information|info)\b/i;
   const hasWriteIntent = !admin && WRITE_INTENT_RE.test(message) && !!session.user.email;
 
-  const [convo, memory, tool, brainForSmart, writePermitted] = await Promise.all([
+  const [convo, memory, tool, brainForSmart, writePermitted, webEnabled] = await Promise.all([
     getConversation(session.user.id, conversationId),
     wantRetrieval
       ? buildMemoryContext(session.user.id, { query: retrievalQuery }).catch((err) => {
@@ -174,7 +177,12 @@ export async function POST(req: Request) {
     hasWriteIntent
       ? isKnowledgeWritePermitted(session.user.email!).catch(() => false)
       : Promise.resolve(true),
+    isWebSearchEnabled().catch(() => true),
   ]);
+
+  // Live-web layer (additive) — classify intent. "internal" leaves every existing
+  // path untouched; "web"/"hybrid" also fetch live results (Phase 2 below).
+  const webIntent = webEnabled && wantRetrieval ? classifyQuery(retrievalQuery) : "internal";
 
   if (!convo) {
     return new Response("Not found", { status: 404 });
@@ -206,7 +214,7 @@ export async function POST(req: Request) {
   // ── Phase 2: parallel lookups that depend on convo.projectId + brainId ──
   // addMessage also runs here — ownership is confirmed above, and Phase 2
   // completes before streaming starts so userMsg is available for the SSE event.
-  const [project, knowledge, history, userMsgResult] = await Promise.all([
+  const [project, knowledge, history, userMsgResult, web] = await Promise.all([
     projectId ? getProject(session.user.id, projectId) : Promise.resolve(null),
     wantKnowledge
       ? (isMulti
@@ -227,6 +235,14 @@ export async function POST(req: Request) {
     listRecentMessages(conversationId, 40),
     !debug && !regenerate
       ? addMessage({ conversationId, role: "user", content: message })
+      : Promise.resolve(null),
+    // Live-web fetch (Phase 2) — runs in parallel with knowledge retrieval, only
+    // for web/hybrid intents. Never throws (Phase 8 fallback on empty/error).
+    webIntent !== "internal"
+      ? webSearch(retrievalQuery, 5).catch((err) => {
+          console.warn("[chat] web search failed:", err);
+          return { results: [], provider: "none", cached: false };
+        })
       : Promise.resolve(null),
   ]);
 
@@ -269,6 +285,17 @@ export async function POST(req: Request) {
     ? "SYSTEM NOTICE: This user does NOT have permission to update system knowledge. If they ask you to save, remember, update, or store any information to your knowledge base or memory, respond with: \"You do not have permission to update system knowledge. Please contact an admin.\" Do not pretend to save anything."
     : "";
 
+  // Live-web context (Phases 4/5/8). "web" → answer from the web (suppress the
+  // internal knowledge/clarify blocks below); "hybrid" → include both, with the
+  // internal knowledge authoritative. Empty results → fallback disclaimer.
+  const isPureWeb = webIntent === "web";
+  const webBlock =
+    webIntent !== "internal"
+      ? web && web.results.length > 0
+        ? renderWebContext(web.results, webIntent)
+        : WEB_UNAVAILABLE_NOTE
+      : "";
+
   // Build the conversation turns so the CURRENT message is always the final user
   // turn. Previously this relied on listRecentMessages() (which races the parallel
   // addMessage write) and only appended the current message in debug mode, so in
@@ -308,10 +335,13 @@ export async function POST(req: Request) {
       ? [{ role: "system" as const, content: `Project instructions:\n${projectInstructions}` }]
       : []),
     ...(memory.block ? [{ role: "system" as const, content: memory.block }] : []),
-    ...(knowledge.block ? [{ role: "system" as const, content: knowledge.block }] : []),
+    // Pure-web queries suppress internal knowledge + the clarify hint (the query
+    // is a live/external one the router can't place); hybrid keeps both.
+    ...(knowledge.block && !isPureWeb ? [{ role: "system" as const, content: knowledge.block }] : []),
     ...(toolBlock ? [{ role: "system" as const, content: toolBlock }] : []),
     ...(writeIntentBlock ? [{ role: "system" as const, content: writeIntentBlock }] : []),
-    ...(clarifyBlock ? [{ role: "system" as const, content: clarifyBlock }] : []),
+    ...(clarifyBlock && !isPureWeb ? [{ role: "system" as const, content: clarifyBlock }] : []),
+    ...(webBlock ? [{ role: "system" as const, content: webBlock }] : []),
     ...(digestBlock ? [{ role: "system" as const, content: digestBlock }] : []),
     ...historyMessages,
   ];

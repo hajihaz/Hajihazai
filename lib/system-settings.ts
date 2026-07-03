@@ -51,3 +51,15 @@ export async function getMaintenanceMessage(): Promise<string> {
 export async function setMaintenanceMessage(message: string): Promise<void> {
   await setSetting("maintenance_message", message);
 }
+
+/* -------------------- Live web search (Phase 7 toggle) -------------------- */
+
+/** Web search is ON by default; admins can disable it. */
+export async function isWebSearchEnabled(): Promise<boolean> {
+  const val = await getSetting("web_search_enabled").catch(() => null);
+  return val !== "false"; // default enabled
+}
+
+export async function setWebSearchEnabled(enabled: boolean): Promise<void> {
+  await setSetting("web_search_enabled", enabled ? "true" : "false");
+}

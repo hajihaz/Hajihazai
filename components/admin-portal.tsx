@@ -293,6 +293,13 @@ export default function AdminPortal() {
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [maintenanceSaving, setMaintenanceSaving] = useState(false);
 
+  /* web search (Phase 7) */
+  type WebStatus = {
+    enabled: boolean; provider: string; lastSearchAt: number | null;
+    cache: { entries: number; hits: number; misses: number; hitRate: number; byKind: Record<string, number> };
+  };
+  const [webStatus, setWebStatus] = useState<WebStatus | null>(null);
+
   /* health */
   const [health, setHealth] = useState<HealthData | null>(null);
   const [healthLoading, setHealthLoading] = useState(false);
@@ -365,6 +372,19 @@ export default function AdminPortal() {
     const d = await res.json().catch(() => ({}));
     setMaintenance(d);
     setMaintenanceMessage(d.message ?? "");
+    void loadWebStatus();
+  }
+
+  async function loadWebStatus() {
+    const res = await fetch("/api/admin/web-search");
+    if (res.ok) setWebStatus(await res.json().catch(() => null));
+  }
+
+  async function toggleWebSearch(enabled: boolean) {
+    const res = await fetch("/api/admin/web-search", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ enabled }),
+    });
+    if (res.ok) void loadWebStatus();
   }
 
   async function loadHealth() {
@@ -1370,6 +1390,41 @@ export default function AdminPortal() {
               </div>
             </div>
           )}
+
+          {/* Web Search settings (Phase 7) */}
+          <div className="mt-6 rounded-xl border p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Live Web Search</h3>
+                <p className="text-xs text-muted-foreground">
+                  Answers current/real-time questions (news, prices, weather, office-holders) from the web.
+                </p>
+              </div>
+              {webStatus && (
+                <button
+                  onClick={() => toggleWebSearch(!webStatus.enabled)}
+                  className={`min-h-9 shrink-0 rounded-lg px-4 text-sm font-medium ${webStatus.enabled ? "bg-green-600 text-white" : "bg-muted text-foreground"}`}
+                >
+                  {webStatus.enabled ? "ON" : "OFF"}
+                </button>
+              )}
+            </div>
+            {webStatus && (
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: "Provider", value: webStatus.provider },
+                  { label: "Cache entries", value: webStatus.cache.entries },
+                  { label: "Cache hit rate", value: `${Math.round(webStatus.cache.hitRate * 100)}%` },
+                  { label: "Last search", value: webStatus.lastSearchAt ? new Date(webStatus.lastSearchAt).toLocaleTimeString() : "—" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-lg border p-2 text-center">
+                    <p className="text-sm font-semibold tabular-nums">{typeof value === "number" ? value.toLocaleString() : value}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </section>
       )}
 
