@@ -340,6 +340,10 @@ export function computeKnowledgeGaps(events: RetrievalEvent[], lowConfidenceThre
 
 /* ------------------------------- DB reader ------------------------------- */
 
+export async function loadRetrievalEvents(days: number, limit = 5000): Promise<RetrievalEvent[]> {
+  return loadEvents(days, limit);
+}
+
 async function loadEvents(days: number, limit: number): Promise<RetrievalEvent[]> {
   const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
   const rows = await db

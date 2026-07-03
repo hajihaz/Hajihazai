@@ -18,7 +18,8 @@ type DataTab =
   | "maintenance"
   | "health"
   | "knowledge-gaps"
-  | "query-tester";
+  | "query-tester"
+  | "quality";
 
 type NotificationRow = {
   id: string;
@@ -281,6 +282,18 @@ export default function AdminPortal() {
   const [qtResult, setQtResult] = useState<QueryTest | null>(null);
   const [qtLoading, setQtLoading] = useState(false);
 
+  /* weekly quality dashboard (observability sprint) */
+  type QualityDash = {
+    rangeDays: number;
+    totalTurns: number;
+    overall: { helpfulPct: number | null; ratedCount: number; clarificationPct: number; zeroResultPct: number; avgLatencyMs: number | null };
+    weeks: Array<{ weekStart: string; turns: number; helpfulPct: number | null; ratedCount: number; clarificationPct: number; zeroResultPct: number; avgLatencyMs: number | null }>;
+    topDislikedQueries: string[];
+    topMissingAreas: string[];
+    mostUsedBrains: Array<{ brain: string; count: number }>;
+  };
+  const [quality, setQuality] = useState<QualityDash | null>(null);
+
   /* notifications */
   const [notifications, setNotifications] = useState<NotificationRow[]>([]);
   const [notifTitle, setNotifTitle] = useState("");
@@ -463,10 +476,16 @@ export default function AdminPortal() {
     setFVisibility("global");
   }
 
+  async function loadQuality() {
+    const res = await fetch("/api/admin/quality");
+    if (res.ok) { const d = await res.json().catch(() => null); setQuality(d?.dashboard ?? null); }
+  }
+
   async function loadTab(tab: DataTab) {
     setDataTab(tab);
     if (tab === "knowledge") { void loadKnowledge(); return; }
     if (tab === "knowledge-gaps") { void loadGaps(); return; }
+    if (tab === "quality") { void loadQuality(); return; }
     if (tab === "query-tester") { return; }
     if (tab === "brains") { void loadBrains(); return; }
     if (tab === "users") { void loadUsers(1, ""); setUserSearch(""); setUserSearchInput(""); return; }
@@ -969,10 +988,11 @@ export default function AdminPortal() {
 
       {/* Data tab bar */}
       <div className="mb-0 flex gap-0 overflow-x-auto border-b">
-        {(["users", "projects", "documents", "knowledge", "knowledge-gaps", "query-tester", "brains", "blocked-emails", "knowledge-permissions", "audit-log", "notifications", "maintenance", "health"] as DataTab[]).map((t) => (
+        {(["users", "projects", "documents", "knowledge", "knowledge-gaps", "quality", "query-tester", "brains", "blocked-emails", "knowledge-permissions", "audit-log", "notifications", "maintenance", "health"] as DataTab[]).map((t) => (
           <button key={t} onClick={() => loadTab(t)} className={tabBtn(dataTab === t)}>
             {t === "knowledge" ? "Knowledge Base"
               : t === "knowledge-gaps" ? "Knowledge Gaps"
+              : t === "quality" ? "Quality"
               : t === "query-tester" ? "Query Tester"
               : t === "blocked-emails" ? "Blocked Emails"
               : t === "knowledge-permissions" ? "K. Permissions"
@@ -1574,6 +1594,116 @@ export default function AdminPortal() {
                     ))}
                   </div>
                 )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {/* ── Quality tab (observability sprint) ── */}
+      {dataTab === "quality" && (
+        <section className="mt-4 space-y-5">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm text-muted-foreground">
+              Real-world answer quality per week{quality ? ` — last ${quality.rangeDays} days, ${quality.totalTurns.toLocaleString()} turns` : ""}.
+            </p>
+            <a
+              href="/api/admin/export/quality"
+              className="shrink-0 rounded-lg border px-3 py-1.5 text-sm hover:bg-accent"
+              download
+            >
+              Export CSV
+            </a>
+          </div>
+          {!quality ? (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: `Helpful % (${quality.overall.ratedCount} rated)`, value: quality.overall.helpfulPct != null ? `${quality.overall.helpfulPct}%` : "—" },
+                  { label: "Clarification rate", value: `${quality.overall.clarificationPct}%` },
+                  { label: "Zero-result rate", value: `${quality.overall.zeroResultPct}%` },
+                  { label: "Avg latency", value: quality.overall.avgLatencyMs != null ? `${quality.overall.avgLatencyMs} ms` : "—" },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-xl border p-3 text-center">
+                    <p className="text-xl font-semibold tabular-nums">{value}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="overflow-x-auto rounded-xl border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/40 text-left text-xs uppercase text-muted-foreground">
+                      <th className="px-3 py-2">Week of</th>
+                      <th className="px-3 py-2 text-right">Turns</th>
+                      <th className="px-3 py-2 text-right">Helpful %</th>
+                      <th className="px-3 py-2 text-right">Clarify %</th>
+                      <th className="px-3 py-2 text-right">Zero-result %</th>
+                      <th className="px-3 py-2 text-right">Avg latency</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {quality.weeks.length === 0 ? (
+                      <tr><td colSpan={6} className="px-3 py-4 text-center text-muted-foreground">No data yet — metrics appear as conversations happen.</td></tr>
+                    ) : (
+                      quality.weeks.map((w) => (
+                        <tr key={w.weekStart} className="border-b last:border-0">
+                          <td className="px-3 py-2 font-medium">{w.weekStart}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{w.turns}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{w.helpfulPct != null ? `${w.helpfulPct}% (${w.ratedCount})` : "—"}</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{w.clarificationPct}%</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{w.zeroResultPct}%</td>
+                          <td className="px-3 py-2 text-right tabular-nums">{w.avgLatencyMs != null ? `${w.avgLatencyMs} ms` : "—"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-xl border p-4">
+                  <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Top disliked queries (👎)</p>
+                  {quality.topDislikedQueries.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No 👎 feedback yet.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {quality.topDislikedQueries.map((q, i) => (
+                        <li key={`${q}-${i}`} className="truncate text-sm">{q}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded-xl border p-4">
+                  <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Top missing knowledge areas</p>
+                  {quality.topMissingAreas.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">Nothing outstanding.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {quality.topMissingAreas.map((q, i) => (
+                        <li key={`${q}-${i}`} className="truncate text-sm">{q}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                <div className="rounded-xl border p-4">
+                  <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Most-used brains</p>
+                  {quality.mostUsedBrains.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No data yet.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {quality.mostUsedBrains.map((b) => (
+                        <li key={b.brain} className="flex justify-between text-sm">
+                          <span className="capitalize">{b.brain}</span>
+                          <span className="tabular-nums text-muted-foreground">{b.count}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </>
           )}
