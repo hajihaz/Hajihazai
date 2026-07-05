@@ -13,9 +13,17 @@ import { isModelUsable } from "@/lib/ai/health";
 import { isAdmin } from "@/lib/auth/admin";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { isMaintenanceMode, isWebSearchEnabled } from "@/lib/system-settings";
-import { classifyQuery } from "@/lib/web/classify";
-import { webSearch, isWebProviderReady } from "@/lib/web/search";
-import { renderWebContext, WEB_UNAVAILABLE_NOTE } from "@/lib/web/render";
+import { classifyQuery, extractUrl, type WebIntent } from "@/lib/web/classify";
+import { webSearch } from "@/lib/web/search";
+import { fetchWebsite, type WebsiteFetchResult } from "@/lib/web/fetch-url";
+import { decideGate } from "@/lib/web/verify";
+import {
+  renderWebContext,
+  WEB_UNAVAILABLE_NOTE,
+  renderWebsiteContent,
+  verificationFailedMessage,
+  websiteFetchFailedMessage,
+} from "@/lib/web/render";
 import { isKnowledgeWritePermitted } from "@/lib/admin/queries";
 import { routeToBrain, type BrainMode } from "@/lib/ai/brain-router";
 import { getBrainBySlug } from "@/lib/db/brain-queries";
@@ -180,13 +188,17 @@ export async function POST(req: Request) {
     isWebSearchEnabled().catch(() => true),
   ]);
 
-  // Live-web layer (additive) — classify intent. "internal" leaves every existing
-  // path untouched; "web"/"hybrid" also fetch live results (Phase 2 below).
-  // isWebProviderReady(): production requires a real search API key (Tavily /
-  // Brave / Serper); the keyless DuckDuckGo scraper is dev-only. Without a key
-  // in production the layer is inert and every query stays internal.
-  const webIntent =
-    webEnabled && isWebProviderReady() && wantRetrieval ? classifyQuery(retrievalQuery) : "internal";
+  // Live-web layer — classify intent. "internal" leaves every existing path
+  // untouched; "web"/"hybrid" fetch live results and "website" fetches a page
+  // (Phase 2 below), after which the verification gate decides answer-vs-refuse.
+  //
+  // IMPORTANT: classification is intentionally NOT gated by provider readiness OR
+  // the admin web-search toggle. We must still RECOGNISE a live/current-event or
+  // website query even when no provider is configured or web search is disabled,
+  // so the gate can REFUSE it (Rule #1/#4) instead of silently answering current
+  // events from stale model memory (the original critical bug). The toggle only
+  // controls whether the live SEARCH is attempted (see the live lookup below).
+  const webIntent: WebIntent = wantRetrieval ? classifyQuery(retrievalQuery) : "internal";
 
   if (!convo) {
     return new Response("Not found", { status: 404 });
@@ -218,7 +230,7 @@ export async function POST(req: Request) {
   // ── Phase 2: parallel lookups that depend on convo.projectId + brainId ──
   // addMessage also runs here — ownership is confirmed above, and Phase 2
   // completes before streaming starts so userMsg is available for the SSE event.
-  const [project, knowledge, history, userMsgResult, web] = await Promise.all([
+  const [project, knowledge, history, userMsgResult, live] = await Promise.all([
     projectId ? getProject(session.user.id, projectId) : Promise.resolve(null),
     wantKnowledge
       ? (isMulti
@@ -240,17 +252,34 @@ export async function POST(req: Request) {
     !debug && !regenerate
       ? addMessage({ conversationId, role: "user", content: message })
       : Promise.resolve(null),
-    // Live-web fetch (Phase 2) — runs in parallel with knowledge retrieval, only
-    // for web/hybrid intents. Never throws (Phase 8 fallback on empty/error).
-    webIntent !== "internal"
-      ? webSearch(retrievalQuery, 5).catch((err) => {
-          console.warn("[chat] web search failed:", err);
-          return { results: [], provider: "none", cached: false };
-        })
+    // Live lookup (Phase 2) — parallel with knowledge retrieval. Never throws;
+    // any failure becomes a not-ok / empty result that the verification gate then
+    // refuses on (so a failed lookup can never fall through to a guessed answer).
+    //   website intent → fetch the actual page (no search key/toggle needed)
+    //   web / hybrid   → live web search (only when the admin toggle is on)
+    webIntent === "website"
+      ? // Website fetch needs no provider and only ever answers from the fetched
+        // page, so it is always safe to attempt (not gated on the toggle).
+        (async (): Promise<{ kind: "website"; fetch: WebsiteFetchResult }> => {
+          const u = extractUrl(retrievalQuery);
+          if (!u) return { kind: "website", fetch: { ok: false, reason: "no valid website address was found in the message" } };
+          return { kind: "website", fetch: await fetchWebsite(u) };
+        })()
+      : webEnabled && (webIntent === "web" || webIntent === "hybrid")
+      ? // Attempted only when web search is enabled. When off, the gate sees
+        // searchEnabled=false and refuses live queries (never guesses from memory).
+        webSearch(retrievalQuery, 5)
+          .then((r) => ({ kind: "search" as const, search: r }))
+          .catch((err) => {
+            console.warn("[chat] web search failed:", err);
+            return { kind: "search" as const, search: { results: [], provider: "none", cached: false } };
+          })
       : Promise.resolve(null),
   ]);
 
   const userMsg = userMsgResult;
+  const searchRes = live?.kind === "search" ? live.search : null;
+  const websiteRes = live?.kind === "website" ? live.fetch : null;
   const projectInstructions = project?.instructions?.trim() ?? "";
 
   // Retrieval analytics (admin) — a compact provenance record persisted on the
@@ -274,7 +303,80 @@ export async function POST(req: Request) {
     wasZeroResult: wantKnowledge && knowledge.count === 0,
     sources: [...new Set(knowledge.chunks.map((c) => c.title))],
     query: sanitizeQueryForLog(message),
+    webIntent,
   };
+
+  // ── Hard verification gate (Rule #4) ──────────────────────────────────────
+  // Decide, from the live-lookup outcome + retrieved knowledge, whether the model
+  // may answer at all. A "refuse_*" decision short-circuits BEFORE any model call,
+  // so a failed live verification or website fetch can never fall through to a
+  // guessed answer. See lib/web/verify.ts for the (pure, unit-tested) policy.
+  const gate = decideGate({
+    intent: webIntent,
+    searchEnabled: webEnabled,
+    searchAttempted: !!searchRes,
+    searchResultCount: searchRes?.results.length ?? 0,
+    fetchAttempted: !!websiteRes,
+    fetchOk: !!websiteRes?.ok,
+    internalKnowledgeCount: knowledge.count,
+  });
+
+  if (gate.action === "refuse_unverified" || gate.action === "refuse_fetch") {
+    const refusalText =
+      gate.action === "refuse_fetch"
+        ? websiteFetchFailedMessage(
+            (websiteRes && !websiteRes.ok ? extractUrl(retrievalQuery) : null) ?? "",
+            gate.reason,
+          )
+        : verificationFailedMessage(gate.reason);
+    const verification = { intent: webIntent, decision: gate.action, reason: gate.reason };
+
+    const body = new ReadableStream({
+      async start(controller) {
+        // Stream the refusal deterministically — the model is never invoked.
+        controller.enqueue(sse({ t: "chunk", text: refusalText }));
+        let assistantMsgId: string | null = null;
+        let title = convo.title;
+        if (!debug) {
+          try {
+            const m = await addMessage({
+              conversationId,
+              role: "assistant",
+              content: refusalText,
+              modelId: "verification-gate",
+              metadata: { ...retrievalMeta, verification, latencyMs: 0 },
+            });
+            assistantMsgId = m.id;
+            if (convo.title === "New chat") {
+              title = message.trim().slice(0, 60);
+              await setConversationTitle(session.user.id, conversationId, title);
+            }
+          } catch (err) {
+            console.error("[chat] refusal persistence failed:", err);
+          }
+        }
+        controller.enqueue(
+          sse({
+            t: "done",
+            conversationId,
+            userMessageId: userMsg?.id ?? null,
+            assistantMessageId: assistantMsgId,
+            title,
+            modelId: "verification-gate",
+            requestedModelId: preferredModelId ?? null,
+            clarify: null,
+            ...(admin
+              ? { meta: { provider: "verification-gate", model: "verification-gate", latencyMs: 0, verification } }
+              : {}),
+          }),
+        );
+        controller.close();
+      },
+    });
+    return new Response(body, {
+      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
+    });
+  }
 
   let toolBlock = "";
   if (tool.toolExecuted && tool.toolResult != null) {
@@ -289,16 +391,23 @@ export async function POST(req: Request) {
     ? "SYSTEM NOTICE: This user does NOT have permission to update system knowledge. If they ask you to save, remember, update, or store any information to your knowledge base or memory, respond with: \"You do not have permission to update system knowledge. Please contact an admin.\" Do not pretend to save anything."
     : "";
 
-  // Live-web context (Phases 4/5/8). "web" → answer from the web (suppress the
-  // internal knowledge/clarify blocks below); "hybrid" → include both, with the
-  // internal knowledge authoritative. Empty results → fallback disclaimer.
-  const isPureWeb = webIntent === "web";
-  const webBlock =
-    webIntent !== "internal"
-      ? web && web.results.length > 0
-        ? renderWebContext(web.results, webIntent)
-        : WEB_UNAVAILABLE_NOTE
-      : "";
+  // Live-web / website context, driven by the verification gate above. We only
+  // reach here on an "answer_*" decision:
+  //   answer_website → summarize ONLY the fetched page (suppress internal blocks)
+  //   answer_web     → answer from verified live results (suppress internal blocks)
+  //   answer_hybrid  → internal is authoritative; add live results, else a disclaimer
+  const suppressInternal = gate.action === "answer_web" || gate.action === "answer_website";
+  let webBlock = "";
+  if (gate.action === "answer_website" && websiteRes?.ok) {
+    webBlock = renderWebsiteContent(websiteRes);
+  } else if (gate.action === "answer_web" && searchRes) {
+    webBlock = renderWebContext(searchRes.results, "web");
+  } else if (gate.action === "answer_hybrid") {
+    webBlock =
+      gate.liveVerified && searchRes && searchRes.results.length > 0
+        ? renderWebContext(searchRes.results, "hybrid")
+        : WEB_UNAVAILABLE_NOTE;
+  }
 
   // Build the conversation turns so the CURRENT message is always the final user
   // turn. Previously this relied on listRecentMessages() (which races the parallel
@@ -339,12 +448,12 @@ export async function POST(req: Request) {
       ? [{ role: "system" as const, content: `Project instructions:\n${projectInstructions}` }]
       : []),
     ...(memory.block ? [{ role: "system" as const, content: memory.block }] : []),
-    // Pure-web queries suppress internal knowledge + the clarify hint (the query
-    // is a live/external one the router can't place); hybrid keeps both.
-    ...(knowledge.block && !isPureWeb ? [{ role: "system" as const, content: knowledge.block }] : []),
+    // Pure-web / website queries suppress internal knowledge + the clarify hint
+    // (the query is a live/external one the router can't place); hybrid keeps both.
+    ...(knowledge.block && !suppressInternal ? [{ role: "system" as const, content: knowledge.block }] : []),
     ...(toolBlock ? [{ role: "system" as const, content: toolBlock }] : []),
     ...(writeIntentBlock ? [{ role: "system" as const, content: writeIntentBlock }] : []),
-    ...(clarifyBlock && !isPureWeb ? [{ role: "system" as const, content: clarifyBlock }] : []),
+    ...(clarifyBlock && !suppressInternal ? [{ role: "system" as const, content: clarifyBlock }] : []),
     ...(webBlock ? [{ role: "system" as const, content: webBlock }] : []),
     ...(digestBlock ? [{ role: "system" as const, content: digestBlock }] : []),
     ...historyMessages,
@@ -455,6 +564,16 @@ export async function POST(req: Request) {
                   // Phase 3 — reference resolution outcome.
                   referenceEntity: refInfo?.entity ?? null,
                   referenceReason: refInfo?.reason ?? null,
+                  // Verification gate — intent + which live source (if any) grounded this answer.
+                  verification: {
+                    intent: webIntent,
+                    decision: gate.action,
+                    liveVerified:
+                      gate.action === "answer_web" ||
+                      gate.action === "answer_website" ||
+                      (gate.action === "answer_hybrid" && gate.liveVerified),
+                    provider: searchRes?.provider ?? (websiteRes?.ok ? "website-fetch" : null),
+                  },
                 },
               }
             : {}),

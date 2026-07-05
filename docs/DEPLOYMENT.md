@@ -21,6 +21,18 @@ Target: **GitHub → Vercel → hajihazai.com**, with **Neon** (Postgres + pgvec
 | `OPENROUTER_API_KEY` | ⚠️ **One of these two required** | OpenRouter (fallback). Set at least one of Gemini/OpenRouter. |
 | `OLLAMA_BASE_URL` | ❌ Omit in prod | Only set if you run a self-hosted Ollama gateway. Absent ⇒ Ollama unavailable (expected on Vercel). |
 | `NEXT_PUBLIC_APP_URL` | ✅ Prod | `https://hajihazai.com` (used as OpenRouter referer). |
+| `TAVILY_API_KEY` *(or `BRAVE_SEARCH_API_KEY` / `SERPER_API_KEY`)* | ⚠️ **Required for current events** | Live-search provider for current-event verification. Without one, current-event queries **refuse** (never guess) — see §9. Website summarization needs no key. |
+
+## 9. Live web search & the verification gate (anti-hallucination)
+
+Current-event and website questions go through a **hard verification gate** (`lib/web/verify.ts`) — the model is only allowed to answer the live/external part after a **successful** live lookup:
+
+- **Current events** (office-holders, news, prices, weather, scores, "who is X", rankings…) → require a live **search**. No results / no provider ⇒ the route streams *"I couldn't verify this information from a live source."* and **never** calls the model. Configure a search key above for these to actually answer.
+- **Website summaries** ("summarize xyz.com") → require a live **page fetch** (no search key needed; SSRF-guarded). Fetch fails ⇒ *"I couldn't access this website."* — never a fabricated summary.
+- **Provider status** is visible in **Admin → Data → Live Web Search** (shows provider, `productionGrade`, and a warning when only the keyless fallback is available).
+- **Deploy gate:** `scripts/verify-live.mts` (wired into `predeploy.sh`) fails the deploy if the gate is bypassable, no search provider is configured, or the website fetch is broken. Overrides: `ALLOW_KEYLESS_WEB=1` (accept keyless DuckDuckGo), `SKIP_WEB_SMOKE=1` (skip the outbound fetch check in restricted CI).
+
+> Policy: **truthfulness > completeness**. With no search key, expect current-event questions to refuse rather than answer — that is intended. Add a key to turn them on.
 
 ## 2. Neon
 - [ ] Project created; **pgvector extension** is created automatically by migration `0004` (`CREATE EXTENSION IF NOT EXISTS vector`).

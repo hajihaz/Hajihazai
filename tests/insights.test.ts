@@ -62,7 +62,9 @@ describe("👎 categorization (Phase 6)", () => {
   it("maps provenance to categories in priority order", () => {
     expect(categorizeDislike(ev({ wasClarify: true }))).toBe("Ambiguous question");
     expect(categorizeDislike(ev({ query: "latest stock price of reliance" }))).toBe("Current-event issue");
-    expect(categorizeDislike(ev({ query: "who is X", knowledgeCount: 0 }))).toBe("Missing knowledge");
+    // Identity/current-event queries ("who is X") now classify as web → Current-event
+    // issue (verified above). Use a plainly-internal query to exercise Missing knowledge.
+    expect(categorizeDislike(ev({ query: "what does my handbook say about leave", knowledgeCount: 0 }))).toBe("Missing knowledge");
     expect(categorizeDislike(ev({ query: "who is haji", knowledgeCount: 3, confidence: 60 }))).toBe("Wrong retrieval");
     expect(categorizeDislike(ev({ query: "who is haji", knowledgeCount: 3, confidence: 100 }))).toBe("Poor wording");
   });
