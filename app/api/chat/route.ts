@@ -46,6 +46,7 @@ import { needsResolution, resolveReference } from "@/lib/ai/reference-resolution
 import { detectMultiBrainScope } from "@/lib/ai/multi-brain";
 import { splitForDigest, renderConversationDigest } from "@/lib/ai/conversation-summary";
 import { sanitizeQueryForLog } from "@/lib/admin/analytics";
+import { planIntelligence } from "@/lib/ai/intelligence-planner";
 
 const CHAT_RATE_LIMIT = 30;
 const CHAT_RATE_WINDOW_MS = 60_000;
@@ -155,14 +156,12 @@ export async function POST(req: Request) {
   // ── Phase 1: all independent lookups run in parallel ─────────────────────
   // None of these depend on each other; they only need userId + retrievalQuery.
   const effectiveBrainMode: BrainMode = brainMode === "smart" ? "smart" : "manual";
-  // Smart routing → { brain, confidence, matchedKeywords, reason }. brain may be
-  // null (no match / low confidence) — we then clarify / answer without a brain.
-  const route = effectiveBrainMode === "smart" ? routeToBrain(retrievalQuery) : null;
-  const resolvedBrainSlug = route?.brain ?? null;
+  const intelligencePlan = planIntelligence(message, retrievalQuery, effectiveBrainMode);
+  const route = intelligencePlan.route;
+  const resolvedBrainSlug = intelligencePlan.brainSlug;
 
-  // Greetings / low-information acknowledgements ("hi", "thanks", "ok") must not
-  // trigger RAG — otherwise memory + knowledge get injected into small talk.
-  const wantRetrieval = shouldRetrieve(message);
+  // Greetings / low-information acknowledgements must not trigger RAG.
+  const wantRetrieval = intelligencePlan.retrieveMemory;
   const EMPTY_MEMORY = { block: "", memories: [] as Awaited<ReturnType<typeof buildMemoryContext>>["memories"], count: 0, fallbackUsed: false };
   const EMPTY_KNOWLEDGE = { block: "", chunks: [] as Awaited<ReturnType<typeof buildKnowledgeContext>>["chunks"], count: 0 };
 
@@ -217,12 +216,10 @@ export async function POST(req: Request) {
   // the model to ask which area the user means when the question looks domain-
   // specific (Phase D — no silent routing).
   const smartUnrouted = effectiveBrainMode === "smart" && resolvedBrainId === null;
-  // Multi-brain (Phase 4): queries spanning brains ("compare AllBee and Suplaykart",
-  // "what businesses does Haji own") retrieve from several brains and merge. Empty
-  // = normal single-brain retrieval. Legal is excluded (isolation).
-  const multiBrains = effectiveBrainMode === "smart" ? detectMultiBrainScope(retrievalQuery) : [];
+  // Multi-brain queries are planned once and reused by retrieval + telemetry.
+  const multiBrains = intelligencePlan.multiBrains;
   const isMulti = multiBrains.length >= 2;
-  const wantKnowledge = wantRetrieval && (isMulti || !smartUnrouted);
+  const wantKnowledge = intelligencePlan.retrieveKnowledge;
   const clarifyBlock = smartUnrouted && !isMulti && wantRetrieval
     ? "SYSTEM: The smart router could not confidently pick a knowledge brain for this message. If the message is an ambiguous role or entity reference — e.g. \"founder\", \"CEO\", \"ownership\", \"owner\" — without naming a company, ask which company or organization they mean (for example: \"Founder of what?\", \"CEO of which company?\", \"Ownership of which organization?\"). If it clearly refers to the user's specific businesses (AllBee, Suplaykart), personal/family life, or law, ask which area they mean. Otherwise answer normally from general knowledge."
     : "";
@@ -455,6 +452,7 @@ export async function POST(req: Request) {
     ...(writeIntentBlock ? [{ role: "system" as const, content: writeIntentBlock }] : []),
     ...(clarifyBlock && !suppressInternal ? [{ role: "system" as const, content: clarifyBlock }] : []),
     ...(webBlock ? [{ role: "system" as const, content: webBlock }] : []),
+    { role: "system" as const, content: intelligencePlan.reasoningInstructions },
     ...(digestBlock ? [{ role: "system" as const, content: digestBlock }] : []),
     ...historyMessages,
   ];
@@ -565,6 +563,14 @@ export async function POST(req: Request) {
                   referenceEntity: refInfo?.entity ?? null,
                   referenceReason: refInfo?.reason ?? null,
                   // Verification gate — intent + which live source (if any) grounded this answer.
+                  intelligence: {
+                    depth: intelligencePlan.depth,
+                    retrieveMemory: intelligencePlan.retrieveMemory,
+                    retrieveKnowledge: intelligencePlan.retrieveKnowledge,
+                    searchWeb: intelligencePlan.searchWeb,
+                    fetchWebsite: intelligencePlan.fetchWebsite,
+                    checkTools: intelligencePlan.checkTools,
+                  },
                   verification: {
                     intent: webIntent,
                     decision: gate.action,

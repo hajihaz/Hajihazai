@@ -23,6 +23,10 @@ DATABASE_URL="postgres://test:test@localhost:5432/testdb" npx vitest run \
   --exclude 'tests/haji-family-retrieval.test.ts' \
   --exclude 'tests/knowledge-retrieval-regression.test.ts'
 
+# The unit-test-only DATABASE_URL override must never leak into the production
+# read-only regression gate below.
+unset DATABASE_URL || true
+
 echo "── 3/5 regression gate (102 questions; A>=95%, D=0) ──"
 npx tsx scripts/run-regression.mts
 
