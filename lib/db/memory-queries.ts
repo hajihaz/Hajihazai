@@ -21,7 +21,7 @@ export async function listMemories(userId: string) {
 
 export async function createMemory(
   userId: string,
-  input: { type?: string; content: string; status?: MemoryStatus },
+  input: { type?: string; content: string; status?: MemoryStatus; confidence?: number; validFrom?: Date; validUntil?: Date | null },
 ) {
   const [row] = await db
     .insert(userMemory)
@@ -30,6 +30,9 @@ export async function createMemory(
       content: input.content,
       ...(input.type ? { type: input.type } : {}),
       ...(input.status ? { status: input.status } : {}),
+      ...(input.confidence !== undefined ? { confidence: Math.max(0, Math.min(100, Math.round(input.confidence))) } : {}),
+      ...(input.validFrom ? { validFrom: input.validFrom } : {}),
+      ...(input.validUntil !== undefined ? { validUntil: input.validUntil } : {}),
     })
     .returning();
   return row;
@@ -38,13 +41,16 @@ export async function createMemory(
 export async function updateMemory(
   userId: string,
   id: string,
-  input: { type?: string; content?: string },
+  input: { type?: string; content?: string; confidence?: number; validUntil?: Date | null; supersededBy?: string | null },
 ) {
   const [row] = await db
     .update(userMemory)
     .set({
       ...(input.type !== undefined ? { type: input.type } : {}),
       ...(input.content !== undefined ? { content: input.content } : {}),
+      ...(input.confidence !== undefined ? { confidence: Math.max(0, Math.min(100, Math.round(input.confidence))) } : {}),
+      ...(input.validUntil !== undefined ? { validUntil: input.validUntil } : {}),
+      ...(input.supersededBy !== undefined ? { supersededBy: input.supersededBy } : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(userMemory.id, id), eq(userMemory.userId, userId)))
@@ -96,6 +102,26 @@ export async function rejectMemory(userId: string, id: string) {
 export async function existingMemoryContents(userId: string) {
   const rows = await listMemories(userId);
   return new Set(rows.map((m) => m.content.trim().toLowerCase()));
+}
+
+/** Mark an existing memory as superseded by a newer memory. History remains intact. */
+export async function supersedeMemory(userId: string, oldId: string, newId: string, at = new Date()) {
+  const [row] = await db
+    .update(userMemory)
+    .set({ validUntil: at, supersededBy: newId, updatedAt: at })
+    .where(and(eq(userMemory.id, oldId), eq(userMemory.userId, userId), eq(userMemory.status, "active")))
+    .returning();
+  return row ?? null;
+}
+
+/** Expire a memory without deleting it, preserving the historical record. */
+export async function expireMemory(userId: string, id: string, at = new Date()) {
+  const [row] = await db
+    .update(userMemory)
+    .set({ validUntil: at, updatedAt: at })
+    .where(and(eq(userMemory.id, id), eq(userMemory.userId, userId), eq(userMemory.status, "active")))
+    .returning();
+  return row ?? null;
 }
 
 /* ---------------------- Phase 5 Step 5: management ----------------------- */

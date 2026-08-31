@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, or, lte, gt, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { userMemory } from "@/lib/db/schema";
 import { rankMemories } from "./ranking";
@@ -13,7 +13,12 @@ export async function getActiveMemories(userId: string) {
   return db
     .select()
     .from(userMemory)
-    .where(and(eq(userMemory.userId, userId), eq(userMemory.status, "active")));
+    .where(and(
+      eq(userMemory.userId, userId),
+      eq(userMemory.status, "active"),
+      lte(userMemory.validFrom, new Date()),
+      or(isNull(userMemory.validUntil), gt(userMemory.validUntil, new Date())),
+    ));
 }
 
 export async function searchMemories(userId: string, q?: string) {

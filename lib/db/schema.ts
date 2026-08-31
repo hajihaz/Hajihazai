@@ -190,6 +190,13 @@ export const userMemory = pgTable(
     status: memoryStatus("status").notNull().default("active"),
     // Phase 6.1: pgvector embedding (nullable until embedded). 768 = canonical.
     embedding: vector("embedding", { dimensions: 768 }),
+    // Temporal memory lifecycle: a fact can expire or be superseded without
+    // destroying its history. Retrieval only considers currently-valid memories.
+    validFrom: timestamp("valid_from", { mode: "date" }).notNull().defaultNow(),
+    validUntil: timestamp("valid_until", { mode: "date" }),
+    supersededBy: text("superseded_by"),
+    // 0-100 confidence assigned by the memory lifecycle, not by the chat model.
+    confidence: integer("confidence"),
     createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
   },
