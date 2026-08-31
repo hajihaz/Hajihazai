@@ -21,17 +21,17 @@ describe("capability levels (Low/Medium active, High/Max coming soon)", () => {
   });
 
   it("Low and Medium are available when a model is healthy", () => {
-    const healthy = new Set(["groq:llama-3.3-70b", "openrouter:qwen-2.5-7b"]);
+    const healthy = new Set(["groq:qwen-qwq-32b", "groq:llama-3.3-70b", "openrouter:qwen-2.5-7b"]);
     const ls = listLevels((id) => healthy.has(id));
     expect(ls.find((l) => l.level === "low")!.available).toBe(true);
     expect(ls.find((l) => l.level === "medium")!.available).toBe(true);
   });
 
   it("resolves Low to cheapest, Medium to best; High/Max never resolve", () => {
-    const healthy = new Set(["groq:llama-3.3-70b", "openrouter:qwen-2.5-7b"]);
+    const healthy = new Set(["groq:qwen-qwq-32b", "groq:llama-3.3-70b", "openrouter:qwen-2.5-7b"]);
     const usable = (id: string) => healthy.has(id);
     expect(resolveLevel("low", usable)).toBe("openrouter:qwen-2.5-7b");
-    expect(resolveLevel("medium", usable)).toBe("groq:llama-3.3-70b");
+    expect(resolveLevel("medium", usable)).toBe("groq:qwen-qwq-32b");
     expect(resolveLevel("high", usable)).toBeNull();
     expect(resolveLevel("max", usable)).toBeNull();
   });

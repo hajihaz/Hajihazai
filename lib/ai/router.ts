@@ -40,11 +40,15 @@ export function planRoute(opts: {
   // (no key / not reachable) are skipped, so local dev with only Ollama still
   // resolves to Ollama. `isProd` is accepted for signature stability.
   void opts.isProd;
-  const order: ProviderName[] = ["openrouter", "groq", "gemini", "ollama"];
+  const order: ProviderName[] = ["groq", "openrouter", "gemini", "ollama"];
 
   const chain: ModelEntry[] = [];
   const pushFirstFor = (p: ProviderName) => {
-    const entry = enabled.find((e) => e.provider === p && opts.available[p]);
+    const preferredGroq =
+      p === "groq"
+        ? enabled.find((e) => e.modelId === "groq:qwen-qwq-32b" && opts.available[p])
+        : undefined;
+    const entry = preferredGroq ?? enabled.find((e) => e.provider === p && opts.available[p]);
     if (entry && !chain.includes(entry)) chain.push(entry);
   };
 

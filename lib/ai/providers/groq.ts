@@ -12,6 +12,18 @@ import { parseOpenAIToolCalls } from "../tool-calls";
  */
 const ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
+function modelParams(model: string) {
+  if (model === "qwen-qwq-32b") {
+    return {
+      temperature: 0.6,
+      top_p: 0.95,
+      reasoning_format: "parsed" as const,
+      max_completion_tokens: 4096,
+    };
+  }
+  return {};
+}
+
 function authHeaders(): Record<string, string> {
   const key = process.env.GROQ_API_KEY;
   if (!key) throw new Error("Groq: GROQ_API_KEY missing");
@@ -35,6 +47,7 @@ export const groqProvider: Provider = {
       body: JSON.stringify({
         model,
         messages,
+        ...modelParams(model),
         stream: false,
         ...(opts?.jsonSchema ? { response_format: { type: "json_object" } } : {}),
       }),
@@ -48,7 +61,7 @@ export const groqProvider: Provider = {
     const res = await fetch(ENDPOINT, {
       method: "POST",
       headers: authHeaders(),
-      body: JSON.stringify({ model, messages, stream: true }),
+      body: JSON.stringify({ model, messages, ...modelParams(model), stream: true }),
     });
     if (!res.ok) throw new Error(`Groq stream error ${res.status}`);
     if (!res.body) throw new Error("Groq: no response body");
@@ -84,6 +97,7 @@ export const groqProvider: Provider = {
       body: JSON.stringify({
         model,
         messages,
+        ...modelParams(model),
         stream: false,
         tool_choice: "auto",
         tools: tools.map((t) => ({

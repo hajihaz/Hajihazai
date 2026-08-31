@@ -10,10 +10,15 @@ const ALL: Record<ProviderName, boolean> = {
   groq: true,
 };
 
-describe("chat routing order: OpenRouter → Groq → Gemini → Ollama", () => {
-  it("prefers OpenRouter when everything is available", () => {
+describe("chat routing order: Groq → OpenRouter → Gemini → Ollama", () => {
+  it("prefers Groq when everything is available", () => {
     const chain = planRoute({ isProd: true, available: ALL });
-    expect(chain[0]?.provider).toBe("openrouter");
+    expect(chain[0]?.provider).toBe("groq");
+  });
+
+  it("prefers the reasoning-focused QwQ model within Groq", () => {
+    const chain = planRoute({ isProd: true, available: ALL });
+    expect(chain[0]?.modelId).toBe("groq:qwen-qwq-32b");
   });
 
   it("falls to Groq when OpenRouter is unavailable", () => {
@@ -44,7 +49,7 @@ describe("chat routing order: OpenRouter → Groq → Gemini → Ollama", () => 
     const chain = planRoute({ isProd: true, available: ALL });
     const order = chain.map((e) => e.provider);
     // first occurrence of each provider in chain order
-    expect(order.indexOf("openrouter")).toBeLessThan(order.indexOf("groq"));
+    expect(order.indexOf("groq")).toBeLessThan(order.indexOf("openrouter"));
     expect(order.indexOf("groq")).toBeLessThan(order.indexOf("gemini"));
     expect(order.indexOf("gemini")).toBeLessThan(order.indexOf("ollama"));
   });
