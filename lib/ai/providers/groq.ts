@@ -12,13 +12,25 @@ import { parseOpenAIToolCalls } from "../tool-calls";
  */
 const ENDPOINT = "https://api.groq.com/openai/v1/chat/completions";
 
+/** Keep private reasoning out of the user-visible answer when a model emits
+ * reasoning tags inside the content field. Groq may expose reasoning separately
+ * on some models, but this also protects against providers that inline <think>.
+ */
+function cleanVisibleText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
+    .replace(/^\s*<think>[\s\S]*$/i, "")
+    .trim();
+}
+
 function modelParams(model: string) {
-  if (model === "qwen-qwq-32b") {
+  if (model === "openai/gpt-oss-120b") {
     return {
-      temperature: 0.6,
-      top_p: 0.95,
-      reasoning_format: "parsed" as const,
+      temperature: 0.5,
       max_completion_tokens: 4096,
+      reasoning_effort: "medium" as const,
     };
   }
   return {};
@@ -54,7 +66,7 @@ export const groqProvider: Provider = {
     });
     if (!res.ok) throw new Error(`Groq error ${res.status}`);
     const data = await res.json();
-    return data?.choices?.[0]?.message?.content ?? "";
+    return cleanVisibleText(data?.choices?.[0]?.message?.content);
   },
 
   async *generateStream(model: string, messages: ChatMessage[]) {
@@ -83,7 +95,7 @@ export const groqProvider: Provider = {
         if (data === "[DONE]") return;
         try {
           const json = JSON.parse(data);
-          const text: string = json?.choices?.[0]?.delta?.content ?? "";
+          const text = cleanVisibleText(json?.choices?.[0]?.delta?.content);
           if (text) yield text;
         } catch { /* skip malformed chunk */ }
       }
@@ -113,7 +125,7 @@ export const groqProvider: Provider = {
     if (!res.ok) throw new Error(`Groq error ${res.status}`);
     const data = await res.json();
     return {
-      text: data?.choices?.[0]?.message?.content ?? "",
+      text: cleanVisibleText(data?.choices?.[0]?.message?.content),
       toolCalls: parseOpenAIToolCalls(data),
     };
   },

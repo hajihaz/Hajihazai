@@ -24,11 +24,10 @@ function estimateUsage(messages: ChatMessage[], text: string) {
  * Pure routing policy (no network) — easy to unit test.
  *
  * Rules:
- *   - Local development  → Ollama first
- *   - Production         → Gemini first
- *   - Fallback           → OpenRouter
- * A user-selected model (preferredModelId) is tried first when available;
- * the rest of the environment chain follows as fallbacks.
+ *   - Groq → OpenRouter → Gemini → Ollama
+ *   - GPT-OSS 120B is the preferred Groq model
+ *   - A user-selected model is tried first when available; the environment
+ *     chain then supplies resilient fallbacks.
  */
 export function planRoute(opts: {
   preferredModelId?: string;
@@ -46,7 +45,7 @@ export function planRoute(opts: {
   const pushFirstFor = (p: ProviderName) => {
     const preferredGroq =
       p === "groq"
-        ? enabled.find((e) => e.modelId === "groq:qwen-qwq-32b" && opts.available[p])
+        ? enabled.find((e) => e.modelId === "groq:gpt-oss-120b" && opts.available[p])
         : undefined;
     const entry = preferredGroq ?? enabled.find((e) => e.provider === p && opts.available[p]);
     if (entry && !chain.includes(entry)) chain.push(entry);
@@ -161,23 +160,48 @@ export async function routeChatStream(
 
   const requestedModelId = chain[0]?.modelId ?? opts.preferredModelId ?? null;
 
-  for (const entry of chain) {
-    const provider = providers[entry.provider];
-    if (typeof provider.generateStream !== "function") continue;
-    return {
-      stream: provider.generateStream(entry.model, messages),
-      modelId: entry.model,
-      provider: entry.provider,
-      requestedModelId,
-    };
-  }
+  // Providers are lazy async generators: the network request happens when the
+  // generator is consumed, not when generateStream() is called. Keep fallback
+  // logic inside the returned generator so an unavailable primary provider can
+  // be skipped automatically before any text reaches the client.
+  const streamWithFallback = async function* (): AsyncIterable<string> {
+    let lastError: unknown;
+    for (let i = 0; i < chain.length; i++) {
+      const entry = chain[i];
+      const provider = providers[entry.provider];
+      if (typeof provider.generateStream !== "function") continue;
+      console.log(`[ai] stream-select provider=${entry.provider} model=${entry.modelId}`);
+      const started = Date.now();
+      let emitted = false;
+      try {
+        const iter = provider.generateStream(entry.model, messages)[Symbol.asyncIterator]();
+        while (true) {
+          const next = await iter.next();
+          if (next.done) break;
+          if (next.value) {
+            emitted = true;
+            yield next.value;
+          }
+        }
+        recordSuccess(entry.modelId, Date.now() - started);
+        return;
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        recordFailure(entry.modelId, reason);
+        lastError = error;
+        console.warn(`[ai] stream provider=${entry.provider} failed: ${reason}`);
+        // Never concatenate two partially generated answers. If the provider
+        // failed before emitting text, safely continue to the next provider.
+        if (emitted) throw error;
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("No AI provider could stream a response");
+  };
 
-  // No streaming provider available: fall back to full non-streaming, yield once.
-  const result = await routeChat(messages, opts);
   return {
-    stream: (async function* () { yield result.text; })(),
-    modelId: result.modelId,
-    provider: result.provider,
+    stream: streamWithFallback(),
+    modelId: chain[0]?.modelId ?? "none",
+    provider: chain[0]?.provider ?? "ollama",
     requestedModelId,
   };
 }

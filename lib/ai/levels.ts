@@ -28,14 +28,14 @@ export const LEVELS: LevelDef[] = [
     label: "Low",
     enabled: true,
     // Lowest-cost first.
-    chain: ["openrouter:qwen-2.5-7b", "groq:llama-3.3-70b", "gemini:2.0-flash"],
+    chain: ["groq:qwen3.6-27b", "openrouter:qwen-2.5-7b", "gemini:2.0-flash"],
   },
   {
     level: "medium",
     label: "Medium",
     enabled: true,
     // Best first.
-    chain: ["groq:qwen-qwq-32b", "groq:llama-3.3-70b", "gemini:2.0-flash", "openrouter:qwen-2.5-7b"],
+    chain: ["groq:gpt-oss-120b", "groq:qwen3.6-27b", "gemini:2.0-flash", "openrouter:qwen-2.5-7b"],
   },
   { level: "high", label: "High", enabled: false, chain: [] },
   { level: "max", label: "Max", enabled: false, chain: [] },

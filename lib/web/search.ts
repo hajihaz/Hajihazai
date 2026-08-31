@@ -4,8 +4,8 @@
  * from env at call time; falls back to a keyless DuckDuckGo HTML scrape so the
  * feature works with no configuration. Results are cached per-kind (Phase 6).
  *
- * To upgrade quality, set one of TAVILY_API_KEY / BRAVE_SEARCH_API_KEY /
- * SERPER_API_KEY in the environment — no code change needed.
+ * A Groq API key is also sufficient: GPT-OSS browser_search is used as the
+ * built-in live-search provider. Tavily / Brave / Serper remain optional upgrades.
  */
 import { rankAndFilter, type WebResult } from "./sources";
 import { getCached, setCached } from "./cache";
@@ -15,20 +15,23 @@ let lastSearchAt: number | null = null;
 
 export function getLastSearchAt(): number | null { return lastSearchAt; }
 
-export function activeProvider(): "tavily" | "brave" | "serper" | "duckduckgo" {
+export function activeProvider(): "tavily" | "brave" | "serper" | "groq-browser" | "duckduckgo" {
   if (process.env.TAVILY_API_KEY) return "tavily";
   if (process.env.BRAVE_SEARCH_API_KEY) return "brave";
   if (process.env.SERPER_API_KEY) return "serper";
+  // Groq GPT-OSS has a server-side browser_search tool. This gives HajiHaz
+  // production-grade live search without requiring a second search account.
+  if (process.env.GROQ_API_KEY) return "groq-browser";
   return "duckduckgo";
 }
 
 /**
- * True when a production-grade search API (Tavily / Brave / Serper) is
- * configured. The keyless DuckDuckGo scraper is a dev/local convenience only —
- * it rate-limits under real traffic and must NOT be production's sole provider.
+ * True when a production-grade live-search provider is configured. This includes
+ * Groq GPT-OSS browser_search plus Tavily / Brave / Serper. The keyless
+ * DuckDuckGo scraper is a dev/local convenience only.
  */
 export function hasProductionGradeProvider(): boolean {
-  return !!(process.env.TAVILY_API_KEY || process.env.BRAVE_SEARCH_API_KEY || process.env.SERPER_API_KEY);
+  return !!(process.env.TAVILY_API_KEY || process.env.BRAVE_SEARCH_API_KEY || process.env.SERPER_API_KEY || process.env.GROQ_API_KEY);
 }
 
 /**
@@ -125,6 +128,80 @@ async function brave(query: string): Promise<WebResult[]> {
   return (data.web?.results ?? []).map((r) => ({ title: r.title, url: r.url, snippet: stripTags(r.description ?? ""), timestamp: r.age || ts }));
 }
 
+/**
+ * Groq GPT-OSS server-side browser search. The model is used only as a search
+ * orchestrator here: HajiHaz ignores its generated answer and extracts the
+ * executed browser-search sources, preventing a stale model answer from being
+ * mistaken for verification. This is available with the existing GROQ_API_KEY.
+ */
+async function groqBrowserSearch(query: string): Promise<WebResult[]> {
+  const res = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "openai/gpt-oss-120b",
+      messages: [{
+        role: "user",
+        content: `Use browser search to research this query. Do not answer from memory. Search for authoritative and recent sources, especially official government or primary sources when applicable: ${query}`,
+      }],
+      temperature: 1,
+      max_completion_tokens: 2048,
+      reasoning_effort: "low",
+      stream: false,
+      tool_choice: "required",
+      tools: [{ type: "browser_search" }],
+    }),
+  });
+  if (!res.ok) throw new Error(`groq-browser http ${res.status}`);
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { executed_tools?: Array<{ type?: string; search_results?: { results?: Array<{ title?: string; url?: string; content?: string; score?: number }> } }> } }>;
+  };
+  const tools = data.choices?.[0]?.message?.executed_tools ?? [];
+  const byUrl = new Map<string, WebResult>();
+  const ts = nowIso();
+  for (const tool of tools) {
+    if (tool.type === "browser_search") {
+      for (const r of tool.search_results?.results ?? []) {
+        if (!r.url || !r.title) continue;
+        byUrl.set(r.url, {
+          title: r.title,
+          url: r.url,
+          snippet: r.content ?? "",
+          timestamp: ts,
+        });
+      }
+    }
+
+    // Browser search may return a result list whose content is empty while the
+    // model subsequently opens the most relevant pages. Preserve that opened
+    // page text as evidence for the final HajiHaz model instead of trusting the
+    // browser-search model's generated answer.
+    if (tool.type === "browser.open" && typeof (tool as { output?: unknown }).output === "string") {
+      const output = (tool as { output: string }).output;
+      const urlMatch = output.match(/URL:\s*(https?:\/\/[^\s]+)/);
+      if (!urlMatch) continue;
+      const url = urlMatch[1];
+      const existing = byUrl.get(url);
+      const body = output.replace(/^[\s\S]*?URL:\s*https?:\/\/[^\n]+\n?/, "").trim();
+      if (existing) {
+        existing.snippet = body.slice(0, 5000) || existing.snippet;
+      } else {
+        const firstHeading = body.split("\n").map((x) => x.replace(/^L\d+:\s*/, "").trim()).find(Boolean) ?? url;
+        byUrl.set(url, {
+          title: firstHeading.slice(0, 240),
+          url,
+          snippet: body.slice(0, 5000),
+          timestamp: ts,
+        });
+      }
+    }
+  }
+  return [...byUrl.values()];
+}
+
 /** Serper.dev Google API. */
 async function serper(query: string): Promise<WebResult[]> {
   const res = await fetchWithTimeout("https://google.serper.dev/search", {
@@ -158,11 +235,15 @@ export async function webSearch(query: string, limit = 5): Promise<WebSearchResu
   if (cached) return { results: cached, provider: activeProvider(), cached: true };
 
   const provider = activeProvider();
-  const impl = provider === "tavily" ? tavily : provider === "brave" ? brave : provider === "serper" ? serper : duckduckgo;
+  const impl = provider === "tavily" ? tavily : provider === "brave" ? brave : provider === "serper" ? serper : provider === "groq-browser" ? groqBrowserSearch : duckduckgo;
 
   const raw = await impl(q);
+  // A search result without readable evidence is not verification. This is
+  // especially important for browser-search providers whose result metadata can
+  // occasionally omit page text; refusing is safer than grounding on a title.
+  const evidence = raw.filter((r) => r.snippet.trim().length >= 40);
   lastSearchAt = Date.now();
-  const ranked = rankAndFilter(raw, limit);
+  const ranked = rankAndFilter(evidence, limit);
   if (ranked.length) setCached(q, ranked);
   return { results: ranked, provider, cached: false };
 }

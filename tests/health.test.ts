@@ -18,21 +18,21 @@ describe("model health store", () => {
   });
 
   it("records success and clears the unhealthy flag", () => {
-    recordFailure("groq:qwen-qwq-32b", "x");
-    recordSuccess("groq:qwen-qwq-32b", 12);
-    expect(isKnownUnhealthy("groq:qwen-qwq-32b")).toBe(false);
-    expect(getHealth("groq:qwen-qwq-32b")?.healthy).toBe(true);
-    expect(getHealth("groq:qwen-qwq-32b")?.latencyMs).toBe(12);
+    recordFailure("groq:gpt-oss-120b", "x");
+    recordSuccess("groq:gpt-oss-120b", 12);
+    expect(isKnownUnhealthy("groq:gpt-oss-120b")).toBe(false);
+    expect(getHealth("groq:gpt-oss-120b")?.healthy).toBe(true);
+    expect(getHealth("groq:gpt-oss-120b")?.latencyMs).toBe(12);
   });
 
   it("isModelUsable is false when a model with a valid key is known-unhealthy", () => {
     const prev = process.env.GROQ_API_KEY;
     process.env.GROQ_API_KEY = "test-key";
     try {
-      recordSuccess("groq:llama-3.3-70b");
-      expect(isModelUsable("groq:llama-3.3-70b")).toBe(true);
-      recordFailure("groq:llama-3.3-70b", "boom");
-      expect(isModelUsable("groq:llama-3.3-70b")).toBe(false);
+      recordSuccess("groq:qwen3.6-27b");
+      expect(isModelUsable("groq:qwen3.6-27b")).toBe(true);
+      recordFailure("groq:qwen3.6-27b", "boom");
+      expect(isModelUsable("groq:qwen3.6-27b")).toBe(false);
     } finally {
       if (prev) process.env.GROQ_API_KEY = prev;
       else delete process.env.GROQ_API_KEY;

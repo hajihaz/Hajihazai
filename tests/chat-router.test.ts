@@ -18,7 +18,7 @@ describe("chat routing order: Groq → OpenRouter → Gemini → Ollama", () => 
 
   it("prefers the reasoning-focused QwQ model within Groq", () => {
     const chain = planRoute({ isProd: true, available: ALL });
-    expect(chain[0]?.modelId).toBe("groq:qwen-qwq-32b");
+    expect(chain[0]?.modelId).toBe("groq:gpt-oss-120b");
   });
 
   it("falls to Groq when OpenRouter is unavailable", () => {
@@ -56,11 +56,11 @@ describe("chat routing order: Groq → OpenRouter → Gemini → Ollama", () => 
 
   it("honors a preferred Groq model first", () => {
     const chain = planRoute({
-      preferredModelId: "groq:llama-3.3-70b",
+      preferredModelId: "groq:qwen3.6-27b",
       isProd: true,
       available: ALL,
     });
-    expect(chain[0]?.modelId).toBe("groq:llama-3.3-70b");
+    expect(chain[0]?.modelId).toBe("groq:qwen3.6-27b");
   });
 
   it("returns an empty chain when no provider is available", () => {

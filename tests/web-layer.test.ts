@@ -66,7 +66,7 @@ describe("production provider gate", () => {
     if (saved.s === undefined) delete process.env.SERPER_API_KEY; else process.env.SERPER_API_KEY = saved.s;
   });
   it("keyless → not production-grade, provider is duckduckgo", () => {
-    delete process.env.TAVILY_API_KEY; delete process.env.BRAVE_SEARCH_API_KEY; delete process.env.SERPER_API_KEY;
+    delete process.env.TAVILY_API_KEY; delete process.env.BRAVE_SEARCH_API_KEY; delete process.env.SERPER_API_KEY; delete process.env.GROQ_API_KEY;
     expect(hasProductionGradeProvider()).toBe(false);
     expect(activeProvider()).toBe("duckduckgo");
   });
