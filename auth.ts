@@ -9,6 +9,9 @@ import { isEmailBlocked } from "@/lib/admin/queries";
 import { syncUserToSheets } from "@/lib/google-sheets";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  // Explicitly pin the App Router endpoint. This prevents Auth.js from falling
+  // back to its core "/auth" base path when AUTH_URL has a root pathname.
+  basePath: "/api/auth",
   trustHost: true,
   adapter: DrizzleAdapter(db, {
     usersTable: users,
@@ -21,6 +24,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Google({
       clientId: process.env.AUTH_GOOGLE_ID,
       clientSecret: process.env.AUTH_GOOGLE_SECRET,
+      // Existing HajiHaz accounts may predate Google OAuth. Google verifies
+      // the account email, so allow a first Google login to link to the
+      // existing user instead of trapping the user at OAuthAccountNotLinked.
+      allowDangerousEmailAccountLinking: true,
     }),
   ],
   callbacks: {
