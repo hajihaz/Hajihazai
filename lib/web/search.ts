@@ -167,6 +167,48 @@ async function duckduckgo(query: string): Promise<WebResult[]> {
   return out;
 }
 
+/**
+ * Google News RSS fallback. This is intentionally keyless and used only when the
+ * primary provider/fallback path cannot produce evidence. RSS search results carry
+ * the publisher URL + publication time, which gives the verification gate a useful
+ * independent source even during provider rate limits.
+ */
+async function googleNewsRss(query: string): Promise<WebResult[]> {
+  const url = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-IN&gl=IN&ceid=IN:en`;
+  const res = await fetchWithTimeout(url, {
+    headers: { "User-Agent": UA, Accept: "application/rss+xml, application/xml, text/xml" },
+  });
+  if (!res.ok) throw new Error(`google-news-rss http ${res.status}`);
+  const xml = await res.text();
+  const out: WebResult[] = [];
+  const items = [...xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)];
+  const decode = (value: string) => value
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+  for (const item of items.slice(0, 10)) {
+    const body = item[1];
+    const title = decode(body.match(/<title>([\s\S]*?)<\/title>/i)?.[1] ?? "");
+    const pubDate = decode(body.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1] ?? "");
+    const sourceMatch = body.match(/<source[^>]*url="([^"]+)"[^>]*>([\s\S]*?)<\/source>/i);
+    const sourceUrl = decode(sourceMatch?.[1] ?? "");
+    const sourceName = decode(sourceMatch?.[2] ?? "");
+    if (!title || !sourceUrl) continue;
+    const evidence = `${title} — ${sourceName || new URL(sourceUrl).hostname}${pubDate ? ` — published ${pubDate}` : ""}`;
+    out.push({
+      title,
+      url: sourceUrl,
+      snippet: evidence,
+      timestamp: pubDate || nowIso(),
+    });
+  }
+  return out;
+}
+
 /** Tavily JSON API (used when TAVILY_API_KEY is set). */
 async function tavily(query: string): Promise<WebResult[]> {
   const res = await fetchWithTimeout("https://api.tavily.com/search", {
@@ -428,12 +470,27 @@ export async function webSearch(
 
     // Groq browser search is the preferred production provider, but a transient
     // 429/provider outage must not make live verification brittle. Fall back to
-    // the keyless search provider; the hard verification gate still refuses if
-    // this fallback also returns no usable evidence.
+    // keyless search providers; the hard verification gate still refuses if
+    // these also return no usable evidence.
     if (provider !== "groq-browser") throw error;
     console.warn("[web] groq-browser failed; trying DuckDuckGo fallback:", error);
-    raw = await duckduckgo(q);
-    effectiveProvider = "duckduckgo-fallback";
+    try {
+      raw = await duckduckgo(q);
+      effectiveProvider = "duckduckgo-fallback";
+      // Keep an independent news index as a second fallback/evidence source.
+      // This is especially important on Vercel where public HTML search endpoints
+      // can be intermittently challenged even though they work locally.
+      try {
+        const rss = await googleNewsRss(q);
+        raw = [...raw, ...rss];
+      } catch (rssError) {
+        console.warn("[web] Google News RSS supplement failed:", rssError);
+      }
+    } catch (fallbackError) {
+      console.warn("[web] DuckDuckGo fallback failed; trying Google News RSS:", fallbackError);
+      raw = await googleNewsRss(q);
+      effectiveProvider = "google-news-rss-fallback";
+    }
   }
 
   // A search result without readable evidence is not verification. If Groq's
@@ -446,7 +503,14 @@ export async function webSearch(
       evidence = fallback.filter((r) => r.snippet.trim().length >= 40);
       if (evidence.length) effectiveProvider = "duckduckgo-fallback";
     } catch (error) {
-      console.warn("[web] DuckDuckGo fallback failed:", error);
+      console.warn("[web] DuckDuckGo fallback failed; trying Google News RSS:", error);
+      try {
+        const rss = await googleNewsRss(q);
+        evidence = rss.filter((r) => r.snippet.trim().length >= 40);
+        if (evidence.length) effectiveProvider = "google-news-rss-fallback";
+      } catch (rssError) {
+        console.warn("[web] Google News RSS fallback failed:", rssError);
+      }
     }
   }
   lastSearchAt = Date.now();

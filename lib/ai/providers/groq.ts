@@ -99,11 +99,20 @@ export const groqProvider: Provider = {
   },
 
   async *generateStream(model: string, messages: ChatMessage[]) {
-    const res = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ model, messages, ...modelParams(model), stream: true }),
-    });
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ model, messages, ...modelParams(model), stream: true }),
+      });
+      if (res.status !== 429 || attempt === 1) break;
+      const retryAfter = Number(res.headers.get("retry-after") ?? "2");
+      const delayMs = Math.min(10_000, Math.max(500, Number.isFinite(retryAfter) ? retryAfter * 1000 : 2_000));
+      console.warn(`[groq] stream rate-limited; retrying in ${delayMs}ms`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+    if (!res) throw new Error("Groq: no response");
     if (!res.ok) throw new Error(`Groq stream error ${res.status}`);
     if (!res.body) throw new Error("Groq: no response body");
 
@@ -127,6 +136,19 @@ export const groqProvider: Provider = {
           const text = cleanStreamText(json?.choices?.[0]?.delta?.content);
           if (text) yield text;
         } catch { /* skip malformed chunk */ }
+      }
+    }
+    // Some proxies close the connection immediately after the final SSE event
+    // without the customary blank-line delimiter. Do not silently lose that event.
+    const finalLine = buf.trim();
+    if (finalLine.startsWith("data: ")) {
+      const data = finalLine.slice(6);
+      if (data !== "[DONE]") {
+        try {
+          const json = JSON.parse(data);
+          const text = cleanStreamText(json?.choices?.[0]?.delta?.content);
+          if (text) yield text;
+        } catch { /* ignore incomplete final event */ }
       }
     }
   },

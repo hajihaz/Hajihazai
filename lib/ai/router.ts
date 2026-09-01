@@ -199,12 +199,19 @@ export async function routeChatStream(
           }
         } else {
           const text = await provider.generate(entry.model, messages);
-          if (text) {
+          if (text && text.trim()) {
             emitted = true;
             yield text;
           } else {
             throw new Error("provider returned an empty response");
           }
+        }
+        // A streaming provider can legally close with HTTP 200 but emit no
+        // usable content. Treat that as a provider failure, not success: the
+        // old behavior returned a clean empty stream, which made the browser
+        // show "No response received" instead of activating the fallback chain.
+        if (!emitted) {
+          throw new Error("provider returned an empty streamed response");
         }
         recordSuccess(entry.modelId, Date.now() - started);
         return;

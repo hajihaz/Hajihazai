@@ -88,6 +88,17 @@ export const openrouterProvider: Provider = {
         } catch { /* skip malformed chunk */ }
       }
     }
+    const finalLine = buf.trim();
+    if (finalLine.startsWith("data: ")) {
+      const data = finalLine.slice(6);
+      if (data !== "[DONE]") {
+        try {
+          const json = JSON.parse(data);
+          const text: string = json?.choices?.[0]?.delta?.content ?? "";
+          if (text) yield text;
+        } catch { /* ignore incomplete final event */ }
+      }
+    }
   },
 
   async generateWithTools(model, messages: ChatMessage[], tools: NativeToolDefinition[]) {
