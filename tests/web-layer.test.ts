@@ -77,6 +77,34 @@ describe("production provider gate", () => {
   });
 });
 
+describe("Groq browser transient retry", () => {
+  it("retries transient 429/5xx failures before surfacing fallback", async () => {
+    const src = await import("@/lib/web/search");
+    const originalFetch = globalThis.fetch;
+    const originalKey = process.env.GROQ_API_KEY;
+    let calls = 0;
+    try {
+      process.env.GROQ_API_KEY = "test-key";
+      globalThis.fetch = (async () => {
+        calls++;
+        if (calls < 3) return new Response("rate limited", { status: 429 });
+        return new Response(JSON.stringify({
+          choices: [{ message: { executed_tools: [{ type: "browser_search", search_results: { results: [{ title: "TN Government", url: "https://tn.gov.in/cm", content: "Official government evidence with enough readable text for verification." }] } }] } }],
+        }), { status: 200, headers: { "content-type": "application/json" } });
+      }) as typeof fetch;
+      src.resetWebSearchStateForTests();
+      const r = await src.webSearch("retry test current fact", 3);
+      expect(calls).toBe(3);
+      expect(r.provider).toBe("groq-browser");
+      expect(r.results).toHaveLength(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = originalKey;
+      src.resetWebSearchStateForTests();
+    }
+  });
+});
+
 describe("freshness cache bypass", () => {
   it("bypasses cache for explicit current/refresh language", () => {
     expect(shouldBypassCache("current Chief Minister of Tamil Nadu")).toBe(true);

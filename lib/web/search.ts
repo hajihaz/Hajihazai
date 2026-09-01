@@ -12,6 +12,7 @@ import { getCached, setCached } from "./cache";
 
 const FETCH_TIMEOUT_MS = 8_000;
 const GROQ_BROWSER_TIMEOUT_MS = 20_000;
+const GROQ_RETRY_DELAYS_MS = [750, 1_500] as const;
 
 // Explicit freshness language must never be satisfied by an older cache entry.
 // This is critical for questions like "current CM", "right now", or "refresh".
@@ -25,6 +26,11 @@ let lastSearchAt: number | null = null;
 
 export function getLastSearchAt(): number | null {
   return lastSearchAt;
+}
+
+/** Test helper: clear in-process search state without exposing cache internals. */
+export function resetWebSearchStateForTests(): void {
+  lastSearchAt = null;
 }
 
 export function activeProvider():
@@ -402,9 +408,24 @@ export async function webSearch(
 
   let raw: WebResult[] = [];
   let effectiveProvider: string = provider;
-  try {
-    raw = await impl(q);
-  } catch (error) {
+  let lastError: unknown;
+  const attempts = provider === "groq-browser" ? GROQ_RETRY_DELAYS_MS.length + 1 : 1;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      raw = await impl(q);
+      lastError = undefined;
+      break;
+    } catch (error) {
+      lastError = error;
+      const status = error instanceof Error ? /http (\d{3})/.exec(error.message)?.[1] : undefined;
+      const retryable = provider === "groq-browser" && (status === "429" || status === "500" || status === "502" || status === "503" || status === "504");
+      if (!retryable || attempt >= attempts - 1) break;
+      await new Promise((resolve) => setTimeout(resolve, GROQ_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+  if (lastError) {
+    const error = lastError;
+
     // Groq browser search is the preferred production provider, but a transient
     // 429/provider outage must not make live verification brittle. Fall back to
     // the keyless search provider; the hard verification gate still refuses if
