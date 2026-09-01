@@ -39,6 +39,11 @@ function cleanStreamText(value: unknown): string {
 }
 
 function modelParams(model: string) {
+  if (model === "groq/compound-mini") {
+    return {
+      max_completion_tokens: 4096,
+    };
+  }
   if (model === "openai/gpt-oss-120b") {
     return {
       temperature: 0.5,

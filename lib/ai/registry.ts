@@ -24,6 +24,14 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     enabled: true,
   },
   {
+    modelId: "groq:compound-mini",
+    provider: "groq",
+    model: "groq/compound-mini",
+    displayName: "Compound Mini (Groq)",
+    contextWindow: 131_072,
+    enabled: true,
+  },
+  {
     // gemini-1.5-flash is retired on current API keys (404). Use 2.0 Flash.
     modelId: "gemini:2.0-flash",
     provider: "gemini",

@@ -39,12 +39,38 @@ describe("model health store", () => {
     }
   });
 
-  it("expires health results after the TTL", () => {
+  it("uses a short cooldown for rate limits", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-01-01T00:00:00Z"));
+    recordFailure("groq:gpt-oss-120b", "Groq stream error 429");
+    expect(isKnownUnhealthy("groq:gpt-oss-120b")).toBe(true);
+    vi.setSystemTime(new Date("2025-01-01T00:00:16Z"));
+    expect(isKnownUnhealthy("groq:gpt-oss-120b")).toBe(false);
+  });
+
+  it("uses a moderate cooldown for timeouts", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-01-01T00:00:00Z"));
+    recordFailure("groq:gpt-oss-120b", "provider timeout after 30000ms");
+    vi.setSystemTime(new Date("2025-01-01T00:00:31Z"));
+    expect(isKnownUnhealthy("groq:gpt-oss-120b")).toBe(false);
+  });
+
+  it("keeps authentication failures quarantined for the normal TTL", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2025-01-01T00:00:00Z"));
+    recordFailure("gemini:2.0-flash", "Gemini error 401");
+    vi.setSystemTime(new Date("2025-01-01T00:01:00Z"));
+    expect(isKnownUnhealthy("gemini:2.0-flash")).toBe(true);
+    vi.setSystemTime(new Date("2025-01-01T00:06:00Z"));
+    expect(isKnownUnhealthy("gemini:2.0-flash")).toBe(false);
+  });
+
+  it("expires generic health results after the TTL", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2025-01-01T00:00:00Z"));
     recordFailure("ollama:qwen2.5", "x");
     expect(isKnownUnhealthy("ollama:qwen2.5")).toBe(true);
-    // Advance past the 5-minute TTL.
     vi.setSystemTime(new Date("2025-01-01T00:06:00Z"));
     expect(getHealth("ollama:qwen2.5")).toBeUndefined();
   });

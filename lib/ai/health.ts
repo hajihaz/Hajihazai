@@ -4,15 +4,9 @@ import type { ChatMessage } from "./types";
 
 /**
  * Model health tracking (server-only).
- *
- * Two signals feed the store:
- *   1. Runtime outcomes — routeChat records success/failure on every real call.
- *   2. Active probes — probeAll() sends a tiny generation to each model.
- *
- * A model is "usable" when its provider has a key AND it is not currently
- * known-unhealthy. Decommissioned model ids / invalid keys surface as
- * failures here and are then hidden from the UI. Failures are logged
- * server-side only — never surfaced to end users.
+ * Runtime outcomes and active probes feed this store. Transient provider
+ * failures get a short quarantine; persistent configuration/model failures
+ * retain the normal TTL so routing can recover quickly without thrashing.
  */
 
 export interface ModelHealth {
@@ -21,9 +15,13 @@ export interface ModelHealth {
   checkedAt: number;
   latencyMs?: number;
   error?: string;
+  retryAfterMs?: number;
+  unhealthyUntil?: number;
 }
 
 const HEALTH_TTL_MS = 5 * 60_000;
+const TRANSIENT_COOLDOWN_MS = 15_000;
+const TIMEOUT_COOLDOWN_MS = 30_000;
 const PROBE_TIMEOUT_MS = 8_000;
 const PROBE_COOLDOWN_MS = 60_000;
 
@@ -35,13 +33,26 @@ export function recordSuccess(modelId: string, latencyMs?: number): void {
 }
 
 export function recordFailure(modelId: string, error: string): void {
-  console.warn(`[health] model unhealthy: ${modelId} — ${error}`);
-  store.set(modelId, { modelId, healthy: false, checkedAt: Date.now(), error });
+  const now = Date.now();
+  const normalized = error.toLowerCase();
+  const transient = /\b429\b|rate.?limit|too many requests|\b5(?:00|02|03|04)\b|temporarily unavailable|econnreset|enotfound/.test(normalized);
+  const timeout = /timeout|timed out|abort/.test(normalized);
+  const retryAfterMs = transient ? TRANSIENT_COOLDOWN_MS : timeout ? TIMEOUT_COOLDOWN_MS : HEALTH_TTL_MS;
+  console.warn(`[health] model unhealthy: ${modelId} — ${error} (retry in ${retryAfterMs}ms)`);
+  store.set(modelId, {
+    modelId,
+    healthy: false,
+    checkedAt: now,
+    error,
+    retryAfterMs,
+    unhealthyUntil: now + retryAfterMs,
+  });
 }
 
 function fresh(h: ModelHealth | undefined): ModelHealth | undefined {
   if (!h) return undefined;
-  return Date.now() - h.checkedAt <= HEALTH_TTL_MS ? h : undefined;
+  const expiresAt = h.unhealthyUntil ?? h.checkedAt + HEALTH_TTL_MS;
+  return Date.now() <= expiresAt ? h : undefined;
 }
 
 export function getHealth(modelId: string): ModelHealth | undefined {
@@ -101,15 +112,11 @@ export async function probeModel(entry: ModelEntry): Promise<ModelHealth> {
   return store.get(entry.modelId)!;
 }
 
-/**
- * Probe every enabled model that lacks a fresh health result.
- * Cooldown-guarded so concurrent requests don't all fan out probes.
- */
+/** Probe enabled models that lack a fresh health result. */
 export async function probeAll(opts: { force?: boolean } = {}): Promise<ModelHealth[]> {
   const now = Date.now();
   const models = listEnabledModels();
   const stale = models.filter((m) => opts.force || !getHealth(m.modelId));
-
   if (stale.length > 0 && (opts.force || now - lastProbeAll > PROBE_COOLDOWN_MS)) {
     lastProbeAll = now;
     await Promise.all(stale.map((m) => probeModel(m)));

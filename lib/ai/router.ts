@@ -45,13 +45,20 @@ export function planRoute(opts: {
   const usable = (entry: ModelEntry) =>
     opts.available[entry.provider] && !isKnownUnhealthy(entry.modelId);
 
-  const pushFirstFor = (p: ProviderName) => {
-    const preferredGroq =
-      p === "groq"
-        ? enabled.find((e) => e.modelId === "groq:gpt-oss-120b" && usable(e))
-        : undefined;
-    const entry = preferredGroq ?? enabled.find((e) => e.provider === p && usable(e));
-    if (entry && !chain.includes(entry)) chain.push(entry);
+  const pushAllFor = (p: ProviderName) => {
+    const entries = enabled.filter((e) => e.provider === p && usable(e));
+    // Keep the strongest legacy Groq model ahead of the other legacy Groq
+    // models, but leave Compound Mini first when it is the selected level.
+    if (p === "groq") {
+      entries.sort((a, b) => {
+        const rank = (id: string) =>
+          id === "groq:compound-mini" ? 0 : id === "groq:gpt-oss-120b" ? 1 : 2;
+        return rank(a.modelId) - rank(b.modelId);
+      });
+    }
+    for (const entry of entries) {
+      if (!chain.includes(entry)) chain.push(entry);
+    }
   };
 
   // Preferred model first (if enabled and its provider is available).
@@ -62,7 +69,7 @@ export function planRoute(opts: {
     if (pref) chain.push(pref);
   }
 
-  for (const p of order) pushFirstFor(p);
+  for (const p of order) pushAllFor(p);
   return chain;
 }
 

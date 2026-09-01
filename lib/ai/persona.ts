@@ -3,7 +3,7 @@
  * A single, versioned persona injected as the system prompt for every
  * conversation. Multi-model routing and additional personas build on this.
  */
-export const HAJI_MODEL = "groq:gpt-oss-120b";
+export const HAJI_MODEL = "groq:compound-mini";
 
 export const HAJI_PERSONA = {
   id: "haji",

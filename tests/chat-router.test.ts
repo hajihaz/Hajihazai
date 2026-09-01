@@ -18,7 +18,7 @@ describe("chat routing order: Groq → OpenRouter → Gemini → Ollama", () => 
 
   it("prefers the reasoning-focused QwQ model within Groq", () => {
     const chain = planRoute({ isProd: true, available: ALL });
-    expect(chain[0]?.modelId).toBe("groq:gpt-oss-120b");
+    expect(chain[0]?.modelId).toBe("groq:compound-mini");
   });
 
   it("falls to Groq when OpenRouter is unavailable", () => {
