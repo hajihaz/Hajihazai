@@ -23,16 +23,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 async function validateWrite(req: Request, user: { userId: string; email: string }, id: string) {
   const limited = await rateLimitResponse(`kb-content:${user.userId}`, 30, 60_000);
-  if (limited) return { response: limited };
+  if (limited) return { response: limited } as const;
   const perm = await assertKnowledgeWritePermission(user.email);
-  if (!perm.ok) return { response: Response.json({ error: perm.error }, { status: 403 }) };
+  if (!perm.ok) return { response: Response.json({ error: perm.error }, { status: 403 }) } as const;
   const body = await req.json().catch(() => null);
-  if (typeof body?.content !== "string") return { response: new Response("content is required", { status: 400 }) };
+  if (typeof body?.content !== "string") return { response: new Response("content is required", { status: 400 }) } as const;
   const safety = validateKnowledgeContent(body.content);
-  if (!safety.ok) return { response: Response.json({ error: safety.error }, { status: 422 }) };
+  if (!safety.ok) return { response: Response.json({ error: safety.error }, { status: 422 }) } as const;
   const doc = await getDocument(user.userId, id);
-  if (!doc) return { response: new Response("Not found", { status: 404 }) };
-  return { body, doc };
+  if (!doc) return { response: new Response("Not found", { status: 404 }) } as const;
+  return { body, doc } as const;
 }
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
