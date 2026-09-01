@@ -3,6 +3,7 @@ import { hashPassword, validatePassword } from "@/lib/auth/password";
 import { createUserSession, isSecureRequest } from "@/lib/auth/session";
 import { validateUsername } from "@/lib/onboarding/validate";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rateLimitIdentity } from "@/lib/auth/request";
 import { isEmailBlocked } from "@/lib/admin/queries";
 import { syncUserToSheets } from "@/lib/google-sheets";
 
@@ -40,6 +41,9 @@ export async function POST(req: Request) {
 
   const pw = validatePassword(body?.password);
   if (!pw.ok) return Response.json({ error: pw.error }, { status: 400 });
+
+  const ipLimited = await rateLimitResponse(rateLimitIdentity(req, "register"), 10, 60_000);
+  if (ipLimited) return ipLimited;
 
   const limited = await rateLimitResponse(`register:${email}`, 5, 60_000);
   if (limited) return limited;

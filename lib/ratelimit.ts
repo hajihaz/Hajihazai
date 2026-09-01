@@ -48,10 +48,10 @@ export async function rateLimitAsync(
   try {
     return await databaseLimiter.check(key, limit, windowMs);
   } catch (error) {
-    // Availability fallback only. The primary production path is now shared
-    // (Upstash or Postgres), so normal Vercel scaling cannot bypass limits.
-    console.error("[ratelimit] shared limiter unavailable; using memory fallback:", error);
-    return memoryLimiter.check(key, limit, windowMs);
+    // Security-sensitive limits fail closed in deployed environments. Falling
+    // back to per-instance memory would silently reintroduce a Vercel bypass.
+    console.error("[ratelimit] shared limiter unavailable; failing closed:", error);
+    return { ok: false, remaining: 0, retryAfterMs: 15_000 };
   }
 }
 

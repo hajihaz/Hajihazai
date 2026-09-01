@@ -2,6 +2,7 @@ import { getLoginProfile, createResetToken } from "@/lib/db/credential-queries";
 import { generateToken } from "@/lib/auth/password";
 import { sendPasswordResetEmail } from "@/lib/email/send";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rateLimitIdentity } from "@/lib/auth/request";
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
@@ -10,6 +11,9 @@ const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const identifier = typeof body?.identifier === "string" ? body.identifier.trim() : "";
+
+  const ipLimited = await rateLimitResponse(rateLimitIdentity(req, "forgot"), 10, 60_000);
+  if (ipLimited) return ipLimited;
 
   const limited = await rateLimitResponse(`forgot:${identifier.toLowerCase() || "anon"}`, 5, 60_000);
   if (limited) return limited;

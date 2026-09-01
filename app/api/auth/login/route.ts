@@ -2,6 +2,7 @@ import { getLoginProfile } from "@/lib/db/credential-queries";
 import { verifyPassword } from "@/lib/auth/password";
 import { createUserSession, isSecureRequest } from "@/lib/auth/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rateLimitIdentity } from "@/lib/auth/request";
 import { isEmailBlocked } from "@/lib/admin/queries";
 import { syncEventToSheets } from "@/lib/google-sheets";
 
@@ -13,6 +14,9 @@ export async function POST(req: Request) {
   if (!identifier || !password) {
     return Response.json({ error: "Username and password are required" }, { status: 400 });
   }
+
+  const ipLimited = await rateLimitResponse(rateLimitIdentity(req, "login"), 30, 60_000);
+  if (ipLimited) return ipLimited;
 
   const limited = await rateLimitResponse(`login:${identifier.toLowerCase()}`, 10, 60_000);
   if (limited) return limited;

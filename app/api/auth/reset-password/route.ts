@@ -1,12 +1,16 @@
 import { consumeResetToken, setUserPassword } from "@/lib/db/credential-queries";
 import { hashPassword, hashToken, validatePassword } from "@/lib/auth/password";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rateLimitIdentity } from "@/lib/auth/request";
 
 /** Complete a password reset with a token from the emailed link. */
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const token = typeof body?.token === "string" ? body.token.trim() : "";
   if (!token) return Response.json({ error: "Invalid or expired link" }, { status: 400 });
+
+  const ipLimited = await rateLimitResponse(rateLimitIdentity(req, "reset"), 20, 60_000);
+  if (ipLimited) return ipLimited;
 
   const limited = await rateLimitResponse(`reset:${token.slice(0, 16)}`, 10, 60_000);
   if (limited) return limited;
