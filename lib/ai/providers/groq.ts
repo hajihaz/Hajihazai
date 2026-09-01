@@ -33,6 +33,12 @@ function modelParams(model: string) {
       reasoning_effort: "medium" as const,
     };
   }
+  if (model === "qwen/qwen3.6-27b") {
+    return {
+      temperature: 0.4,
+      max_completion_tokens: 4096,
+    };
+  }
   return {};
 }
 
