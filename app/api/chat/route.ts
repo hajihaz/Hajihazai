@@ -14,7 +14,7 @@ import { isAdmin } from "@/lib/auth/admin";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { isMaintenanceMode, isWebSearchEnabled } from "@/lib/system-settings";
 import { classifyQuery, extractUrl, type WebIntent } from "@/lib/web/classify";
-import { webSearch } from "@/lib/web/search";
+import { webSearchMany } from "@/lib/web/search";
 import { fetchWebsite, type WebsiteFetchResult } from "@/lib/web/fetch-url";
 import { decideGate } from "@/lib/web/verify";
 import {
@@ -33,18 +33,21 @@ import {
   buildKnowledgeBlock,
   mergeBrainChunks,
 } from "@/lib/memory/context";
-import {
-  selectAndRunTool,
-  type ToolExecution,
-} from "@/lib/tools/tool-calling";
+import { selectAndRunTool, type ToolExecution } from "@/lib/tools/tool-calling";
 import { shouldCheckTools } from "@/lib/tools/should-check-tools";
 import { shouldRetrieve } from "@/lib/ai/should-retrieve";
 import { wrapToolOutput } from "@/lib/tools/output-guard";
 import type { ChatMessage } from "@/lib/ai/types";
 import { buildConversationTurns } from "@/lib/ai/conversation-turns";
-import { needsResolution, resolveReference } from "@/lib/ai/reference-resolution";
+import {
+  needsResolution,
+  resolveReference,
+} from "@/lib/ai/reference-resolution";
 import { detectMultiBrainScope } from "@/lib/ai/multi-brain";
-import { splitForDigest, renderConversationDigest } from "@/lib/ai/conversation-summary";
+import {
+  splitForDigest,
+  renderConversationDigest,
+} from "@/lib/ai/conversation-summary";
 import { sanitizeQueryForLog } from "@/lib/admin/analytics";
 import { planIntelligence } from "@/lib/ai/intelligence-planner";
 
@@ -80,7 +83,11 @@ async function retrieveMultiBrain(
   const results = (
     await Promise.all(
       brains.map((b) =>
-        buildKnowledgeContext(userId, { query, projectId, brainId: b.id }).catch(() => null),
+        buildKnowledgeContext(userId, {
+          query,
+          projectId,
+          brainId: b.id,
+        }).catch(() => null),
       ),
     )
   ).filter((r): r is NonNullable<typeof r> => r !== null);
@@ -105,11 +112,22 @@ export async function POST(req: Request) {
     if (maintenance) {
       const body = new ReadableStream({
         start(ctrl) {
-          ctrl.enqueue(sse({ t: "error", message: "System is currently under maintenance. Please try again later." }));
+          ctrl.enqueue(
+            sse({
+              t: "error",
+              message:
+                "System is currently under maintenance. Please try again later.",
+            }),
+          );
           ctrl.close();
         },
       });
-      return new Response(body, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache" } });
+      return new Response(body, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+        },
+      });
     }
   }
 
@@ -124,7 +142,15 @@ export async function POST(req: Request) {
   );
   if (limited) return limited;
 
-  const { conversationId, message, modelId, level, regenerate, brainId: clientBrainId, brainMode } = await req.json();
+  const {
+    conversationId,
+    message,
+    modelId,
+    level,
+    regenerate,
+    brainId: clientBrainId,
+    brainMode,
+  } = await req.json();
   if (!conversationId || typeof message !== "string" || !message.trim()) {
     return new Response("Bad request", { status: 400 });
   }
@@ -137,7 +163,9 @@ export async function POST(req: Request) {
     preferredModelId = modelId;
   }
   if (message.length > MESSAGE_MAX_CHARS) {
-    return new Response(`message exceeds ${MESSAGE_MAX_CHARS} characters`, { status: 413 });
+    return new Response(`message exceeds ${MESSAGE_MAX_CHARS} characters`, {
+      status: 413,
+    });
   }
 
   // Reference resolution (Phase 3): if the message uses a pronoun with no named
@@ -149,43 +177,71 @@ export async function POST(req: Request) {
   let refInfo: ReturnType<typeof resolveReference> | null = null;
   if (needsResolution(message)) {
     const prior = await listRecentMessages(conversationId, 8).catch(() => []);
-    refInfo = resolveReference(message, prior.filter((m) => m.role === "user").map((m) => m.content));
+    refInfo = resolveReference(
+      message,
+      prior.filter((m) => m.role === "user").map((m) => m.content),
+    );
     retrievalQuery = refInfo.resolved;
   }
 
   // ── Phase 1: all independent lookups run in parallel ─────────────────────
   // None of these depend on each other; they only need userId + retrievalQuery.
-  const effectiveBrainMode: BrainMode = brainMode === "smart" ? "smart" : "manual";
-  const intelligencePlan = planIntelligence(message, retrievalQuery, effectiveBrainMode);
+  const effectiveBrainMode: BrainMode =
+    brainMode === "smart" ? "smart" : "manual";
+  const intelligencePlan = planIntelligence(
+    message,
+    retrievalQuery,
+    effectiveBrainMode,
+  );
   const route = intelligencePlan.route;
   const resolvedBrainSlug = intelligencePlan.brainSlug;
 
   // Greetings / low-information acknowledgements must not trigger RAG.
   const wantRetrieval = intelligencePlan.retrieveMemory;
-  const EMPTY_MEMORY = { block: "", memories: [] as Awaited<ReturnType<typeof buildMemoryContext>>["memories"], count: 0, fallbackUsed: false };
-  const EMPTY_KNOWLEDGE = { block: "", chunks: [] as Awaited<ReturnType<typeof buildKnowledgeContext>>["chunks"], count: 0 };
+  const EMPTY_MEMORY = {
+    block: "",
+    memories: [] as Awaited<ReturnType<typeof buildMemoryContext>>["memories"],
+    count: 0,
+    fallbackUsed: false,
+  };
+  const EMPTY_KNOWLEDGE = {
+    block: "",
+    chunks: [] as Awaited<ReturnType<typeof buildKnowledgeContext>>["chunks"],
+    count: 0,
+  };
 
   const WRITE_INTENT_RE =
     /\b(remember|save|update|store|add|don'?t forget)\b.{0,40}\b(this|that|it|knowledge|memory|information|info)\b/i;
-  const hasWriteIntent = !admin && WRITE_INTENT_RE.test(message) && !!session.user.email;
+  const hasWriteIntent =
+    !admin && WRITE_INTENT_RE.test(message) && !!session.user.email;
 
-  const [convo, memory, tool, brainForSmart, writePermitted, webEnabled] = await Promise.all([
-    getConversation(session.user.id, conversationId),
-    wantRetrieval
-      ? buildMemoryContext(session.user.id, { query: retrievalQuery }).catch((err) => {
-          console.warn("[chat] memory context failed:", err);
-          return EMPTY_MEMORY;
-        })
-      : Promise.resolve(EMPTY_MEMORY),
-    shouldCheckTools(message)
-      ? selectAndRunTool(session.user.id, message, { audit: true })
-      : Promise.resolve<ToolExecution>({ toolRequested: null, toolExecuted: false, toolResult: null, run: null }),
-    resolvedBrainSlug ? getBrainBySlug(resolvedBrainSlug).catch(() => null) : Promise.resolve(null),
-    hasWriteIntent
-      ? isKnowledgeWritePermitted(session.user.email!).catch(() => false)
-      : Promise.resolve(true),
-    isWebSearchEnabled().catch(() => true),
-  ]);
+  const [convo, memory, tool, brainForSmart, writePermitted, webEnabled] =
+    await Promise.all([
+      getConversation(session.user.id, conversationId),
+      wantRetrieval
+        ? buildMemoryContext(session.user.id, { query: retrievalQuery }).catch(
+            (err) => {
+              console.warn("[chat] memory context failed:", err);
+              return EMPTY_MEMORY;
+            },
+          )
+        : Promise.resolve(EMPTY_MEMORY),
+      shouldCheckTools(message)
+        ? selectAndRunTool(session.user.id, message, { audit: true })
+        : Promise.resolve<ToolExecution>({
+            toolRequested: null,
+            toolExecuted: false,
+            toolResult: null,
+            run: null,
+          }),
+      resolvedBrainSlug
+        ? getBrainBySlug(resolvedBrainSlug).catch(() => null)
+        : Promise.resolve(null),
+      hasWriteIntent
+        ? isKnowledgeWritePermitted(session.user.email!).catch(() => false)
+        : Promise.resolve(true),
+      isWebSearchEnabled().catch(() => true),
+    ]);
 
   // Live-web layer — classify intent. "internal" leaves every existing path
   // untouched; "web"/"hybrid" fetch live results and "website" fetches a page
@@ -197,7 +253,9 @@ export async function POST(req: Request) {
   // so the gate can REFUSE it (Rule #1/#4) instead of silently answering current
   // events from stale model memory (the original critical bug). The toggle only
   // controls whether the live SEARCH is attempted (see the live lookup below).
-  const webIntent: WebIntent = wantRetrieval ? classifyQuery(retrievalQuery) : "internal";
+  const webIntent: WebIntent = wantRetrieval
+    ? classifyQuery(retrievalQuery)
+    : "internal";
 
   if (!convo) {
     return new Response("Not found", { status: 404 });
@@ -208,21 +266,23 @@ export async function POST(req: Request) {
     effectiveBrainMode === "smart"
       ? (brainForSmart?.id ?? null)
       : typeof clientBrainId === "string"
-      ? clientBrainId
-      : null;
+        ? clientBrainId
+        : null;
 
   // Smart mode that produced no confident brain → skip brain-scoped knowledge
   // retrieval (never fall through to an unscoped "search everything"), and hint
   // the model to ask which area the user means when the question looks domain-
   // specific (Phase D — no silent routing).
-  const smartUnrouted = effectiveBrainMode === "smart" && resolvedBrainId === null;
+  const smartUnrouted =
+    effectiveBrainMode === "smart" && resolvedBrainId === null;
   // Multi-brain queries are planned once and reused by retrieval + telemetry.
   const multiBrains = intelligencePlan.multiBrains;
   const isMulti = multiBrains.length >= 2;
   const wantKnowledge = intelligencePlan.retrieveKnowledge;
-  const clarifyBlock = smartUnrouted && !isMulti && wantRetrieval
-    ? "SYSTEM: The smart router could not confidently pick a knowledge brain for this message. If the message is an ambiguous role or entity reference — e.g. \"founder\", \"CEO\", \"ownership\", \"owner\" — without naming a company, ask which company or organization they mean (for example: \"Founder of what?\", \"CEO of which company?\", \"Ownership of which organization?\"). If it clearly refers to the user's specific businesses (AllBee, Suplaykart), personal/family life, or law, ask which area they mean. Otherwise answer normally from general knowledge."
-    : "";
+  const clarifyBlock =
+    smartUnrouted && !isMulti && wantRetrieval
+      ? 'SYSTEM: The smart router could not confidently pick a knowledge brain for this message. If the message is an ambiguous role or entity reference — e.g. "founder", "CEO", "ownership", "owner" — without naming a company, ask which company or organization they mean (for example: "Founder of what?", "CEO of which company?", "Ownership of which organization?"). If it clearly refers to the user\'s specific businesses (AllBee, Suplaykart), personal/family life, or law, ask which area they mean. Otherwise answer normally from general knowledge.'
+      : "";
 
   // ── Phase 2: parallel lookups that depend on convo.projectId + brainId ──
   // addMessage also runs here — ownership is confirmed above, and Phase 2
@@ -231,7 +291,12 @@ export async function POST(req: Request) {
     projectId ? getProject(session.user.id, projectId) : Promise.resolve(null),
     wantKnowledge
       ? (isMulti
-          ? retrieveMultiBrain(session.user.id, retrievalQuery, projectId, multiBrains)
+          ? retrieveMultiBrain(
+              session.user.id,
+              retrievalQuery,
+              projectId,
+              multiBrains,
+            )
           : buildKnowledgeContext(session.user.id, {
               query: retrievalQuery,
               projectId,
@@ -259,19 +324,34 @@ export async function POST(req: Request) {
         // page, so it is always safe to attempt (not gated on the toggle).
         (async (): Promise<{ kind: "website"; fetch: WebsiteFetchResult }> => {
           const u = extractUrl(retrievalQuery);
-          if (!u) return { kind: "website", fetch: { ok: false, reason: "no valid website address was found in the message" } };
+          if (!u)
+            return {
+              kind: "website",
+              fetch: {
+                ok: false,
+                reason: "no valid website address was found in the message",
+              },
+            };
           return { kind: "website", fetch: await fetchWebsite(u) };
         })()
       : webEnabled && (webIntent === "web" || webIntent === "hybrid")
-      ? // Attempted only when web search is enabled. When off, the gate sees
-        // searchEnabled=false and refuses live queries (never guesses from memory).
-        webSearch(retrievalQuery, 5)
-          .then((r) => ({ kind: "search" as const, search: r }))
-          .catch((err) => {
-            console.warn("[chat] web search failed:", err);
-            return { kind: "search" as const, search: { results: [], provider: "none", cached: false } };
-          })
-      : Promise.resolve(null),
+        ? // Attempted only when web search is enabled. When off, the gate sees
+          // searchEnabled=false and refuses live queries (never guesses from memory).
+          webSearchMany(
+            intelligencePlan.researchQueries.length
+              ? intelligencePlan.researchQueries
+              : [retrievalQuery],
+            5,
+          )
+            .then((r) => ({ kind: "search" as const, search: r }))
+            .catch((err) => {
+              console.warn("[chat] web search failed:", err);
+              return {
+                kind: "search" as const,
+                search: { results: [], provider: "none", cached: false },
+              };
+            })
+        : Promise.resolve(null),
   ]);
 
   const userMsg = userMsgResult;
@@ -294,8 +374,8 @@ export async function POST(req: Request) {
     retrievalMethod: !wantKnowledge
       ? "none"
       : memory.fallbackUsed
-      ? "keyword-fallback"
-      : "semantic",
+        ? "keyword-fallback"
+        : "semantic",
     wasClarify: !!clarifyBlock,
     wasZeroResult: wantKnowledge && knowledge.count === 0,
     sources: [...new Set(knowledge.chunks.map((c) => c.title))],
@@ -322,11 +402,17 @@ export async function POST(req: Request) {
     const refusalText =
       gate.action === "refuse_fetch"
         ? websiteFetchFailedMessage(
-            (websiteRes && !websiteRes.ok ? extractUrl(retrievalQuery) : null) ?? "",
+            (websiteRes && !websiteRes.ok
+              ? extractUrl(retrievalQuery)
+              : null) ?? "",
             gate.reason,
           )
         : verificationFailedMessage(gate.reason);
-    const verification = { intent: webIntent, decision: gate.action, reason: gate.reason };
+    const verification = {
+      intent: webIntent,
+      decision: gate.action,
+      reason: gate.reason,
+    };
 
     const body = new ReadableStream({
       async start(controller) {
@@ -346,7 +432,11 @@ export async function POST(req: Request) {
             assistantMsgId = m.id;
             if (convo.title === "New chat") {
               title = message.trim().slice(0, 60);
-              await setConversationTitle(session.user.id, conversationId, title);
+              await setConversationTitle(
+                session.user.id,
+                conversationId,
+                title,
+              );
             }
           } catch (err) {
             console.error("[chat] refusal persistence failed:", err);
@@ -363,7 +453,14 @@ export async function POST(req: Request) {
             requestedModelId: preferredModelId ?? null,
             clarify: null,
             ...(admin
-              ? { meta: { provider: "verification-gate", model: "verification-gate", latencyMs: 0, verification } }
+              ? {
+                  meta: {
+                    provider: "verification-gate",
+                    model: "verification-gate",
+                    latencyMs: 0,
+                    verification,
+                  },
+                }
               : {}),
           }),
         );
@@ -371,7 +468,11 @@ export async function POST(req: Request) {
       },
     });
     return new Response(body, {
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", "X-Accel-Buffering": "no" },
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+      },
     });
   }
 
@@ -384,16 +485,18 @@ export async function POST(req: Request) {
     toolBlock = wrapToolOutput(tool.toolRequested?.tool ?? "tool", serialized);
   }
 
-  const writeIntentBlock = hasWriteIntent && !writePermitted
-    ? "SYSTEM NOTICE: This user does NOT have permission to update system knowledge. If they ask you to save, remember, update, or store any information to your knowledge base or memory, respond with: \"You do not have permission to update system knowledge. Please contact an admin.\" Do not pretend to save anything."
-    : "";
+  const writeIntentBlock =
+    hasWriteIntent && !writePermitted
+      ? 'SYSTEM NOTICE: This user does NOT have permission to update system knowledge. If they ask you to save, remember, update, or store any information to your knowledge base or memory, respond with: "You do not have permission to update system knowledge. Please contact an admin." Do not pretend to save anything.'
+      : "";
 
   // Live-web / website context, driven by the verification gate above. We only
   // reach here on an "answer_*" decision:
   //   answer_website → summarize ONLY the fetched page (suppress internal blocks)
   //   answer_web     → answer from verified live results (suppress internal blocks)
   //   answer_hybrid  → internal is authoritative; add live results, else a disclaimer
-  const suppressInternal = gate.action === "answer_web" || gate.action === "answer_website";
+  const suppressInternal =
+    gate.action === "answer_web" || gate.action === "answer_website";
   let webBlock = "";
   if (gate.action === "answer_website" && websiteRes?.ok) {
     webBlock = renderWebsiteContent(websiteRes);
@@ -434,31 +537,53 @@ export async function POST(req: Request) {
   } catch (err) {
     console.warn("[chat] conversation digest failed:", err);
   }
-  const historyMessages: ChatMessage[] = buildConversationTurns(recent, message, {
-    regenerate,
-    currentUserMessageId: userMsg?.id,
-  });
+  const historyMessages: ChatMessage[] = buildConversationTurns(
+    recent,
+    message,
+    {
+      regenerate,
+      currentUserMessageId: userMsg?.id,
+    },
+  );
 
   const chatMessages: ChatMessage[] = [
     { role: "system", content: HAJI_PERSONA.system },
     ...(projectInstructions
-      ? [{ role: "system" as const, content: `Project instructions:\n${projectInstructions}` }]
+      ? [
+          {
+            role: "system" as const,
+            content: `Project instructions:\n${projectInstructions}`,
+          },
+        ]
       : []),
-    ...(memory.block ? [{ role: "system" as const, content: memory.block }] : []),
+    ...(memory.block
+      ? [{ role: "system" as const, content: memory.block }]
+      : []),
     // Pure-web / website queries suppress internal knowledge + the clarify hint
     // (the query is a live/external one the router can't place); hybrid keeps both.
-    ...(knowledge.block && !suppressInternal ? [{ role: "system" as const, content: knowledge.block }] : []),
+    ...(knowledge.block && !suppressInternal
+      ? [{ role: "system" as const, content: knowledge.block }]
+      : []),
     ...(toolBlock ? [{ role: "system" as const, content: toolBlock }] : []),
-    ...(writeIntentBlock ? [{ role: "system" as const, content: writeIntentBlock }] : []),
-    ...(clarifyBlock && !suppressInternal ? [{ role: "system" as const, content: clarifyBlock }] : []),
+    ...(writeIntentBlock
+      ? [{ role: "system" as const, content: writeIntentBlock }]
+      : []),
+    ...(clarifyBlock && !suppressInternal
+      ? [{ role: "system" as const, content: clarifyBlock }]
+      : []),
     ...(webBlock ? [{ role: "system" as const, content: webBlock }] : []),
-    { role: "system" as const, content: intelligencePlan.reasoningInstructions },
+    {
+      role: "system" as const,
+      content: intelligencePlan.reasoningInstructions,
+    },
     ...(digestBlock ? [{ role: "system" as const, content: digestBlock }] : []),
     ...historyMessages,
   ];
 
   // Stream the response via SSE.
-  const streamResult = await routeChatStream(chatMessages, { preferredModelId });
+  const streamResult = await routeChatStream(chatMessages, {
+    preferredModelId,
+  });
   const startMs = Date.now();
 
   const CHUNK_TIMEOUT_MS = 30_000;
@@ -476,7 +601,9 @@ export async function POST(req: Request) {
             ),
           ]);
           if (next === "timeout") {
-            throw Object.assign(new Error("provider timeout"), { timedOut: true });
+            throw Object.assign(new Error("provider timeout"), {
+              timedOut: true,
+            });
           }
           if (next.done) break;
           fullText += next.value;
@@ -489,12 +616,26 @@ export async function POST(req: Request) {
             role: "assistant",
             content: fullText.trimEnd() + "\n\n*[Response interrupted]*",
             modelId: streamResult.modelId,
-            metadata: { ...retrievalMeta, errorReason: (err as { timedOut?: boolean }).timedOut ? "timeout" : "stream_error", latencyMs: Date.now() - startMs },
+            metadata: {
+              ...retrievalMeta,
+              errorReason: (err as { timedOut?: boolean }).timedOut
+                ? "timeout"
+                : "stream_error",
+              latencyMs: Date.now() - startMs,
+            },
           }).catch(() => {});
         }
         const isTimeout = (err as { timedOut?: boolean }).timedOut === true;
-        console.error("[chat] stream error:", isTimeout ? "provider timeout" : err);
-        controller.enqueue(sse({ t: "error", message: isTimeout ? "Request timed out" : "Stream interrupted" }));
+        console.error(
+          "[chat] stream error:",
+          isTimeout ? "provider timeout" : err,
+        );
+        controller.enqueue(
+          sse({
+            t: "error",
+            message: isTimeout ? "Request timed out" : "Stream interrupted",
+          }),
+        );
         controller.close();
         return;
       }
@@ -537,7 +678,11 @@ export async function POST(req: Request) {
           // roles ("CEO", "ownership") apply only to the companies; "founder" and
           // generic prompts also include Haji.
           clarify: clarifyBlock
-            ? { options: /\b(ceo|ownership|owner)\b/i.test(message) ? ["AllBee", "Suplaykart"] : ["AllBee", "Suplaykart", "Haji"] }
+            ? {
+                options: /\b(ceo|ownership|owner)\b/i.test(message)
+                  ? ["AllBee", "Suplaykart"]
+                  : ["AllBee", "Suplaykart", "Haji"],
+              }
             : null,
           ...(admin
             ? {
@@ -552,7 +697,9 @@ export async function POST(req: Request) {
                   multiBrains: isMulti ? multiBrains : null,
                   brainConfidence: route?.confidence ?? null,
                   brainMatched: route?.matchedKeywords ?? null,
-                  brainReason: route?.reason ?? (clarifyBlock ? "clarification requested" : null),
+                  brainReason:
+                    route?.reason ??
+                    (clarifyBlock ? "clarification requested" : null),
                   knowledgeCount: knowledge.count,
                   memoryCount: memory.count,
                   // Reuse the single source-of-truth provenance computed above.
@@ -570,6 +717,8 @@ export async function POST(req: Request) {
                     searchWeb: intelligencePlan.searchWeb,
                     fetchWebsite: intelligencePlan.fetchWebsite,
                     checkTools: intelligencePlan.checkTools,
+                    researchQueries: intelligencePlan.researchQueries,
+                    researchReason: intelligencePlan.researchReason,
                   },
                   verification: {
                     intent: webIntent,
@@ -578,7 +727,9 @@ export async function POST(req: Request) {
                       gate.action === "answer_web" ||
                       gate.action === "answer_website" ||
                       (gate.action === "answer_hybrid" && gate.liveVerified),
-                    provider: searchRes?.provider ?? (websiteRes?.ok ? "website-fetch" : null),
+                    provider:
+                      searchRes?.provider ??
+                      (websiteRes?.ok ? "website-fetch" : null),
                   },
                 },
               }
