@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { listProjects, createProject } from "@/lib/db/project-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const NAME_MAX = 100;
 const TEXT_MAX = 4000;
 
@@ -9,7 +10,7 @@ export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
   const rows = await listProjects(session.user.id);
-  return Response.json({ projects: rows });
+  return Response.json({ projects: rows }, { headers: PRIVATE_NO_STORE });
 }
 
 export async function POST(req: Request) {

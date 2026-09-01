@@ -5,6 +5,7 @@ import {
 } from "@/lib/knowledge/semantic-search";
 import { rateLimitAsync } from "@/lib/ratelimit";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 /** Semantic search over the current user's knowledge-base chunks. */
 export async function GET(req: Request) {
   const session = await auth();
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const q = url.searchParams.get("q") ?? "";
+  const q = (url.searchParams.get("q") ?? "").slice(0, 500);
   const requestedLimit = Number(url.searchParams.get("limit"));
   const limit = Number.isFinite(requestedLimit)
     ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 50)
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
     : DEFAULT_DOC_SIMILARITY_THRESHOLD;
 
   if (!q.trim()) {
-    return Response.json({ query: "", threshold, results: [] });
+    return Response.json({ query: "", threshold, results: [] }, { headers: PRIVATE_NO_STORE });
   }
 
   const results = await semanticDocumentSearch(
@@ -47,5 +48,5 @@ export async function GET(req: Request) {
     limit,
     threshold,
   );
-  return Response.json({ query: q, threshold, results });
+  return Response.json({ query: q, threshold, results }, { headers: PRIVATE_NO_STORE });
 }

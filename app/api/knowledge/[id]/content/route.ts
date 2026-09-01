@@ -5,6 +5,7 @@ import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { validateKnowledgeContent, logKnowledgeAction } from "@/lib/knowledge/safety";
 import { reindexKnowledgeDocument } from "@/lib/knowledge/reindex";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 async function requireUser() {
   const session = await auth();
   if (!session?.user?.id) return null;
@@ -16,7 +17,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   if (!user) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
   if (!(await getDocument(user.userId, id))) return new Response("Not found", { status: 404 });
-  return Response.json({ content: await getContent(user.userId, id) });
+  return Response.json({ content: await getContent(user.userId, id) }, { headers: PRIVATE_NO_STORE });
 }
 
 async function validateWrite(req: Request, user: { userId: string; email: string }, id: string) {

@@ -2,12 +2,13 @@ import { auth } from "@/auth";
 import { getUserNotifications, markNotificationRead } from "@/lib/admin/queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
 
   const items = await getUserNotifications(session.user.id);
-  return Response.json({ notifications: items });
+  return Response.json({ notifications: items }, { headers: PRIVATE_NO_STORE });
 }
 
 export async function POST(req: Request) {

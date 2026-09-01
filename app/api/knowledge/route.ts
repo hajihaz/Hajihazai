@@ -3,6 +3,7 @@ import { createDocument, listDocuments } from "@/lib/db/knowledge-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { validateKnowledgeContent, logKnowledgeAction } from "@/lib/knowledge/safety";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const SOURCE_TYPES = ["pdf", "text", "website", "note"] as const;
 
 export async function GET() {
@@ -11,7 +12,7 @@ export async function GET() {
     return new Response("Unauthorized", { status: 401 });
   }
   const documents = await listDocuments(session.user.id);
-  return Response.json({ documents });
+  return Response.json({ documents }, { headers: PRIVATE_NO_STORE });
 }
 
 export async function POST(req: Request) {

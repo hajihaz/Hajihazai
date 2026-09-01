@@ -1,6 +1,8 @@
 import { auth } from "@/auth";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { searchMemories, searchWithDiagnostics } from "@/lib/memory/retrieve";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 type MemoryRow = {
   id: string;
   type: string;
@@ -27,8 +29,11 @@ export async function GET(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const limited = await rateLimitResponse(`memory-search:${session.user.id}`, 120, 60_000);
+  if (limited) return limited;
+
   const url = new URL(req.url);
-  const q = url.searchParams.get("q") ?? "";
+  const q = (url.searchParams.get("q") ?? "").slice(0, 500);
   const debug = url.searchParams.get("debug");
 
   if (debug === "1" || debug === "true") {
@@ -37,9 +42,9 @@ export async function GET(req: Request) {
       query: data.query,
       results: data.results.map(serialize),
       excluded: data.excluded,
-    });
+    }, { headers: PRIVATE_NO_STORE });
   }
 
   const results = await searchMemories(session.user.id, q);
-  return Response.json({ query: q, results: results.map(serialize) });
+  return Response.json({ query: q, results: results.map(serialize) }, { headers: PRIVATE_NO_STORE });
 }

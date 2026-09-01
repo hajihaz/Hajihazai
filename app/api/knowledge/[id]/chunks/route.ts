@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { listChunks } from "@/lib/db/knowledge-chunk-queries";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 /** Return the document's chunk count and ordered chunk list. */
 export async function GET(
   _req: Request,
@@ -24,5 +25,5 @@ export async function GET(
       chunkIndex: c.chunkIndex,
       content: c.content,
     })),
-  });
+  }, { headers: PRIVATE_NO_STORE });
 }

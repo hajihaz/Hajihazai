@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { deleteDocument, getDocument } from "@/lib/db/knowledge-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 export async function GET(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -16,7 +17,7 @@ export async function GET(
   if (!document) {
     return new Response("Not found", { status: 404 });
   }
-  return Response.json({ document });
+  return Response.json({ document }, { headers: PRIVATE_NO_STORE });
 }
 
 export async function DELETE(

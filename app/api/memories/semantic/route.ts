@@ -5,6 +5,7 @@ import {
 } from "@/lib/memory/semantic-search";
 import { rateLimitAsync } from "@/lib/ratelimit";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 /** Semantic search over the current user's active memories. User-scoped. */
 export async function GET(req: Request) {
   const session = await auth();
@@ -24,17 +25,20 @@ export async function GET(req: Request) {
   }
 
   const url = new URL(req.url);
-  const q = url.searchParams.get("q") ?? "";
-  const limit = Math.min(Number(url.searchParams.get("limit")) || 10, 50);
+  const q = (url.searchParams.get("q") ?? "").slice(0, 500);
+  const requestedLimit = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 50)
+    : 10;
   const thresholdParam = Number(url.searchParams.get("threshold"));
   const threshold = Number.isFinite(thresholdParam)
     ? thresholdParam
     : DEFAULT_SIMILARITY_THRESHOLD;
 
   if (!q.trim()) {
-    return Response.json({ query: "", threshold, results: [] });
+    return Response.json({ query: "", threshold, results: [] }, { headers: PRIVATE_NO_STORE });
   }
 
   const results = await semanticSearch(session.user.id, q, limit, threshold);
-  return Response.json({ query: q, threshold, results });
+  return Response.json({ query: q, threshold, results }, { headers: PRIVATE_NO_STORE });
 }

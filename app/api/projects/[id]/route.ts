@@ -4,6 +4,7 @@ import { listProjectConversations } from "@/lib/db/queries";
 import { listProjectDocuments } from "@/lib/db/knowledge-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const NAME_MAX = 100;
 const TEXT_MAX = 4000;
 
@@ -32,7 +33,7 @@ export async function GET(
       status: d.status,
       createdAt: d.createdAt,
     })),
-  });
+  }, { headers: PRIVATE_NO_STORE });
 }
 
 export async function PATCH(

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { listLevels, defaultLevel } from "@/lib/ai/levels";
 import { refreshSharedHealth } from "@/lib/ai/health";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 /**
  * Returns the capability levels configured for the model selector. This endpoint
  * is metadata-only: it MUST NOT make real provider completions just because the
@@ -16,5 +17,5 @@ export async function GET() {
 
   await refreshSharedHealth();
   const levels = listLevels();
-  return Response.json({ levels, default: defaultLevel() });
+  return Response.json({ levels, default: defaultLevel() }, { headers: PRIVATE_NO_STORE });
 }

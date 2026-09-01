@@ -4,6 +4,7 @@ import { updateUsername } from "@/lib/db/credential-queries";
 import { validateUsername } from "@/lib/onboarding/validate";
 import { rateLimitResponse } from "@/lib/ratelimit";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
@@ -18,7 +19,7 @@ export async function GET() {
       createdAt: p.createdAt,
       hasPassword: !!p.passwordHash,
     },
-  });
+  }, { headers: PRIVATE_NO_STORE });
 }
 
 /** Change username. */
