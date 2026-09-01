@@ -109,6 +109,8 @@ describe("freshness cache bypass", () => {
   it("bypasses cache for explicit current/refresh language", () => {
     expect(shouldBypassCache("current Chief Minister of Tamil Nadu")).toBe(true);
     expect(shouldBypassCache("refresh latest news now")).toBe(true);
+    expect(shouldBypassCache("latest Supreme Court judgment")).toBe(true);
+    expect(shouldBypassCache("recent RBI policy update")).toBe(true);
     expect(shouldBypassCache("Who founded AllBee?")).toBe(false);
   });
 });

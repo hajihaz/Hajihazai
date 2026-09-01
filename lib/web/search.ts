@@ -16,7 +16,7 @@ const GROQ_RETRY_DELAYS_MS = [750, 1_500] as const;
 
 // Explicit freshness language must never be satisfied by an older cache entry.
 // This is critical for questions like "current CM", "right now", or "refresh".
-const FRESHNESS_BYPASS_RE = /\b(current|currently|right now|as of (today|now)|refresh|just now|live)\b/i;
+const FRESHNESS_BYPASS_RE = /\b(current|currently|right now|as of (today|now)|refresh|just now|live|latest|most recent|recent|recently)\b/i;
 
 export function shouldBypassCache(query: string): boolean {
   return FRESHNESS_BYPASS_RE.test(query);
