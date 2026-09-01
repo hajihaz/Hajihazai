@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { getProject } from "@/lib/db/project-queries";
 import { ingestDocument, MAX_UPLOAD_BYTES } from "@/lib/knowledge/ingest";
 import { extFromName, isSupportedExt } from "@/lib/knowledge/extract";
@@ -8,6 +9,9 @@ import { rateLimitResponse } from "@/lib/ratelimit";
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
+
+  const perm = await assertKnowledgeWritePermission(session.user.email);
+  if (!perm.ok) return Response.json({ error: perm.error }, { status: 403 });
 
   const limited = await rateLimitResponse(`knowledge-upload:${session.user.id}`, 20, 60_000);
   if (limited) return limited;

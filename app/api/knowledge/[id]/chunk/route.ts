@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { getContent } from "@/lib/db/knowledge-content-queries";
 import { getDocument } from "@/lib/db/knowledge-queries";
 import { createChunks } from "@/lib/db/knowledge-chunk-queries";
@@ -13,6 +14,8 @@ export async function POST(
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const perm = await assertKnowledgeWritePermission(session.user.email);
+  if (!perm.ok) return Response.json({ error: perm.error }, { status: 403 });
   const { id } = await params;
 
   if (!(await getDocument(session.user.id, id))) {

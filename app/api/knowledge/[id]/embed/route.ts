@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { getDocument } from "@/lib/db/knowledge-queries";
 import { getChunkEmbeddingStatus } from "@/lib/db/knowledge-embedding-queries";
 import { embedDocumentChunks } from "@/lib/knowledge/embed-chunks";
@@ -13,6 +14,8 @@ export async function POST(
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const perm = await assertKnowledgeWritePermission(session.user.email);
+  if (!perm.ok) return Response.json({ error: perm.error }, { status: 403 });
   const { id } = await params;
 
   const limited = await rateLimitAsync(`kb-embed:${session.user.id}`, 5, 60_000);
