@@ -659,6 +659,26 @@ export const rateLimitBuckets = pgTable(
 export type RateLimitBucket = typeof rateLimitBuckets.$inferSelect;
 
 /* ------------------------------------------------------------------ */
+/* Shared AI model health (distributed circuit-breaker state)           */
+/* ------------------------------------------------------------------ */
+
+export const aiModelHealth = pgTable(
+  "ai_model_health",
+  {
+    modelId: text("model_id").primaryKey(),
+    healthy: boolean("healthy").notNull(),
+    checkedAt: timestamp("checked_at", { mode: "date" }).notNull(),
+    latencyMs: integer("latency_ms"),
+    error: text("error"),
+    retryAfterMs: integer("retry_after_ms"),
+    unhealthyUntil: timestamp("unhealthy_until", { mode: "date" }),
+  },
+  (t) => [index("ai_model_health_unhealthy_idx").on(t.unhealthyUntil)],
+);
+
+export type AiModelHealth = typeof aiModelHealth.$inferSelect;
+
+/* ------------------------------------------------------------------ */
 /* V1+ — Admin Notifications                                           */
 /* ------------------------------------------------------------------ */
 

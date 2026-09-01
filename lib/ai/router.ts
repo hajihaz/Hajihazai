@@ -7,7 +7,11 @@ import type {
 } from "./types";
 import { listEnabledModels, type ModelEntry } from "./registry";
 import { providers } from "./providers";
-import { isKnownUnhealthy, recordFailure, recordSuccess } from "./health";
+import { isKnownUnhealthy, recordFailure, recordSuccess, refreshSharedHealth } from "./health";
+
+async function refreshRoutingHealth(): Promise<void> {
+  await refreshSharedHealth(listEnabledModels().map((model) => model.modelId));
+}
 
 function estimateUsage(messages: ChatMessage[], text: string) {
   // Providers here don't report token usage; approximate at ~4 chars/token.
@@ -78,6 +82,8 @@ export async function routeChat(
   messages: ChatMessage[],
   opts: { preferredModelId?: string; jsonSchema?: Record<string, unknown> } = {},
 ): Promise<GenerateResult> {
+  await refreshRoutingHealth();
+
   const available: Record<ProviderName, boolean> = {
     ollama: providers.ollama.isAvailable(),
     gemini: providers.gemini.isAvailable(),
@@ -175,6 +181,8 @@ export async function routeChatStream(
   messages: ChatMessage[],
   opts: { preferredModelId?: string } = {},
 ): Promise<StreamChatResult> {
+  await refreshRoutingHealth();
+
   const available: Record<ProviderName, boolean> = {
     ollama: providers.ollama.isAvailable(),
     gemini: providers.gemini.isAvailable(),
@@ -275,6 +283,8 @@ export async function routeChatWithTools(
   tools: NativeToolDefinition[],
   opts: { preferredModelId?: string } = {},
 ): Promise<GenerateWithToolsResult & { modelId: string; provider: ProviderName }> {
+  await refreshRoutingHealth();
+
   const available: Record<ProviderName, boolean> = {
     ollama: providers.ollama.isAvailable(),
     gemini: providers.gemini.isAvailable(),

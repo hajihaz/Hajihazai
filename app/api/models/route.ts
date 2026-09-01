@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { listLevels, defaultLevel } from "@/lib/ai/levels";
+import { refreshSharedHealth } from "@/lib/ai/health";
 
 /**
  * Returns the capability levels configured for the model selector. This endpoint
@@ -13,6 +14,7 @@ export async function GET() {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  await refreshSharedHealth();
   const levels = listLevels();
   return Response.json({ levels, default: defaultLevel() });
 }

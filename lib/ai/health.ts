@@ -1,6 +1,7 @@
 import { listEnabledModels, MODEL_REGISTRY, type ModelEntry } from "./registry";
 import { providers } from "./providers";
 import type { ChatMessage } from "./types";
+import { loadSharedHealth, persistSharedHealth } from "./shared-health";
 
 /**
  * Model health tracking (server-only).
@@ -24,12 +25,18 @@ const TRANSIENT_COOLDOWN_MS = 15_000;
 const TIMEOUT_COOLDOWN_MS = 30_000;
 const PROBE_TIMEOUT_MS = 8_000;
 const PROBE_COOLDOWN_MS = 60_000;
+const SHARED_READ_COOLDOWN_MS = 2_000;
 
 const store = new Map<string, ModelHealth>();
 let lastProbeAll = 0;
+let lastSharedRead = 0;
 
 export function recordSuccess(modelId: string, latencyMs?: number): void {
-  store.set(modelId, { modelId, healthy: true, checkedAt: Date.now(), latencyMs });
+  const health: ModelHealth = { modelId, healthy: true, checkedAt: Date.now(), latencyMs };
+  store.set(modelId, health);
+  void persistSharedHealth(health).catch((error) => {
+    console.warn(`[health] shared success persistence failed: ${error instanceof Error ? error.message : String(error)}`);
+  });
 }
 
 export function recordFailure(modelId: string, error: string): void {
@@ -39,13 +46,17 @@ export function recordFailure(modelId: string, error: string): void {
   const timeout = /timeout|timed out|abort/.test(normalized);
   const retryAfterMs = transient ? TRANSIENT_COOLDOWN_MS : timeout ? TIMEOUT_COOLDOWN_MS : HEALTH_TTL_MS;
   console.warn(`[health] model unhealthy: ${modelId} — ${error} (retry in ${retryAfterMs}ms)`);
-  store.set(modelId, {
+  const health: ModelHealth = {
     modelId,
     healthy: false,
     checkedAt: now,
     error,
     retryAfterMs,
     unhealthyUntil: now + retryAfterMs,
+  };
+  store.set(modelId, health);
+  void persistSharedHealth(health).catch((persistError) => {
+    console.warn(`[health] shared failure persistence failed: ${persistError instanceof Error ? persistError.message : String(persistError)}`);
   });
 }
 
@@ -61,6 +72,23 @@ export function getHealth(modelId: string): ModelHealth | undefined {
 
 export function isKnownUnhealthy(modelId: string): boolean {
   return getHealth(modelId)?.healthy === false;
+}
+
+/** Refresh local health from the shared database without putting the DB on the hot path. */
+export async function refreshSharedHealth(modelIds: string[] = listEnabledModels().map((m) => m.modelId)): Promise<void> {
+  if (process.env.NODE_ENV === "test") return;
+  const now = Date.now();
+  if (now - lastSharedRead < SHARED_READ_COOLDOWN_MS) return;
+  lastSharedRead = now;
+  try {
+    await loadSharedHealth(modelIds, (health) => {
+      const local = store.get(health.modelId);
+      if (!local || health.checkedAt >= local.checkedAt) store.set(health.modelId, health);
+    });
+  } catch (error) {
+    // Shared health is advisory: routing must continue if the DB is temporarily unavailable.
+    console.warn(`[health] shared health read failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 const entryById = (id: string): ModelEntry | undefined =>
@@ -114,6 +142,7 @@ export async function probeModel(entry: ModelEntry): Promise<ModelHealth> {
 
 /** Probe enabled models that lack a fresh health result. */
 export async function probeAll(opts: { force?: boolean } = {}): Promise<ModelHealth[]> {
+  await refreshSharedHealth();
   const now = Date.now();
   const models = listEnabledModels();
   const stale = models.filter((m) => opts.force || !getHealth(m.modelId));
