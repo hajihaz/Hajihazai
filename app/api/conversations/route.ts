@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { createConversation, listConversations } from "@/lib/db/queries";
 import { getProject } from "@/lib/db/project-queries";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 export async function GET() {
   const session = await auth();
@@ -23,6 +24,9 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const limited = await rateLimitResponse(`conversations:${session.user.id}`, 30, 60_000);
+  if (limited) return limited;
 
   // Optional: create the chat inside a project the user owns.
   const body = await req.json().catch(() => null);

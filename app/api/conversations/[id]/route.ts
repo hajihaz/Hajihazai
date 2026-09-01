@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { deleteConversation, renameConversation } from "@/lib/db/queries";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 const TITLE_MAX = 120;
 
@@ -12,6 +13,8 @@ export async function PATCH(
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const limited = await rateLimitResponse(`conversation-mutation:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
   const { id } = await params;
 
   const body = await req.json().catch(() => null);
@@ -32,6 +35,8 @@ export async function DELETE(
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const limited = await rateLimitResponse(`conversation-mutation:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
   const { id } = await params;
   await deleteConversation(session.user.id, id);
   return new Response(null, { status: 204 });

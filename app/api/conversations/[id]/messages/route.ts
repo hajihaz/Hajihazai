@@ -25,5 +25,7 @@ export async function GET(
       content: m.content,
       modelId: m.modelId,
     })),
+  }, {
+    headers: { "Cache-Control": "private, no-store" },
   });
 }
