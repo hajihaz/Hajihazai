@@ -32,7 +32,7 @@ export async function POST(req: Request) {
   const pw = validatePassword(body?.password);
   if (!pw.ok) return Response.json({ error: pw.error }, { status: 400 });
 
-  const limited = rateLimitResponse(`register:${email}`, 5, 60_000);
+  const limited = await rateLimitResponse(`register:${email}`, 5, 60_000);
   if (limited) return limited;
 
   const passwordHash = await hashPassword(pw.value);

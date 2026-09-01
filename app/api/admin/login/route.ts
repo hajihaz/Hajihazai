@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Username and password are required" }, { status: 400 });
   }
 
-  const limited = rateLimitResponse(`admin-login:${username.toLowerCase()}`, 8, 60_000);
+  const limited = await rateLimitResponse(`admin-login:${username.toLowerCase()}`, 8, 60_000);
   if (limited) return limited;
 
   const admin = await getAdminByUsername(username);

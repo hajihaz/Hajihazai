@@ -14,7 +14,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Username and password are required" }, { status: 400 });
   }
 
-  const limited = rateLimitResponse(`login:${identifier.toLowerCase()}`, 10, 60_000);
+  const limited = await rateLimitResponse(`login:${identifier.toLowerCase()}`, 10, 60_000);
   if (limited) return limited;
 
   const profile = await getLoginProfile(identifier);

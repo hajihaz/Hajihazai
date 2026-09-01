@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { getDocument } from "@/lib/db/knowledge-queries";
 import { getChunkEmbeddingStatus } from "@/lib/db/knowledge-embedding-queries";
 import { embedDocumentChunks } from "@/lib/knowledge/embed-chunks";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimitAsync } from "@/lib/ratelimit";
 
 /** Generate and store embeddings for all of a document's chunks. */
 export async function POST(
@@ -15,7 +15,7 @@ export async function POST(
   }
   const { id } = await params;
 
-  const limited = rateLimit(`kb-embed:${session.user.id}`, 5, 60_000);
+  const limited = await rateLimitAsync(`kb-embed:${session.user.id}`, 5, 60_000);
   if (!limited.ok) {
     return new Response("Too many embedding requests. Please wait.", {
       status: 429,

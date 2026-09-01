@@ -3,7 +3,7 @@ import {
   semanticSearch,
   DEFAULT_SIMILARITY_THRESHOLD,
 } from "@/lib/memory/semantic-search";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimitAsync } from "@/lib/ratelimit";
 
 /** Semantic search over the current user's active memories. User-scoped. */
 export async function GET(req: Request) {
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   }
 
   // Each query embeds text via the model — cap per user.
-  const limited = rateLimit(`semantic:${session.user.id}`, 30, 60_000);
+  const limited = await rateLimitAsync(`semantic:${session.user.id}`, 30, 60_000);
   if (!limited.ok) {
     return new Response("Too many search requests. Please wait.", {
       status: 429,

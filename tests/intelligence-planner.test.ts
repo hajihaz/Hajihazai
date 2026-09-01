@@ -11,12 +11,13 @@ describe("intelligence planner", () => {
     expect(p.searchWeb).toBe(false);
   });
 
-  it("plans current-event questions as research + live web", () => {
+  it("plans current-event questions as fast smart + live web", () => {
     const p = planIntelligence("Who is the current Chief Minister of Tamil Nadu?");
-    expect(p.depth).toBe("research");
+    expect(p.depth).toBe("smart");
     expect(p.webIntent).toBe("web");
     expect(p.requiresLiveVerification).toBe(true);
     expect(p.searchWeb).toBe(true);
+    expect(p.researchQueries).toEqual([p.retrievalQuery]);
   });
 
   it("plans internal business questions for knowledge retrieval", () => {

@@ -3,7 +3,7 @@ import {
   semanticDocumentSearch,
   DEFAULT_DOC_SIMILARITY_THRESHOLD,
 } from "@/lib/knowledge/semantic-search";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimitAsync } from "@/lib/ratelimit";
 
 /** Semantic search over the current user's knowledge-base chunks. */
 export async function GET(req: Request) {
@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   }
 
   // Each query embeds text via the model — cap per user.
-  const limited = rateLimit(`kb-search:${session.user.id}`, 30, 60_000);
+  const limited = await rateLimitAsync(`kb-search:${session.user.id}`, 30, 60_000);
   if (!limited.ok) {
     return new Response("Too many search requests. Please wait.", {
       status: 429,

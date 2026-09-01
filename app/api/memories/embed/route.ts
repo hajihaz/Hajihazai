@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { embedAllMemories } from "@/lib/memory/embed-memory";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimitAsync } from "@/lib/ratelimit";
 
 // Embedding calls the embedding model per memory — cap it per user.
 const EMBED_LIMIT = 5;
@@ -13,7 +13,7 @@ export async function POST() {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const limit = rateLimit(`embed:${session.user.id}`, EMBED_LIMIT, EMBED_WINDOW_MS);
+  const limit = await rateLimitAsync(`embed:${session.user.id}`, EMBED_LIMIT, EMBED_WINDOW_MS);
   if (!limit.ok) {
     return new Response("Too many embedding requests. Please wait.", {
       status: 429,

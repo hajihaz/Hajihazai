@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { listConversations } from "@/lib/db/queries";
 import { extractMemories } from "@/lib/memory/extract";
-import { rateLimit } from "@/lib/ratelimit";
+import { rateLimitAsync } from "@/lib/ratelimit";
 
 // Extraction calls an LLM — cap it per user to limit cost/abuse.
 const EXTRACT_LIMIT = 5;
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const limit = rateLimit(
+  const limit = await rateLimitAsync(
     `extract:${session.user.id}`,
     EXTRACT_LIMIT,
     EXTRACT_WINDOW_MS,

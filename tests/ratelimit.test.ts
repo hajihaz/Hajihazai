@@ -3,6 +3,7 @@ import {
   rateLimit,
   resetRateLimits,
   rateLimitResponse,
+  rateLimitAsync,
   MemoryRateLimiter,
 } from "@/lib/ratelimit";
 
@@ -33,6 +34,13 @@ describe("rate limiter (memory)", () => {
   });
 });
 
+describe("rateLimitAsync fallback", () => {
+  it("uses memory when Upstash is not configured", async () => {
+    expect((await rateLimitAsync("async", 1, 60_000)).ok).toBe(true);
+    expect((await rateLimitAsync("async", 1, 60_000)).ok).toBe(false);
+  });
+});
+
 describe("MemoryRateLimiter (abstraction)", () => {
   it("implements the RateLimiter interface", () => {
     const rl = new MemoryRateLimiter();
@@ -47,13 +55,13 @@ describe("MemoryRateLimiter (abstraction)", () => {
 describe("rateLimitResponse middleware", () => {
   beforeEach(() => resetRateLimits());
 
-  it("returns null while under the limit", () => {
-    expect(rateLimitResponse("m", 2, 60_000)).toBeNull();
+  it("returns null while under the limit", async () => {
+    expect(await rateLimitResponse("m", 2, 60_000)).toBeNull();
   });
 
-  it("returns a 429 with Retry-After when over the limit", () => {
-    rateLimitResponse("m2", 1, 60_000); // consume
-    const res = rateLimitResponse("m2", 1, 60_000);
+  it("returns a 429 with Retry-After when over the limit", async () => {
+    await rateLimitResponse("m2", 1, 60_000); // consume
+    const res = await rateLimitResponse("m2", 1, 60_000);
     expect(res).not.toBeNull();
     expect(res!.status).toBe(429);
     expect(res!.headers.get("Retry-After")).toBeTruthy();

@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const limited = rateLimitResponse(`onboarding:${session.user.id}`, 20, 60_000);
+  const limited = await rateLimitResponse(`onboarding:${session.user.id}`, 20, 60_000);
   if (limited) return limited;
 
   const body = await req.json().catch(() => null);

@@ -13,7 +13,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
 
-  const limited = rateLimitResponse(`set-password:${session.user.id}`, 10, 60_000);
+  const limited = await rateLimitResponse(`set-password:${session.user.id}`, 10, 60_000);
   if (limited) return limited;
 
   const body = await req.json().catch(() => null);

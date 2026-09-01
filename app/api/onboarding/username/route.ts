@@ -10,7 +10,7 @@ export async function GET(req: Request) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const limited = rateLimitResponse(`username-check:${session.user.id}`, 60, 60_000);
+  const limited = await rateLimitResponse(`username-check:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
 
   const u = new URL(req.url).searchParams.get("u") ?? "";

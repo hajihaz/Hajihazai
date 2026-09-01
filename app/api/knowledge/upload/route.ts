@@ -9,7 +9,7 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
 
-  const limited = rateLimitResponse(`knowledge-upload:${session.user.id}`, 20, 60_000);
+  const limited = await rateLimitResponse(`knowledge-upload:${session.user.id}`, 20, 60_000);
   if (limited) return limited;
 
   const form = await req.formData().catch(() => null);

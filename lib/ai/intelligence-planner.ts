@@ -40,7 +40,9 @@ const QUICK_RE =
 function chooseDepth(message: string, webIntent: WebIntent): IntelligenceDepth {
   if (RESEARCH_RE.test(message) || webIntent === "website") return "research";
   if (QUICK_RE.test(message.trim())) return "quick";
-  if (webIntent === "web" || webIntent === "hybrid") return "research";
+  // Live facts need verification, but not every live fact needs a deep
+  // multi-query research fanout. Keep ordinary current-event turns fast;
+  // explicit research/deep-dive language opts into the broader fanout.
   return "smart";
 }
 

@@ -12,6 +12,7 @@ const base: GateInput = {
   searchEnabled: true,
   searchAttempted: false,
   searchResultCount: 0,
+  trustedResultCount: 0,
   fetchAttempted: false,
   fetchOk: false,
   internalKnowledgeCount: 0,
@@ -23,7 +24,7 @@ describe("decideGate — explicit cases", () => {
   });
 
   it("web with verified results answers", () => {
-    expect(decideGate({ ...base, intent: "web", searchAttempted: true, searchResultCount: 3 })).toEqual({
+    expect(decideGate({ ...base, intent: "web", searchAttempted: true, searchResultCount: 3, trustedResultCount: 1 })).toEqual({
       action: "answer_web",
     });
   });
@@ -31,6 +32,12 @@ describe("decideGate — explicit cases", () => {
   it("web with NO results refuses", () => {
     const d = decideGate({ ...base, intent: "web", searchAttempted: true, searchResultCount: 0 });
     expect(d.action).toBe("refuse_unverified");
+  });
+
+  it("web with results from untrusted sources refuses", () => {
+    const d = decideGate({ ...base, intent: "web", searchAttempted: true, searchResultCount: 3, trustedResultCount: 0 });
+    expect(d.action).toBe("refuse_unverified");
+    expect(d.reason).toContain("trusted");
   });
 
   it("web with search disabled refuses", () => {
@@ -55,21 +62,21 @@ describe("decideGate — explicit cases", () => {
   });
 
   it("hybrid verified → answers with live", () => {
-    expect(decideGate({ ...base, intent: "hybrid", searchAttempted: true, searchResultCount: 2 })).toEqual({
+    expect(decideGate({ ...base, intent: "hybrid", searchAttempted: true, searchResultCount: 2, trustedResultCount: 1 })).toEqual({
       action: "answer_hybrid",
       liveVerified: true,
     });
   });
 
   it("hybrid with failed live but internal facts → answers internal, live unverified", () => {
-    expect(decideGate({ ...base, intent: "hybrid", searchAttempted: true, searchResultCount: 0, internalKnowledgeCount: 4 })).toEqual({
+    expect(decideGate({ ...base, intent: "hybrid", searchAttempted: true, searchResultCount: 0, trustedResultCount: 0, internalKnowledgeCount: 4 })).toEqual({
       action: "answer_hybrid",
       liveVerified: false,
     });
   });
 
   it("hybrid with failed live AND no internal facts → refuses", () => {
-    const d = decideGate({ ...base, intent: "hybrid", searchAttempted: true, searchResultCount: 0, internalKnowledgeCount: 0 });
+    const d = decideGate({ ...base, intent: "hybrid", searchAttempted: true, searchResultCount: 0, trustedResultCount: 0, internalKnowledgeCount: 0 });
     expect(d.action).toBe("refuse_unverified");
   });
 });
@@ -84,6 +91,7 @@ describe("INVARIANT: no verification-required + failed path ever answers", () =>
       for (const searchEnabled of bools)
         for (const searchAttempted of bools)
           for (const searchResultCount of [0, 5])
+            for (const trustedResultCount of [0, 1])
             for (const fetchAttempted of bools)
               for (const fetchOk of bools)
                 for (const internalKnowledgeCount of [0, 3]) {
@@ -108,7 +116,7 @@ describe("INVARIANT: no verification-required + failed path ever answers", () =>
                   if (d.action === "answer_hybrid") {
                     expect(input.intent).toBe("hybrid");
                     const grounded =
-                      (input.searchAttempted && input.searchResultCount > 0) || input.internalKnowledgeCount > 0;
+                      (input.searchAttempted && input.searchResultCount > 0 && input.trustedResultCount > 0) || input.internalKnowledgeCount > 0;
                     expect(grounded).toBe(true);
                   }
                   // website/web that did NOT verify must be a refusal.
@@ -119,6 +127,6 @@ describe("INVARIANT: no verification-required + failed path ever answers", () =>
                     expect(isRefusal(d)).toBe(true);
                   }
                 }
-    expect(checked).toBe(intents.length * 2 * 2 * 2 * 2 * 2 * 2);
+    expect(checked).toBe(intents.length * 2 * 2 * 2 * 2 * 2 * 2 * 2);
   });
 });

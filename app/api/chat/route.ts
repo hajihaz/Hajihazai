@@ -140,7 +140,7 @@ export async function POST(req: Request) {
     admin &&
     ["1", "true"].includes(new URL(req.url).searchParams.get("debug") ?? "");
 
-  const limited = rateLimitResponse(
+  const limited = await rateLimitResponse(
     `chat:${session.user.id}`,
     CHAT_RATE_LIMIT,
     CHAT_RATE_WINDOW_MS,
@@ -409,6 +409,8 @@ export async function POST(req: Request) {
     searchEnabled: webEnabled,
     searchAttempted: !!searchRes,
     searchResultCount: searchRes?.results.length ?? 0,
+    trustedResultCount:
+      searchRes?.results.filter((r) => (r.tier ?? 5) <= 3).length ?? 0,
     fetchAttempted: !!websiteRes,
     fetchOk: !!websiteRes?.ok,
     internalKnowledgeCount: knowledge.count,

@@ -37,13 +37,14 @@ try {
 const { decideGate } = await import("../lib/web/verify.ts");
 const { hasProductionGradeProvider, activeProvider } = await import("../lib/web/search.ts");
 const { fetchWebsite } = await import("../lib/web/fetch-url.ts");
+const { webSearchMany } = await import("../lib/web/search.ts");
 
 const failures: string[] = [];
 const ok = (m: string) => console.log(`  ✅ ${m}`);
 const bad = (m: string) => { failures.push(m); console.log(`  ❌ ${m}`); };
 
 /* 1) Gate integrity — no verification-required + failed path may answer. */
-console.log("── 1/3 verification-gate integrity ──");
+console.log("── 1/4 verification-gate integrity ──");
 {
   const intents = ["internal", "web", "hybrid", "website"] as const;
   const b = [false, true];
@@ -52,13 +53,14 @@ console.log("── 1/3 verification-gate integrity ──");
     for (const searchEnabled of b)
       for (const searchAttempted of b)
         for (const searchResultCount of [0, 5])
+          for (const trustedResultCount of [0, 1])
           for (const fetchAttempted of b)
             for (const fetchOk of b)
               for (const internalKnowledgeCount of [0, 3]) {
-                const d = decideGate({ intent, searchEnabled, searchAttempted, searchResultCount, fetchAttempted, fetchOk, internalKnowledgeCount });
-                if (intent === "web" && d.action === "answer_web" && !(searchAttempted && searchResultCount > 0)) bypass++;
+                const d = decideGate({ intent, searchEnabled, searchAttempted, searchResultCount, trustedResultCount, fetchAttempted, fetchOk, internalKnowledgeCount });
+                if (intent === "web" && d.action === "answer_web" && !(searchAttempted && searchResultCount > 0 && trustedResultCount > 0)) bypass++;
                 if (intent === "website" && d.action === "answer_website" && !(fetchAttempted && fetchOk)) bypass++;
-                if (intent === "web" && !(searchEnabled && searchAttempted && searchResultCount > 0) && d.action.startsWith("answer")) bypass++;
+                if (intent === "web" && !(searchEnabled && searchAttempted && searchResultCount > 0 && trustedResultCount > 0) && d.action.startsWith("answer")) bypass++;
                 if (intent === "website" && !(fetchAttempted && fetchOk) && d.action.startsWith("answer")) bypass++;
               }
   if (bypass === 0) ok("no verification-required query can answer without a successful lookup");
@@ -66,7 +68,7 @@ console.log("── 1/3 verification-gate integrity ──");
 }
 
 /* 2) Live verification availability. */
-console.log("── 2/3 live search provider ──");
+console.log("── 2/4 live search provider ──");
 {
   const allowKeyless = process.env.ALLOW_KEYLESS_WEB === "1";
   if (hasProductionGradeProvider()) ok(`production-grade provider configured: ${activeProvider()}`);
@@ -74,8 +76,26 @@ console.log("── 2/3 live search provider ──");
   else bad("no production-grade search provider (set TAVILY_API_KEY / BRAVE_SEARCH_API_KEY / SERPER_API_KEY, or ALLOW_KEYLESS_WEB=1 to accept keyless)");
 }
 
-/* 3) Website fetch capability. */
-console.log("── 3/3 website fetch smoke ──");
+/* 3) Real current-event search smoke. */
+console.log("── 3/4 current-event search smoke ──");
+if (process.env.SKIP_LIVE_SEARCH_SMOKE === "1") {
+  ok("skipped (SKIP_LIVE_SEARCH_SMOKE=1)");
+} else {
+  try {
+    const r = await webSearchMany(["Who is the current Chief Minister of Tamil Nadu?"], 5);
+    const trusted = r.results.filter((x) => (x.tier ?? 5) <= 3);
+    if (trusted.length > 0) {
+      ok(`current-event search returned ${trusted.length} trusted source(s) via ${r.provider}`);
+    } else {
+      bad(`current-event search returned no trusted source (provider=${r.provider})`);
+    }
+  } catch (e) {
+    bad(`current-event search threw: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+/* 4) Website fetch capability. */
+console.log("── 4/4 website fetch smoke ──");
 if (process.env.SKIP_WEB_SMOKE === "1") {
   ok("skipped (SKIP_WEB_SMOKE=1)");
 } else {

@@ -212,10 +212,11 @@ async function brave(query: string): Promise<WebResult[]> {
 }
 
 /**
- * Groq GPT-OSS server-side browser search. The model is used only as a search
- * orchestrator here: HajiHaz ignores its generated answer and extracts the
- * executed browser-search sources, preventing a stale model answer from being
- * mistaken for verification. This is available with the existing GROQ_API_KEY.
+ * Groq GPT-OSS server-side browser search. Use the 120B reasoning model here
+ * because current-event verification is correctness-critical; GPT-OSS 20B is
+ * faster but can produce stale answers even after browser search. The generated
+ * answer is used only as supplemental evidence when it contains citations; the
+ * actual source pages remain the primary evidence.
  */
 async function groqBrowserSearch(query: string): Promise<WebResult[]> {
   const res = await fetchWithTimeout(
@@ -227,7 +228,7 @@ async function groqBrowserSearch(query: string): Promise<WebResult[]> {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
+        model: process.env.GROQ_WEB_MODEL || "openai/gpt-oss-120b",
         messages: [
           {
             role: "user",
@@ -235,7 +236,7 @@ async function groqBrowserSearch(query: string): Promise<WebResult[]> {
           },
         ],
         temperature: 1,
-        max_completion_tokens: 2048,
+        max_completion_tokens: 1200,
         reasoning_effort: "low",
         stream: false,
         tool_choice: "required",
@@ -247,6 +248,7 @@ async function groqBrowserSearch(query: string): Promise<WebResult[]> {
   const data = (await res.json()) as {
     choices?: Array<{
       message?: {
+        content?: string;
         executed_tools?: Array<{
           type?: string;
           search_results?: {
@@ -309,6 +311,15 @@ async function groqBrowserSearch(query: string): Promise<WebResult[]> {
         });
       }
     }
+  }
+
+  // The browser model returns a synthesized answer with citation markers. Keep
+  // it only as supplemental evidence when we also have at least one opened
+  // source page; never create a synthetic source from the model alone.
+  const generated = data.choices?.[0]?.message?.content?.trim() ?? "";
+  if (generated.length >= 40 && /【\d+†L\d+[-–]?\d*】/.test(generated)) {
+    const first = [...byUrl.values()].find((r) => r.snippet.length >= 40);
+    if (first) first.snippet = `${generated}\n\nSOURCE PAGE EVIDENCE:\n${first.snippet}`.slice(0, 5000);
   }
   return [...byUrl.values()];
 }
@@ -376,15 +387,38 @@ export async function webSearch(
             ? groqBrowserSearch
             : duckduckgo;
 
-  const raw = await impl(q);
-  // A search result without readable evidence is not verification. This is
-  // especially important for browser-search providers whose result metadata can
-  // occasionally omit page text; refusing is safer than grounding on a title.
-  const evidence = raw.filter((r) => r.snippet.trim().length >= 40);
+  let raw: WebResult[] = [];
+  let effectiveProvider: string = provider;
+  try {
+    raw = await impl(q);
+  } catch (error) {
+    // Groq browser search is the preferred production provider, but a transient
+    // 429/provider outage must not make live verification brittle. Fall back to
+    // the keyless search provider; the hard verification gate still refuses if
+    // this fallback also returns no usable evidence.
+    if (provider !== "groq-browser") throw error;
+    console.warn("[web] groq-browser failed; trying DuckDuckGo fallback:", error);
+    raw = await duckduckgo(q);
+    effectiveProvider = "duckduckgo-fallback";
+  }
+
+  // A search result without readable evidence is not verification. If Groq's
+  // browser-search metadata contains only empty snippets or blocked page-open
+  // messages, use DuckDuckGo as an independent evidence source before refusing.
+  let evidence = raw.filter((r) => r.snippet.trim().length >= 40);
+  if (!evidence.length && provider === "groq-browser") {
+    try {
+      const fallback = await duckduckgo(q);
+      evidence = fallback.filter((r) => r.snippet.trim().length >= 40);
+      if (evidence.length) effectiveProvider = "duckduckgo-fallback";
+    } catch (error) {
+      console.warn("[web] DuckDuckGo fallback failed:", error);
+    }
+  }
   lastSearchAt = Date.now();
   const ranked = rankAndFilter(evidence, limit);
   if (ranked.length) setCached(q, ranked);
-  return { results: ranked, provider, cached: false };
+  return { results: ranked, provider: effectiveProvider, cached: false };
 }
 
 /**

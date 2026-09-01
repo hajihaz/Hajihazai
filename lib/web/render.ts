@@ -64,8 +64,8 @@ export function renderWebsiteContent(c: WebsiteContent): string {
 export function renderWebContext(results: WebResult[], intent: WebIntent): string {
   const guard =
     intent === "hybrid"
-      ? "These are LIVE external results. The internal knowledge base is authoritative for Haji, his family/friends, AllBee, Suplaykart, and other private HajiHaz facts."
-      : "These are LIVE external results. Answer current facts from this evidence only; do not fall back to stale model memory.";
+      ? "These are LIVE external results. The internal knowledge base is authoritative for Haji, his family/friends, AllBee, Suplaykart, and other private HajiHaz facts. For the live portion, use the freshest and highest-authority evidence below."
+      : "These are LIVE external results. Answer current facts from this evidence only; do not fall back to stale model memory. Prefer official government/primary sources over secondary sources, and prefer newer evidence when sources conflict. If the evidence genuinely conflicts or does not establish the answer, say that you could not verify it instead of guessing.";
   const ledger = buildEvidenceLedger(results.map((r, i) => ({
     id: `WEB-${i + 1}`,
     kind: "web" as const,

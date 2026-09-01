@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   const token = typeof body?.token === "string" ? body.token.trim() : "";
   if (!token) return Response.json({ error: "Invalid or expired link" }, { status: 400 });
 
-  const limited = rateLimitResponse(`reset:${token.slice(0, 16)}`, 10, 60_000);
+  const limited = await rateLimitResponse(`reset:${token.slice(0, 16)}`, 10, 60_000);
   if (limited) return limited;
 
   const pw = validatePassword(body?.password);

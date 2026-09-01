@@ -26,7 +26,7 @@ export async function PATCH(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
 
-  const limited = rateLimitResponse(`profile:${session.user.id}`, 20, 60_000);
+  const limited = await rateLimitResponse(`profile:${session.user.id}`, 20, 60_000);
   if (limited) return limited;
 
   const body = await req.json().catch(() => null);

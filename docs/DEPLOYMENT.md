@@ -3,9 +3,9 @@
 Target: **GitHub → Vercel → hajihazai.com**, with **Neon** (Postgres + pgvector).
 
 > ⚠️ **Hard blocker:** Vercel has **no Ollama**. In production the router order is
-> Gemini → OpenRouter → Ollama, and Ollama is unavailable. **You MUST set at least
-> one cloud model key** (Gemini or OpenRouter) or chat returns "could not reach any
-> provider" and tools never fire.
+> Groq → OpenRouter → Gemini → Ollama, with Ollama unavailable on Vercel. **You MUST set
+> at least one cloud model key** (Groq, OpenRouter, or Gemini) or chat returns "could not
+> reach any provider" and tools never fire.
 
 ---
 
@@ -21,6 +21,9 @@ Target: **GitHub → Vercel → hajihazai.com**, with **Neon** (Postgres + pgvec
 | `OPENROUTER_API_KEY` | ⚠️ **One of these two required** | OpenRouter (fallback). Set at least one of Gemini/OpenRouter. |
 | `OLLAMA_BASE_URL` | ❌ Omit in prod | Only set if you run a self-hosted Ollama gateway. Absent ⇒ Ollama unavailable (expected on Vercel). |
 | `NEXT_PUBLIC_APP_URL` | ✅ Prod | `https://hajihazai.com` (used as OpenRouter referer). |
+| `RESEND_API_KEY` / `EMAIL_FROM` | ⚠️ Password reset | Resend HTTPS delivery; without these the reset flow remains generic but no email is delivered. |
+| `UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN` | ⚠️ Scale | Shared fixed-window rate limiting across Vercel instances; memory fallback remains available. |
+| `SENTRY_DSN` / `NEXT_PUBLIC_SENTRY_DSN` | ⚠️ Monitoring | Enables Sentry server/edge/client error monitoring. `SENTRY_AUTH_TOKEN` is optional for source-map upload. |
 | `TAVILY_API_KEY` *(or `BRAVE_SEARCH_API_KEY` / `SERPER_API_KEY`)* | ⚠️ **Required for current events** | Live-search provider for current-event verification. Without one, current-event queries **refuse** (never guess) — see §9. Website summarization needs no key. |
 
 ## 9. Live web search & the verification gate (anti-hallucination)
@@ -36,7 +39,7 @@ Current-event and website questions go through a **hard verification gate** (`li
 
 ## 2. Neon
 - [ ] Project created; **pgvector extension** is created automatically by migration `0004` (`CREATE EXTENSION IF NOT EXISTS vector`).
-- [ ] Run migrations against prod: `DATABASE_URL=<prod> npm run db:migrate` (applies `0000`–`0011`).
+- [ ] Run migrations against prod: `DATABASE_URL=<prod> npm run db:migrate` (applies the full migration journal through the current release).
 - [ ] Verify HNSW indexes exist on `user_memory.embedding` and `knowledge_chunk.embedding`.
 - [ ] Use the **pooled** connection string for serverless.
 
@@ -52,18 +55,18 @@ Current-event and website questions go through a **hard verification gate** (`li
 
 ## 5. Models
 - [ ] **Ollama:** not used in prod (no gateway). Local dev only.
-- [ ] **Gemini:** key set → primary in prod. ⚠️ Native tool-calling (`functionDeclarations`) is **implemented but UNVERIFIED against the live API** — smoke-test a tool call after deploy.
-- [ ] **OpenRouter:** key set → fallback. ⚠️ Same unverified caveat (OpenAI-compatible `tools`).
+- [ ] **Gemini:** key set → available in the production routing chain. Native tool-calling is covered by the provider contract tests; live smoke-test after deployment.
+- [ ] **OpenRouter:** key set → fallback. Native tool-calling is covered by the provider contract tests; live smoke-test after deployment.
 - [ ] After deploy, confirm a chat message that needs a tool actually executes one (check `/tools/history`).
 
 ## 6. Rate limiting
-- [ ] **Known limitation:** the limiter is **in-memory per-instance** (`MemoryRateLimiter`). On multi-instance Vercel the per-user limits are **NOT global** and can be exceeded across instances.
-- [ ] For real protection, implement `UpstashRateLimiter` (stub at `lib/ratelimit/upstash.ts`) and swap the limiter in `lib/ratelimit.ts`. Until then, rely on Vercel platform protections (WAF/Firewall) as a backstop.
+- [x] Shared rate limiting implemented with `UpstashRateLimiter` and used by rate-limited API routes.
+- [ ] Configure Upstash production credentials; if unavailable, the app safely falls back to per-instance memory limiting.
 - [ ] Per-route limits: `/api/chat` 30/min, `/api/tools` 60/min, memory/knowledge routes 5–30/min.
 
-## 7. Monitoring (not yet implemented — recommended before scale)
-- [ ] Add error monitoring (e.g. Sentry) — currently **none**.
-- [ ] Add LLM tracing (e.g. Langfuse) — currently **none**.
+## 7. Monitoring
+- [x] Sentry error monitoring integration added for client, server and edge runtimes; enable with DSN env vars.
+- [ ] Add LLM tracing (e.g. Langfuse) if deeper prompt/provider traces are needed at scale.
 - [ ] Tool calls are audited in `tool_invocation` (view at `/tools/history`).
 - [ ] Set up Neon storage/compute alerts; plan retention for `message` and `tool_invocation` (no TTL today).
 

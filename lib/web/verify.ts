@@ -26,6 +26,8 @@ export interface GateInput {
   searchAttempted: boolean;
   /** Number of usable results the search returned. */
   searchResultCount: number;
+  /** Number of results from trusted/reference/news/official tiers (0–3). */
+  trustedResultCount: number;
   /** A website fetch was actually performed for this query. */
   fetchAttempted: boolean;
   /** The website fetch succeeded and produced readable content. */
@@ -66,9 +68,11 @@ export function decideGate(i: GateInput): GateDecision {
       return { action: "refuse_unverified", reason: "live web search is turned off or no search provider is configured" };
     if (!i.searchAttempted)
       return { action: "refuse_unverified", reason: "a live search was not performed" };
-    return i.searchResultCount > 0
+    if (i.searchResultCount <= 0)
+      return { action: "refuse_unverified", reason: "no live source returned a usable result" };
+    return i.trustedResultCount > 0
       ? { action: "answer_web" }
-      : { action: "refuse_unverified", reason: "no live source returned a usable result" };
+      : { action: "refuse_unverified", reason: "live results were not from a trusted or established source" };
   }
 
   // Hybrid — internal entity plus a live/external facet. Internal facts are
@@ -77,7 +81,8 @@ export function decideGate(i: GateInput): GateDecision {
   //   - live verified            → answer with internal + web
   //   - live failed, have internal → answer internal, disclaim the live part
   //   - live failed, no internal   → nothing to stand on → refuse
-  if (i.searchAttempted && i.searchResultCount > 0) return { action: "answer_hybrid", liveVerified: true };
+  if (i.searchAttempted && i.searchResultCount > 0 && i.trustedResultCount > 0)
+    return { action: "answer_hybrid", liveVerified: true };
   if (i.internalKnowledgeCount > 0) return { action: "answer_hybrid", liveVerified: false };
   return { action: "refuse_unverified", reason: "no internal knowledge and no live source were available to verify this" };
 }

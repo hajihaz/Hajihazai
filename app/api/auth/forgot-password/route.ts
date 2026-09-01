@@ -11,7 +11,7 @@ export async function POST(req: Request) {
   const body = await req.json().catch(() => null);
   const identifier = typeof body?.identifier === "string" ? body.identifier.trim() : "";
 
-  const limited = rateLimitResponse(`forgot:${identifier.toLowerCase() || "anon"}`, 5, 60_000);
+  const limited = await rateLimitResponse(`forgot:${identifier.toLowerCase() || "anon"}`, 5, 60_000);
   if (limited) return limited;
 
   const generic = Response.json({
