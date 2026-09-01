@@ -140,6 +140,23 @@ export async function routeChat(
   };
 }
 
+const STREAM_IDLE_TIMEOUT_MS = 15_000;
+
+function nextWithTimeout<T>(
+  iterator: AsyncIterator<T>,
+  timeoutMs: number,
+): Promise<IteratorResult<T>> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return Promise.race([
+    iterator.next(),
+    new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`provider stream timeout after ${timeoutMs}ms`)), timeoutMs);
+    }),
+  ]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
+
 export interface StreamChatResult {
   stream: AsyncIterable<string>;
   modelId: string;
@@ -190,7 +207,7 @@ export async function routeChatStream(
         if (typeof provider.generateStream === "function") {
           const iter = provider.generateStream(entry.model, messages)[Symbol.asyncIterator]();
           while (true) {
-            const next = await iter.next();
+            const next = await nextWithTimeout(iter, STREAM_IDLE_TIMEOUT_MS);
             if (next.done) break;
             if (next.value) {
               emitted = true;
