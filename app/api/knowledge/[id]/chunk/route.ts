@@ -1,9 +1,9 @@
 import { auth } from "@/auth";
-import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { getContent } from "@/lib/db/knowledge-content-queries";
 import { getDocument } from "@/lib/db/knowledge-queries";
 import { createChunks } from "@/lib/db/knowledge-chunk-queries";
 import { chunkDocument } from "@/lib/knowledge/chunk";
+import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 
 /** Load the document's content, chunk it, and persist the chunks. */
 export async function POST(
@@ -15,7 +15,9 @@ export async function POST(
     return new Response("Unauthorized", { status: 401 });
   }
   const perm = await assertKnowledgeWritePermission(session.user.email);
-  if (!perm.ok) return Response.json({ error: perm.error }, { status: 403 });
+  if (!perm.ok) {
+    return Response.json({ error: perm.error }, { status: 403 });
+  }
   const { id } = await params;
 
   if (!(await getDocument(session.user.id, id))) {
