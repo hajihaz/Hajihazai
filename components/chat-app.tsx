@@ -479,9 +479,10 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
             if (event.t === "chunk") {
               if (!addedStreamMsg) {
                 setSending(false);
+                const chunk = typeof event.text === "string" ? event.text : "";
                 setMessages((p) => [
                   ...p,
-                  { id: streamMsgId, role: "assistant" as const, content: event.text, streaming: true, isNew: true },
+                  { id: streamMsgId, role: "assistant" as const, content: chunk, streaming: true, isNew: true },
                 ]);
                 addedStreamMsg = true;
                 assistantShown = true;
