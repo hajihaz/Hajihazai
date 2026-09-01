@@ -169,18 +169,31 @@ export async function routeChatStream(
     for (let i = 0; i < chain.length; i++) {
       const entry = chain[i];
       const provider = providers[entry.provider];
-      if (typeof provider.generateStream !== "function") continue;
       console.log(`[ai] stream-select provider=${entry.provider} model=${entry.modelId}`);
       const started = Date.now();
       let emitted = false;
       try {
-        const iter = provider.generateStream(entry.model, messages)[Symbol.asyncIterator]();
-        while (true) {
-          const next = await iter.next();
-          if (next.done) break;
-          if (next.value) {
+        // Prefer true streaming, but never make a non-streaming provider a dead
+        // end in the fallback chain. Gemini, for example, exposes generate() but
+        // not generateStream(); it must still be able to rescue a failed Groq /
+        // OpenRouter request in production.
+        if (typeof provider.generateStream === "function") {
+          const iter = provider.generateStream(entry.model, messages)[Symbol.asyncIterator]();
+          while (true) {
+            const next = await iter.next();
+            if (next.done) break;
+            if (next.value) {
+              emitted = true;
+              yield next.value;
+            }
+          }
+        } else {
+          const text = await provider.generate(entry.model, messages);
+          if (text) {
             emitted = true;
-            yield next.value;
+            yield text;
+          } else {
+            throw new Error("provider returned an empty response");
           }
         }
         recordSuccess(entry.modelId, Date.now() - started);

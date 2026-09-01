@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { planRoute } from "@/lib/ai/router";
+import { planRoute, routeChatStream } from "@/lib/ai/router";
 import { providers } from "@/lib/ai/providers";
 import type { ProviderName } from "@/lib/ai/types";
 
@@ -88,5 +88,46 @@ describe("Groq provider availability", () => {
 
   it("supports native tool calling", () => {
     expect(typeof providers.groq.generateWithTools).toBe("function");
+  });
+
+  it("falls through stream failures to a non-streaming provider", async () => {
+    const originals = {
+      groqAvailable: providers.groq.isAvailable,
+      openrouterAvailable: providers.openrouter.isAvailable,
+      geminiAvailable: providers.gemini.isAvailable,
+      ollamaAvailable: providers.ollama.isAvailable,
+      groqStream: providers.groq.generateStream,
+      openrouterStream: providers.openrouter.generateStream,
+      geminiGenerate: providers.gemini.generate,
+    };
+    try {
+      providers.groq.isAvailable = () => true;
+      providers.openrouter.isAvailable = () => true;
+      providers.gemini.isAvailable = () => true;
+      providers.ollama.isAvailable = () => false;
+      providers.groq.generateStream = async function* () {
+        throw new Error("Groq 401");
+      };
+      providers.openrouter.generateStream = async function* () {
+        throw new Error("OpenRouter 401");
+      };
+      providers.gemini.generate = async () => "Fallback works with spaces.";
+
+      const result = await routeChatStream(
+        [{ role: "user", content: "Who is Haji?" }],
+        { preferredModelId: "groq:gpt-oss-120b" },
+      );
+      const chunks: string[] = [];
+      for await (const chunk of result.stream) chunks.push(chunk);
+      expect(chunks.join("")).toBe("Fallback works with spaces.");
+    } finally {
+      providers.groq.isAvailable = originals.groqAvailable;
+      providers.openrouter.isAvailable = originals.openrouterAvailable;
+      providers.gemini.isAvailable = originals.geminiAvailable;
+      providers.ollama.isAvailable = originals.ollamaAvailable;
+      providers.groq.generateStream = originals.groqStream;
+      providers.openrouter.generateStream = originals.openrouterStream;
+      providers.gemini.generate = originals.geminiGenerate;
+    }
   });
 });

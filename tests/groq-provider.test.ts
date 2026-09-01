@@ -26,6 +26,29 @@ describe("Groq provider", () => {
     expect(body.max_completion_tokens).toBe(4096);
   });
 
+  it("preserves token-boundary whitespace while streaming", async () => {
+    const encoder = new TextEncoder();
+    const payloads = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "Hello" } }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: { content: " world" } }] })}\n\n`,
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "! How are you?" } }] })}\n\n`,
+      "data: [DONE]\n\n",
+    ];
+    const stream = new ReadableStream({
+      start(controller) {
+        for (const payload of payloads) controller.enqueue(encoder.encode(payload));
+        controller.close();
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response(stream, { status: 200 }));
+    globalThis.fetch = fetchMock;
+    const chunks: string[] = [];
+    for await (const chunk of groqProvider.generateStream("openai/gpt-oss-120b", [
+      { role: "user", content: "hello" },
+    ])) chunks.push(chunk);
+    expect(chunks.join("")).toBe("Hello world! How are you?");
+  });
+
   it("uses stable generation settings for Qwen fallback", async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       choices: [{ message: { content: "<think>reasoning</think>\nQwen answer" } }],

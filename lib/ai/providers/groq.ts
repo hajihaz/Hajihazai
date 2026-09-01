@@ -25,6 +25,19 @@ function cleanVisibleText(value: unknown): string {
     .trim();
 }
 
+/**
+ * Streaming chunks are already token-boundary text. Never trim them: model
+ * tokens commonly carry the leading space before the next word, and trimming
+ * every chunk turns `Hello world` into `Helloworld`.
+ */
+function cleanStreamText(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, "")
+    .replace(/^<think>[\s\S]*$/i, "");
+}
+
 function modelParams(model: string) {
   if (model === "openai/gpt-oss-120b") {
     return {
@@ -106,7 +119,7 @@ export const groqProvider: Provider = {
         if (data === "[DONE]") return;
         try {
           const json = JSON.parse(data);
-          const text = cleanVisibleText(json?.choices?.[0]?.delta?.content);
+          const text = cleanStreamText(json?.choices?.[0]?.delta?.content);
           if (text) yield text;
         } catch { /* skip malformed chunk */ }
       }
