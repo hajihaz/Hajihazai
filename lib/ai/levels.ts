@@ -83,6 +83,18 @@ export function resolveLevel(level: Level, usable: Usable = defaultUsable): stri
   return null;
 }
 
+/**
+ * Choose a model capability level from the intelligence planner's depth when
+ * the user did not explicitly select a level/model. This keeps trivial turns
+ * cheap/fast while giving research turns the stronger reasoning tier.
+ */
+export function levelForIntelligenceDepth(
+  depth: "quick" | "smart" | "research",
+): Level {
+  if (depth === "quick") return "low";
+  return "medium";
+}
+
 /** The default level to preselect: prefer Medium, else Low, else null. */
 export function defaultLevel(usable: Usable = defaultUsable): Level | null {
   const statuses = listLevels(usable);

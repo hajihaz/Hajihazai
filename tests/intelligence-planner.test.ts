@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { planIntelligence } from "../lib/ai/intelligence-planner";
+import { levelForIntelligenceDepth } from "../lib/ai/levels";
 
 describe("intelligence planner", () => {
   it("keeps small talk on the quick path", () => {
@@ -39,5 +40,17 @@ describe("intelligence planner", () => {
     expect(p.webIntent).toBe("website");
     expect(p.fetchWebsite).toBe(true);
     expect(p.searchWeb).toBe(false);
+  });
+});
+
+
+describe("intelligence depth → model level", () => {
+  it("keeps quick turns on the low tier", () => {
+    expect(levelForIntelligenceDepth("quick")).toBe("low");
+  });
+
+  it("uses the stronger tier for smart and research turns", () => {
+    expect(levelForIntelligenceDepth("smart")).toBe("medium");
+    expect(levelForIntelligenceDepth("research")).toBe("medium");
   });
 });

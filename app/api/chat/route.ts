@@ -8,7 +8,12 @@ import {
 import { HAJI_PERSONA } from "@/lib/ai/persona";
 import { routeChatStream } from "@/lib/ai/router";
 import { getProject } from "@/lib/db/project-queries";
-import { resolveLevel, isLevel, isLevelEnabled } from "@/lib/ai/levels";
+import {
+  resolveLevel,
+  isLevel,
+  isLevelEnabled,
+  levelForIntelligenceDepth,
+} from "@/lib/ai/levels";
 import { isModelUsable } from "@/lib/ai/health";
 import { isAdmin } from "@/lib/auth/admin";
 import { rateLimitResponse } from "@/lib/ratelimit";
@@ -156,6 +161,8 @@ export async function POST(req: Request) {
   }
 
   let preferredModelId: string | undefined;
+  const hasExplicitModelChoice =
+    isLevel(level) || (typeof modelId === "string" && modelId.length > 0);
   if (isLevel(level)) {
     const effective = isLevelEnabled(level) ? level : "medium";
     preferredModelId = resolveLevel(effective) ?? undefined;
@@ -195,6 +202,15 @@ export async function POST(req: Request) {
   );
   const route = intelligencePlan.route;
   const resolvedBrainSlug = intelligencePlan.brainSlug;
+
+  // Adaptive model selection: explicit user choices always win. Otherwise
+  // small talk uses the low-cost/fast tier while substantive and research
+  // turns use the stronger reasoning tier. Provider health/fallback remains
+  // centralized in routeChatStream().
+  if (!hasExplicitModelChoice) {
+    const adaptiveLevel = levelForIntelligenceDepth(intelligencePlan.depth);
+    preferredModelId = resolveLevel(adaptiveLevel) ?? preferredModelId;
+  }
 
   // Greetings / low-information acknowledgements must not trigger RAG.
   const wantRetrieval = intelligencePlan.retrieveMemory;
