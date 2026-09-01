@@ -31,12 +31,17 @@ function modelParams(model: string) {
       temperature: 0.5,
       max_completion_tokens: 4096,
       reasoning_effort: "medium" as const,
+      // GPT-OSS exposes reasoning separately by default. Never return it to
+      // the chat UI: the application needs only the final assistant answer.
+      include_reasoning: false,
     };
   }
   if (model === "qwen/qwen3.6-27b") {
     return {
       temperature: 0.4,
       max_completion_tokens: 4096,
+      // Qwen reasoning is otherwise emitted as <think> content by Groq.
+      reasoning_format: "hidden" as const,
     };
   }
   return {};

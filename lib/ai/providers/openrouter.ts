@@ -32,6 +32,9 @@ export const openrouterProvider: Provider = {
         model,
         messages,
         stream: false,
+        // Reasoning-capable OpenRouter models may expose thinking separately.
+        // Exclude it so only the final assistant answer enters chat history.
+        reasoning: { exclude: true },
         ...(opts?.jsonSchema ? { response_format: { type: "json_object" } } : {}),
       }),
     });
@@ -53,7 +56,12 @@ export const openrouterProvider: Provider = {
         "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
         "X-Title": "HajiHaz AI",
       },
-      body: JSON.stringify({ model, messages, stream: true }),
+      body: JSON.stringify({
+        model,
+        messages,
+        stream: true,
+        reasoning: { exclude: true },
+      }),
     });
     if (!res.ok) throw new Error(`OpenRouter stream error ${res.status}`);
     if (!res.body) throw new Error("OpenRouter: no response body");
@@ -98,6 +106,7 @@ export const openrouterProvider: Provider = {
         model,
         messages,
         stream: false,
+        reasoning: { exclude: true },
         tool_choice: "auto",
         tools: tools.map((t) => ({
           type: "function",

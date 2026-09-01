@@ -22,6 +22,7 @@ describe("Groq provider", () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(text).toBe("Final answer");
     expect(body.reasoning_effort).toBe("medium");
+    expect(body.include_reasoning).toBe(false);
     expect(body.max_completion_tokens).toBe(4096);
   });
 
@@ -39,5 +40,6 @@ describe("Groq provider", () => {
     expect(body.temperature).toBe(0.4);
     expect(body.max_completion_tokens).toBe(4096);
     expect(body.reasoning_effort).toBeUndefined();
+    expect(body.reasoning_format).toBe("hidden");
   });
 });
