@@ -11,6 +11,7 @@ import { rankAndFilter, type WebResult } from "./sources";
 import { getCached, setCached } from "./cache";
 
 const FETCH_TIMEOUT_MS = 8_000;
+const GROQ_BROWSER_TIMEOUT_MS = 20_000;
 
 // Explicit freshness language must never be satisfied by an older cache entry.
 // This is critical for questions like "current CM", "right now", or "refresh".
@@ -63,9 +64,10 @@ export function isWebProviderReady(): boolean {
 async function fetchWithTimeout(
   url: string,
   init?: RequestInit,
+  timeoutMs = FETCH_TIMEOUT_MS,
 ): Promise<Response> {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: ctrl.signal });
   } finally {
@@ -221,9 +223,9 @@ async function brave(query: string): Promise<WebResult[]> {
 }
 
 /**
- * Groq GPT-OSS server-side browser search. Use the 120B reasoning model here
- * because current-event verification is correctness-critical; GPT-OSS 20B is
- * faster but can produce stale answers even after browser search. The generated
+ * Groq GPT-OSS server-side browser search. Use GPT-OSS 20B by default because it
+ * is the currently supported browser-search path with lower latency/cost. Operators
+ * can opt into the 120B browser-search model with GROQ_WEB_MODEL when capacity is available.
  * answer is used only as supplemental evidence when it contains citations; the
  * actual source pages remain the primary evidence.
  */
@@ -237,7 +239,7 @@ async function groqBrowserSearch(query: string): Promise<WebResult[]> {
         Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
       },
       body: JSON.stringify({
-        model: process.env.GROQ_WEB_MODEL || "openai/gpt-oss-120b",
+        model: process.env.GROQ_WEB_MODEL || "openai/gpt-oss-20b",
         messages: [
           {
             role: "user",
@@ -252,6 +254,7 @@ async function groqBrowserSearch(query: string): Promise<WebResult[]> {
         tools: [{ type: "browser_search" }],
       }),
     },
+    GROQ_BROWSER_TIMEOUT_MS,
   );
   if (!res.ok) throw new Error(`groq-browser http ${res.status}`);
   const data = (await res.json()) as {
