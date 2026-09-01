@@ -5,6 +5,8 @@ import { embedDocumentChunks } from "@/lib/knowledge/embed-chunks";
 import { rateLimitAsync } from "@/lib/ratelimit";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 
+const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
+
 /** Generate and store embeddings for all of a document's chunks. */
 export async function POST(
   _req: Request,
@@ -48,6 +50,16 @@ export async function GET(
   }
   const { id } = await params;
 
+  const limited = await rateLimitAsync(`kb-embed-status:${session.user.id}`, 60, 60_000);
+  if (!limited.ok) {
+    return new Response("Too many embedding status requests. Please wait.", {
+      status: 429,
+      headers: {
+        "Retry-After": String(Math.ceil((limited.retryAfterMs ?? 1000) / 1000)),
+      },
+    });
+  }
+
   if (!(await getDocument(session.user.id, id))) {
     return new Response("Not found", { status: 404 });
   }
@@ -57,5 +69,5 @@ export async function GET(
     total: status?.total ?? 0,
     embedded: status?.embedded ?? 0,
     dimensions: 768,
-  });
+  }, { headers: PRIVATE_NO_STORE });
 }

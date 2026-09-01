@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { createDocument, listDocuments } from "@/lib/db/knowledge-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { rateLimitResponse } from "@/lib/ratelimit";
-import { validateKnowledgeContent, logKnowledgeAction } from "@/lib/knowledge/safety";
+import { logKnowledgeAction } from "@/lib/knowledge/safety";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const SOURCE_TYPES = ["pdf", "text", "website", "note"] as const;
@@ -38,16 +38,20 @@ export async function POST(req: Request) {
   if (typeof title !== "string" || !title.trim()) {
     return new Response("title is required", { status: 400 });
   }
+  if (title.trim().length > 200) {
+    return new Response("title is too long (maximum 200 characters)", { status: 400 });
+  }
   if (sourceType !== undefined && !SOURCE_TYPES.includes(sourceType)) {
     return new Response("invalid sourceType", { status: 400 });
   }
 
-  // Safety validation when content is provided at creation time
-  if (typeof content === "string") {
-    const safety = validateKnowledgeContent(content);
-    if (!safety.ok) {
-      return Response.json({ error: safety.error }, { status: 422 });
-    }
+  // Content has a dedicated canonical-content endpoint. Reject it here rather
+  // than validating/logging and silently discarding caller data.
+  if (content !== undefined) {
+    return Response.json(
+      { error: "content is not accepted by this endpoint; create the document first, then save content" },
+      { status: 400 },
+    );
   }
 
   const document = await createDocument(session.user.id, {
@@ -61,7 +65,7 @@ export async function POST(req: Request) {
     action: "create",
     documentId: document.id,
     documentTitle: title.trim(),
-    contentAfter: typeof content === "string" ? content.slice(0, 2000) : null,
+    contentAfter: null,
   });
 
   return Response.json({ document }, { status: 201 });
