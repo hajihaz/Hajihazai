@@ -7,6 +7,6 @@ export async function GET() {
 
   const brains = await listBrainsForPicker();
   return Response.json({ brains }, {
-    headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=60" },
+    headers: { "Cache-Control": "private, max-age=300, stale-while-revalidate=60" },
   });
 }
