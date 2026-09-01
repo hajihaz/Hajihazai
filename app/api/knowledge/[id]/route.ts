@@ -14,6 +14,9 @@ export async function GET(
   }
   const { id } = await params;
 
+  const limited = await rateLimitResponse(`knowledge-read:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
+
   const document = await getDocument(session.user.id, id);
   if (!document) {
     return new Response("Not found", { status: 404 });

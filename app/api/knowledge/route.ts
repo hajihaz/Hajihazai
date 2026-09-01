@@ -12,6 +12,8 @@ export async function GET() {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const limited = await rateLimitResponse(`knowledge-list:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
   const documents = await listDocuments(session.user.id);
   return Response.json({ documents }, { headers: PRIVATE_NO_STORE });
 }

@@ -17,6 +17,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const user = await requireUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
+  const limited = await rateLimitResponse(`kb-content-read:${user.userId}`, 60, 60_000);
+  if (limited) return limited;
   if (!(await getDocument(user.userId, id))) return new Response("Not found", { status: 404 });
   return Response.json({ content: await getContent(user.userId, id) }, { headers: PRIVATE_NO_STORE });
 }
