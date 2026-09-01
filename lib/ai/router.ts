@@ -7,7 +7,7 @@ import type {
 } from "./types";
 import { listEnabledModels, type ModelEntry } from "./registry";
 import { providers } from "./providers";
-import { recordFailure, recordSuccess } from "./health";
+import { isKnownUnhealthy, recordFailure, recordSuccess } from "./health";
 
 function estimateUsage(messages: ChatMessage[], text: string) {
   // Providers here don't report token usage; approximate at ~4 chars/token.
@@ -42,19 +42,22 @@ export function planRoute(opts: {
   const order: ProviderName[] = ["groq", "openrouter", "gemini", "ollama"];
 
   const chain: ModelEntry[] = [];
+  const usable = (entry: ModelEntry) =>
+    opts.available[entry.provider] && !isKnownUnhealthy(entry.modelId);
+
   const pushFirstFor = (p: ProviderName) => {
     const preferredGroq =
       p === "groq"
-        ? enabled.find((e) => e.modelId === "groq:gpt-oss-120b" && opts.available[p])
+        ? enabled.find((e) => e.modelId === "groq:gpt-oss-120b" && usable(e))
         : undefined;
-    const entry = preferredGroq ?? enabled.find((e) => e.provider === p && opts.available[p]);
+    const entry = preferredGroq ?? enabled.find((e) => e.provider === p && usable(e));
     if (entry && !chain.includes(entry)) chain.push(entry);
   };
 
   // Preferred model first (if enabled and its provider is available).
   if (opts.preferredModelId) {
     const pref = enabled.find(
-      (e) => e.modelId === opts.preferredModelId && opts.available[e.provider],
+      (e) => e.modelId === opts.preferredModelId && usable(e),
     );
     if (pref) chain.push(pref);
   }
