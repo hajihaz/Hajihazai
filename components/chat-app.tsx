@@ -289,32 +289,63 @@ export default function ChatApp({
   }, []);
 
   const newChat = useCallback(async () => {
-    const res = await fetch("/api/conversations", { method: "POST" });
-    const convo: Conv = await res.json();
-    setConversations((p) => [convo, ...p]);
-    setActiveId(convo.id);
-    setMessages([]);
-    setSidebarOpen(false);
-  }, []);
+    try {
+      const res = await fetch("/api/conversations", { method: "POST" });
+      if (!res.ok) {
+        notify("Couldn't create a new chat");
+        return;
+      }
+      const convo: Conv = await res.json();
+      setConversations((p) => [convo, ...p]);
+      setActiveId(convo.id);
+      setMessages([]);
+      setSidebarOpen(false);
+    } catch {
+      notify("Couldn't create a new chat");
+    }
+  }, [notify]);
 
   async function confirmDelete() {
     if (!pendingDelete) return;
     const id = pendingDelete.id;
     setPendingDelete(null);
-    await fetch(`/api/conversations/${id}`, { method: "DELETE" });
-    setConversations((p) => p.filter((c) => c.id !== id));
-    if (activeId === id) { setActiveId(null); setMessages([]); }
+    try {
+      const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      if (!res.ok) {
+        notify("Couldn't delete the chat");
+        return;
+      }
+      setConversations((p) => p.filter((c) => c.id !== id));
+      if (activeId === id) { setActiveId(null); setMessages([]); }
+    } catch {
+      notify("Couldn't delete the chat");
+    }
   }
 
   const handleRename = useCallback(async (id: string, title: string) => {
-    if (!title.trim()) return;
-    setConversations((p) => p.map((c) => (c.id === id ? { ...c, title } : c)));
-    await fetch(`/api/conversations/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
-    }).catch(() => {});
-  }, []);
+    const nextTitle = title.trim();
+    if (!nextTitle) return;
+    const previous = conversations.find((c) => c.id === id)?.title;
+    setConversations((p) => p.map((c) => (c.id === id ? { ...c, title: nextTitle } : c)));
+    try {
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: nextTitle }),
+      });
+      if (!res.ok) {
+        if (previous !== undefined) {
+          setConversations((p) => p.map((c) => (c.id === id ? { ...c, title: previous } : c)));
+        }
+        notify("Couldn't rename the chat");
+      }
+    } catch {
+      if (previous !== undefined) {
+        setConversations((p) => p.map((c) => (c.id === id ? { ...c, title: previous } : c)));
+      }
+      notify("Couldn't rename the chat");
+    }
+  }, [conversations, notify]);
 
   function exportConversation(format: "md" | "txt" | "pdf") {
     if (!activeId || messages.length === 0) return;
@@ -364,10 +395,22 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     catch { notify("Copy failed"); }
   }, [notify]);
 
-  const deleteMessage = useCallback((msg: Msg) => {
-    setMessages((p) => p.filter((m) => m.id !== msg.id));
-    if (msg.dbId) void fetch(`/api/messages/${msg.dbId}`, { method: "DELETE" }).catch(() => {});
-  }, []);
+  const deleteMessage = useCallback(async (msg: Msg) => {
+    if (!msg.dbId) {
+      setMessages((p) => p.filter((m) => m.id !== msg.id));
+      return;
+    }
+    try {
+      const res = await fetch(`/api/messages/${msg.dbId}`, { method: "DELETE" });
+      if (!res.ok) {
+        notify("Couldn't delete the message");
+        return;
+      }
+      setMessages((p) => p.filter((m) => m.id !== msg.id));
+    } catch {
+      notify("Couldn't delete the message");
+    }
+  }, [notify]);
 
   function retryMessage(msg: Msg) {
     if (msg.error) {
@@ -384,7 +427,8 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     if (!priorText) return;
     if (msg.dbId) void fetch(`/api/messages/${msg.dbId}`, { method: "DELETE" }).catch(() => {});
     setMessages((p) => p.filter((m) => m.id !== msg.id));
-    void runChat(priorText, { regenerate: true });
+    const priorUser = [...messages.slice(0, idx)].reverse().find((m) => m.role === "user");
+    void runChat(priorText, { regenerate: true, regenerateUserMessageId: priorUser?.dbId ?? undefined });
   }
 
   function send() {
@@ -408,14 +452,29 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
   // Phase 5 — record 👍/👎 on an assistant message (optimistic).
   async function sendFeedback(msg: Msg, value: "helpful" | "not_helpful") {
     if (!msg.dbId) return;
+    const previous = msg.feedback;
     setMessages((p) => p.map((m) => (m.id === msg.id ? { ...m, feedback: value } : m)));
-    await fetch("/api/chat/feedback", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messageId: msg.dbId, value }),
-    }).catch(() => {});
+    try {
+      const res = await fetch("/api/chat/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId: msg.dbId, value }),
+      });
+      if (!res.ok) {
+        setMessages((p) => p.map((m) => (m.id === msg.id ? { ...m, feedback: previous } : m)));
+        notify("Couldn't save feedback");
+      }
+    } catch {
+      setMessages((p) => p.map((m) => (m.id === msg.id ? { ...m, feedback: previous } : m)));
+      notify("Couldn't save feedback");
+    }
   }
 
-  async function runChat(text: string, opts: { userLocalId?: string; regenerate?: boolean }) {
+  async function runChat(text: string, opts: {
+    userLocalId?: string;
+    regenerate?: boolean;
+    regenerateUserMessageId?: string;
+  }) {
     if (generatingRef.current) return; // never run two generations at once
     generatingRef.current = true;
     setSending(true);
@@ -448,6 +507,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
             message: text,
             level,
             regenerate: opts.regenerate ?? false,
+            userMessageId: opts.regenerateUserMessageId ?? null,
             brainId: brainMode === "manual" ? selectedBrainId : null,
             brainMode,
           }),

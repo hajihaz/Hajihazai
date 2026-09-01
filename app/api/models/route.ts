@@ -1,11 +1,11 @@
 import { auth } from "@/auth";
-import { probeAll } from "@/lib/ai/health";
 import { listLevels, defaultLevel } from "@/lib/ai/levels";
 
 /**
- * Returns the capability levels that are currently healthy, for the model
- * selector. Runs cooldown-guarded health probes so decommissioned models /
- * invalid keys are hidden. No provider names or failure details are exposed.
+ * Returns the capability levels configured for the model selector. This endpoint
+ * is metadata-only: it MUST NOT make real provider completions just because the
+ * UI opened. Provider health is learned from actual chat traffic and controlled
+ * health/admin paths, preventing startup requests from consuming provider quota.
  */
 export async function GET() {
   const session = await auth();
@@ -13,7 +13,6 @@ export async function GET() {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  await probeAll();
   const levels = listLevels();
   return Response.json({ levels, default: defaultLevel() });
 }

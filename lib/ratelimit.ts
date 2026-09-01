@@ -1,5 +1,6 @@
 import { MemoryRateLimiter } from "./ratelimit/memory";
 import { UpstashRateLimiter } from "./ratelimit/upstash";
+import { DatabaseRateLimiter } from "./ratelimit/db";
 import type { RateLimitResult } from "./ratelimit/types";
 
 export type { RateLimiter, RateLimitResult } from "./ratelimit/types";
@@ -12,6 +13,7 @@ export { UpstashRateLimiter } from "./ratelimit/upstash";
  */
 const memoryLimiter = new MemoryRateLimiter();
 const sharedLimiter = new UpstashRateLimiter();
+const databaseLimiter = new DatabaseRateLimiter();
 
 /** Backward-compatible sync helper (existing callers). */
 export function rateLimit(
@@ -29,13 +31,28 @@ export async function rateLimitAsync(
   limit: number,
   windowMs: number,
 ): Promise<RateLimitResult> {
+  // Unit tests intentionally run without a real database. Keep their limiter
+  // deterministic and in-memory; production/preview use the shared store.
+  if (process.env.NODE_ENV === "test") {
+    return memoryLimiter.check(key, limit, windowMs);
+  }
+
   if (sharedLimiter.configured) {
-    try { return await sharedLimiter.check(key, limit, windowMs); }
-    catch (error) {
-      console.error("[ratelimit] Upstash unavailable; using memory fallback:", error);
+    try {
+      return await sharedLimiter.check(key, limit, windowMs);
+    } catch (error) {
+      console.error("[ratelimit] Upstash unavailable; trying database limiter:", error);
     }
   }
-  return memoryLimiter.check(key, limit, windowMs);
+
+  try {
+    return await databaseLimiter.check(key, limit, windowMs);
+  } catch (error) {
+    // Availability fallback only. The primary production path is now shared
+    // (Upstash or Postgres), so normal Vercel scaling cannot bypass limits.
+    console.error("[ratelimit] shared limiter unavailable; using memory fallback:", error);
+    return memoryLimiter.check(key, limit, windowMs);
+  }
 }
 
 /** Test helper. */

@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "./index";
 import { userProfiles, users, passwordResetTokens, type UserProfile } from "./schema";
 
@@ -92,16 +92,22 @@ export async function createResetToken(
   await db.insert(passwordResetTokens).values({ userId, tokenHash, expiresAt });
 }
 
-/** Validate + single-use consume a reset token. Returns the userId or null. */
+/**
+ * Atomically validate + consume a reset token. The UPDATE predicate makes the
+ * token single-use even when two reset requests arrive concurrently.
+ */
 export async function consumeResetToken(tokenHash: string): Promise<string | null> {
+  const now = new Date();
   const [row] = await db
-    .select()
-    .from(passwordResetTokens)
-    .where(eq(passwordResetTokens.tokenHash, tokenHash));
-  if (!row || row.usedAt || row.expiresAt.getTime() < Date.now()) return null;
-  await db
     .update(passwordResetTokens)
-    .set({ usedAt: new Date() })
-    .where(eq(passwordResetTokens.id, row.id));
-  return row.userId;
+    .set({ usedAt: now })
+    .where(
+      and(
+        eq(passwordResetTokens.tokenHash, tokenHash),
+        isNull(passwordResetTokens.usedAt),
+        gt(passwordResetTokens.expiresAt, now),
+      ),
+    )
+    .returning({ userId: passwordResetTokens.userId });
+  return row?.userId ?? null;
 }

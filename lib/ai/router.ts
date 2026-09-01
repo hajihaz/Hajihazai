@@ -91,7 +91,7 @@ export async function routeChat(
     available,
   });
 
-  const requestedModelId = chain[0]?.modelId ?? opts.preferredModelId ?? null;
+  const requestedModelId = opts.preferredModelId ?? chain[0]?.modelId ?? null;
   let lastError: unknown;
   for (let i = 0; i < chain.length; i++) {
     const entry = chain[i];
@@ -159,9 +159,12 @@ function nextWithTimeout<T>(
 
 export interface StreamChatResult {
   stream: AsyncIterable<string>;
+  /** Actual serving model/provider; populated once the stream selects a provider. */
   modelId: string;
   provider: ProviderName;
   requestedModelId: string | null;
+  fallbackFrom: string | null;
+  attempts: number;
 }
 
 /**
@@ -185,7 +188,7 @@ export async function routeChatStream(
     available,
   });
 
-  const requestedModelId = chain[0]?.modelId ?? opts.preferredModelId ?? null;
+  const requestedModelId = opts.preferredModelId ?? chain[0]?.modelId ?? null;
 
   // Providers are lazy async generators: the network request happens when the
   // generator is consumed, not when generateStream() is called. Keep fallback
@@ -196,6 +199,13 @@ export async function routeChatStream(
     for (let i = 0; i < chain.length; i++) {
       const entry = chain[i];
       const provider = providers[entry.provider];
+      result.modelId = entry.modelId;
+      result.provider = entry.provider;
+      result.attempts = i + 1;
+      result.fallbackFrom =
+        i > 0 && requestedModelId && requestedModelId !== entry.modelId
+          ? requestedModelId
+          : null;
       console.log(`[ai] stream-select provider=${entry.provider} model=${entry.modelId}`);
       const started = Date.now();
       let emitted = false;
@@ -245,12 +255,15 @@ export async function routeChatStream(
     throw lastError instanceof Error ? lastError : new Error("No AI provider could stream a response");
   };
 
-  return {
+  const result: StreamChatResult = {
     stream: streamWithFallback(),
-    modelId: chain[0]?.modelId ?? "none",
-    provider: chain[0]?.provider ?? "ollama",
+    modelId: "none",
+    provider: "ollama",
     requestedModelId,
+    fallbackFrom: null,
+    attempts: 0,
   };
+  return result;
 }
 
 /**

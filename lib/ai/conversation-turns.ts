@@ -34,7 +34,11 @@ export interface HistoryRow {
 export function buildConversationTurns(
   history: HistoryRow[],
   currentMessage: string,
-  opts: { regenerate?: boolean; currentUserMessageId?: string | null } = {},
+  opts: {
+    regenerate?: boolean;
+    currentUserMessageId?: string | null;
+    regenerateUserMessageId?: string | null;
+  } = {},
 ): ChatMessage[] {
   const trimmed = currentMessage.trim();
   const turns: ChatMessage[] = history
@@ -48,6 +52,10 @@ export function buildConversationTurns(
 
   // Regenerate: the target user message already exists in history. Guarantee it
   // is the final turn even if later turns remain in the window.
+  if (opts.regenerateUserMessageId) {
+    const target = history.findIndex((m) => m.id === opts.regenerateUserMessageId);
+    if (target >= 0) return turns.slice(0, target + 1);
+  }
   for (let i = turns.length - 1; i >= 0; i--) {
     if (turns[i].role === "user" && turns[i].content.trim() === trimmed) {
       return turns.slice(0, i + 1);

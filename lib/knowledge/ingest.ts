@@ -1,4 +1,4 @@
-import { createDocument } from "@/lib/db/knowledge-queries";
+import { createDocument, deleteDocument } from "@/lib/db/knowledge-queries";
 import { createContent } from "@/lib/db/knowledge-content-queries";
 import { createChunks } from "@/lib/db/knowledge-chunk-queries";
 import { chunkDocument } from "./chunk";
@@ -47,19 +47,29 @@ export async function ingestDocument(
     visibility: input.visibility ?? "private",
   });
 
-  await createContent(userId, doc.id, text);
-  const chunks = chunkDocument(text);
-  await createChunks(userId, doc.id, chunks);
-
-  // Best-effort embedding for semantic search. Keyword retrieval works without
-  // it, so a down embedding provider never blocks ingestion or retrieval.
   try {
-    await embedDocumentChunks(userId, doc.id);
-  } catch (err) {
-    console.warn("[knowledge] embedding failed (keyword retrieval still works):", err);
-  }
+    const content = await createContent(userId, doc.id, text);
+    if (!content) throw new Error("failed to store document content");
+    const chunks = chunkDocument(text);
+    const storedChunks = await createChunks(userId, doc.id, chunks);
+    if (storedChunks === null) throw new Error("failed to store document chunks");
 
-  return { ok: true, documentId: doc.id, chunks: chunks.length };
+    // Best-effort embedding for semantic search. Keyword retrieval works without
+    // it, so a down embedding provider never blocks ingestion or retrieval.
+    try {
+      await embedDocumentChunks(userId, doc.id);
+    } catch (err) {
+      console.warn("[knowledge] embedding failed (keyword retrieval still works):", err);
+    }
+
+    return { ok: true, documentId: doc.id, chunks: chunks.length };
+  } catch (err) {
+    console.error("[knowledge] ingestion persistence failed; cleaning up document:", err);
+    await deleteDocument(userId, doc.id).catch((cleanupErr) =>
+      console.error("[knowledge] document cleanup failed:", cleanupErr),
+    );
+    return { ok: false, error: "Could not save the document. Please try again." };
+  }
 }
 
 /**

@@ -80,6 +80,16 @@ export async function renameConversation(
 
 /* -------------------------------- Messages -------------------------------- */
 
+export async function getMessage(userId: string, messageId: string) {
+  const [row] = await db
+    .select({ message: messages })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(and(eq(messages.id, messageId), eq(conversations.userId, userId)))
+    .limit(1);
+  return row?.message ?? null;
+}
+
 export async function listMessages(conversationId: string) {
   return db
     .select()
@@ -120,6 +130,36 @@ export async function addMessage(input: {
     .where(eq(conversations.id, input.conversationId));
   return row;
 }
+
+/**
+ * Insert a message only when the conversation belongs to the given user.
+ * Ownership is enforced in the same DB operation sequence as the insert, so a
+ * caller cannot write into another user's conversation merely by knowing its ID.
+ */
+export async function addOwnedMessage(
+  userId: string,
+  input: {
+    conversationId: string;
+    role: "user" | "assistant" | "system";
+    content: string;
+    modelId?: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  const [owned] = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.id, input.conversationId),
+        eq(conversations.userId, userId),
+      ),
+    )
+    .limit(1);
+  if (!owned) return null;
+  return addMessage(input);
+}
+
 
 /**
  * Record 👍/👎 feedback on an assistant message the user owns. Merges into the

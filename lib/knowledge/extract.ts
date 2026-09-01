@@ -20,8 +20,6 @@ export function extractText(
     return { ok: true, text: buf.toString("utf8") };
   }
   if (ext === "pdf" || ext === "docx") {
-    // Parser dependency not installed yet. Fail clearly rather than storing
-    // binary garbage as "text". Add pdf-parse/mammoth and wire here.
     return {
       ok: false,
       error: `${ext.toUpperCase()} parsing is not configured yet — upload TXT or MD, or paste the text.`,

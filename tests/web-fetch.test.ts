@@ -50,21 +50,29 @@ describe("htmlToText", () => {
   });
 });
 
-function mockFetch(res: Partial<Response> & { text?: () => Promise<string> }) {
-  return vi.spyOn(globalThis, "fetch").mockResolvedValue({
-    ok: true,
-    status: 200,
-    url: "https://example.com/",
-    headers: new Headers({ "content-type": "text/html" }),
-    text: async () => "",
-    ...res,
-  } as Response);
+function mockFetch(res: {
+  status?: number;
+  url?: string;
+  headers?: Headers;
+  bodyText?: string;
+  location?: string;
+}) {
+  const response = new Response(res.bodyText ?? "", {
+    status: res.status ?? 200,
+    headers: new Headers({
+      "content-type": "text/html",
+      ...(res.location ? { location: res.location } : {}),
+      ...Object.fromEntries((res.headers ?? new Headers()).entries()),
+    }),
+  });
+  Object.defineProperty(response, "url", { value: res.url ?? "https://example.com/" });
+  return vi.spyOn(globalThis, "fetch").mockResolvedValue(response);
 }
 
 describe("fetchWebsite", () => {
   it("returns extracted content on a good HTML response", async () => {
     mockFetch({
-      text: async () =>
+      bodyText:
         "<title>Acme</title><body><h1>Acme Corporation</h1>" +
         "<p>We build durable widgets and logistics software for retailers across India.</p></body>",
     });
@@ -85,21 +93,21 @@ describe("fetchWebsite", () => {
   });
 
   it("refuses non-2xx responses", async () => {
-    mockFetch({ ok: false, status: 404, text: async () => "nope" });
+    mockFetch({ status: 404, bodyText: "nope" });
     const r = await fetchWebsite("example.com");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toContain("404");
   });
 
   it("refuses non-HTML content types", async () => {
-    mockFetch({ headers: new Headers({ "content-type": "application/pdf" }), text: async () => "%PDF" });
+    mockFetch({ headers: new Headers({ "content-type": "application/pdf" }), bodyText: "%PDF" });
     const r = await fetchWebsite("example.com/doc.pdf");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toContain("not readable");
   });
 
   it("refuses a redirect that lands on an internal host", async () => {
-    mockFetch({ url: "http://127.0.0.1/", text: async () => "<body>secret internal page content here</body>" });
+    mockFetch({ status: 302, location: "http://127.0.0.1/" });
     const r = await fetchWebsite("example.com");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toContain("non-public");
@@ -112,7 +120,7 @@ describe("fetchWebsite", () => {
   });
 
   it("refuses a page with no readable text", async () => {
-    mockFetch({ text: async () => "<body><script>var a=1</script></body>" });
+    mockFetch({ bodyText: "<body><script>var a=1</script></body>" });
     const r = await fetchWebsite("example.com");
     expect(r.ok).toBe(false);
   });

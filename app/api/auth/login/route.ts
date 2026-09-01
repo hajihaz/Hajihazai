@@ -30,9 +30,18 @@ export async function POST(req: Request) {
   if (!ok) return invalid();
 
   // Check blocked / terminated accounts after password verification (avoids timing oracle)
-  const blocked = profile.email
-    ? await isEmailBlocked(profile.email).catch(() => false)
-    : false;
+  let blocked = false;
+  if (profile.email) {
+    try {
+      blocked = await isEmailBlocked(profile.email);
+    } catch (err) {
+      console.error("[auth] blocked-account check failed:", err);
+      return Response.json(
+        { error: "Authentication service temporarily unavailable" },
+        { status: 503 },
+      );
+    }
+  }
   if (blocked || profile.isDisabled || profile.isSuspended) {
     return Response.json({ error: "This account is not active. Please contact support." }, { status: 403 });
   }

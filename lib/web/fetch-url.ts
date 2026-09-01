@@ -1,3 +1,6 @@
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+
 /**
  * Website fetch + readable-text extraction for "summarize <url>" (Rule #3).
  *
@@ -36,26 +39,98 @@ export interface WebsiteError {
 export type WebsiteFetchResult = WebsiteContent | WebsiteError;
 
 /** Loopback / private / link-local / metadata hosts we must never fetch. */
+function ipv4ToBigInt(value: string): bigint | null {
+  const parts = value.split(".");
+  if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p))) return null;
+  const nums = parts.map(Number);
+  if (nums.some((n) => n < 0 || n > 255)) return null;
+  return (BigInt(nums[0]) << 24n) | (BigInt(nums[1]) << 16n) | (BigInt(nums[2]) << 8n) | BigInt(nums[3]);
+}
+
+function ipv6ToBigInt(value: string): bigint | null {
+  let h = value.toLowerCase();
+  const mapped = h.lastIndexOf("::ffff:");
+  if (mapped === 0 && h.includes(".")) {
+    const v4 = ipv4ToBigInt(h.slice(7));
+    return v4 === null ? null : (0xffffn << 32n) | v4;
+  }
+  const halves = h.split("::");
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  const parse = (parts: string[]) => parts.map((part) => (/^[0-9a-f]{1,4}$/.test(part) ? parseInt(part, 16) : -1));
+  const l = parse(left);
+  const r = parse(right);
+  if (l.includes(-1) || r.includes(-1)) return null;
+  const missing = 8 - l.length - r.length;
+  if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+  const groups = [...l, ...Array(Math.max(0, missing)).fill(0), ...r];
+  if (groups.length !== 8) return null;
+  return groups.reduce((acc, group) => (acc << 16n) | BigInt(group), 0n);
+}
+
+function isPrivateIp(address: string): boolean {
+  const normalized = address.toLowerCase().replace(/^\[|\]$/g, "");
+  if (isIP(normalized) === 4) {
+    const n = ipv4ToBigInt(normalized);
+    if (n === null) return true;
+    const a = Number((n >> 24n) & 255n);
+    const b = Number((n >> 16n) & 255n);
+    // RFC1918, loopback, unspecified, link-local, CGNAT, documentation/reserved
+    // and multicast/broadcast ranges are all unsuitable SSRF destinations.
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 0) ||
+      (a === 192 && b === 168) ||
+      (a === 198 && (b === 18 || b === 19)) ||
+      a >= 224
+    );
+  }
+  if (isIP(normalized) === 6) {
+    const n = ipv6ToBigInt(normalized);
+    if (n === null) return true;
+    const first = Number((n >> 120n) & 255n);
+    const second = Number((n >> 112n) & 255n);
+    const mappedV4 = n >> 32n;
+    // ::/128, ::1/128, IPv4-mapped IPv6, ULA, link-local and multicast.
+    return (
+      n === 0n ||
+      n === 1n ||
+      mappedV4 === 0xffffn ||
+      (first & 0xfe) === 0xfc ||
+      (first === 0xfe && (second & 0xc0) === 0x80) ||
+      first >= 0xff
+    );
+  }
+  return true;
+}
+
+/** Reject local/private destinations, including IPv4-mapped IPv6 and DNS names resolving internally. */
 function isBlockedHost(hostname: string): boolean {
   const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (!h) return true;
   if (h === "localhost" || h.endsWith(".localhost")) return true;
   if (h.endsWith(".internal") || h.endsWith(".local")) return true;
   if (h === "metadata.google.internal") return true;
-  // IPv6 loopback / unspecified.
-  if (h === "::1" || h === "::") return true;
-  // IPv4 literal ranges.
-  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(h);
-  if (v4) {
-    const [a, b] = [Number(v4[1]), Number(v4[2])];
-    if (a === 127 || a === 0 || a === 10) return true; // loopback / this-host / private
-    if (a === 169 && b === 254) return true; // link-local (incl. cloud metadata)
-    if (a === 192 && b === 168) return true; // private
-    if (a === 172 && b >= 16 && b <= 31) return true; // private
-    if (a === 100 && b >= 64 && b <= 127) return true; // carrier-grade NAT
-  }
-  return false;
+  return isIP(h) > 0 ? isPrivateIp(h) : false;
 }
+
+/** Resolve a hostname and reject if any current DNS answer is non-public. */
+async function assertPublicDestination(url: string): Promise<void> {
+  const hostname = new URL(url).hostname.replace(/^\[|\]$/g, "");
+  if (isBlockedHost(hostname)) throw new Error("the destination is not public");
+  if (isIP(hostname)) return;
+  const addresses = await lookup(hostname, { all: true, verbatim: true });
+  if (!addresses.length || addresses.some(({ address }) => isPrivateIp(address))) {
+    throw new Error("the destination resolves to a non-public host");
+  }
+}
+
 
 /**
  * Validate + normalize a raw URL/domain into a fetchable https(s) URL, or return
@@ -121,49 +196,93 @@ export function htmlToText(html: string): { title: string; text: string } {
  * read. Never throws.
  */
 export async function fetchWebsite(rawUrl: string): Promise<WebsiteFetchResult> {
-  const url = normalizeUrl(rawUrl);
+  let url = normalizeUrl(rawUrl);
   if (!url) return { ok: false, reason: "the address is invalid or points to a non-public host" };
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      signal: ctrl.signal,
-      redirect: "follow",
-      headers: { "User-Agent": UA, Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5" },
-    });
+    for (let redirects = 0; redirects <= 5; redirects++) {
+      await assertPublicDestination(url);
+      const res = await fetch(url, {
+        signal: ctrl.signal,
+        redirect: "manual",
+        headers: {
+          "User-Agent": UA,
+          Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
+        },
+      });
 
-    // A redirect may have landed on an internal host — re-check the final URL.
-    try {
-      if (res.url && isBlockedHost(new URL(res.url).hostname)) {
-        return { ok: false, reason: "the site redirected to a non-public host" };
+      if ([301, 302, 303, 307, 308].includes(res.status)) {
+        const location = res.headers.get("location");
+        if (!location) return { ok: false, reason: "the site returned an invalid redirect" };
+        const nextUrl = normalizeUrl(new URL(location, url).toString());
+        if (!nextUrl) return { ok: false, reason: "the site redirected to a non-public host" };
+        url = nextUrl;
+        if (redirects === 5) return { ok: false, reason: "too many redirects" };
+        continue;
       }
-    } catch {
-      /* keep the original url below */
+
+      // Re-check the URL returned by the server before accepting the body.
+      if (res.url) {
+        const finalUrl = normalizeUrl(res.url);
+        if (!finalUrl) return { ok: false, reason: "the site redirected to a non-public host" };
+        url = finalUrl;
+      }
+
+      if (!res.ok) return { ok: false, reason: `the server responded ${res.status}` };
+
+      const ctype = (res.headers.get("content-type") ?? "").toLowerCase();
+      if (ctype && !/(text\/html|application\/xhtml|text\/plain|application\/xml)/.test(ctype)) {
+        return { ok: false, reason: `the page is not readable text (content-type: ${ctype.split(";")[0]})` };
+      }
+
+      const declaredLength = Number(res.headers.get("content-length") ?? "0");
+      if (declaredLength > MAX_BYTES) {
+        return { ok: false, reason: "the page is too large to read" };
+      }
+
+      if (!res.body) return { ok: false, reason: "the server returned an empty body" };
+      const reader = res.body.getReader();
+      const chunks: Uint8Array[] = [];
+      let total = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > MAX_BYTES) {
+            await reader.cancel();
+            return { ok: false, reason: "the page is too large to read" };
+          }
+          chunks.push(value);
+        }
+      } finally {
+        reader.releaseLock();
+      }
+
+      const bytes = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.byteLength;
+      }
+      const html = new TextDecoder().decode(bytes);
+      const { title, text } = htmlToText(html);
+      if (text.replace(/\s/g, "").length < 30) {
+        return { ok: false, reason: "the page returned no readable text (it may be JavaScript-rendered or empty)" };
+      }
+
+      await assertPublicDestination(url);
+      return {
+        ok: true,
+        url: normalizeUrl(rawUrl)!,
+        finalUrl: url,
+        title,
+        text: text.slice(0, MAX_TEXT_CHARS),
+      };
     }
-
-    if (!res.ok) return { ok: false, reason: `the server responded ${res.status}` };
-
-    const ctype = (res.headers.get("content-type") ?? "").toLowerCase();
-    if (ctype && !/(text\/html|application\/xhtml|text\/plain|application\/xml)/.test(ctype)) {
-      return { ok: false, reason: `the page is not readable text (content-type: ${ctype.split(";")[0]})` };
-    }
-
-    let html = await res.text();
-    if (html.length > MAX_BYTES) html = html.slice(0, MAX_BYTES);
-
-    const { title, text } = htmlToText(html);
-    if (text.replace(/\s/g, "").length < 30) {
-      return { ok: false, reason: "the page returned no readable text (it may be JavaScript-rendered or empty)" };
-    }
-
-    return {
-      ok: true,
-      url,
-      finalUrl: res.url || url,
-      title,
-      text: text.slice(0, MAX_TEXT_CHARS),
-    };
+    return { ok: false, reason: "too many redirects" };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isAbort = err instanceof Error && err.name === "AbortError";

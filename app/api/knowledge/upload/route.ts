@@ -22,7 +22,7 @@ export async function POST(req: Request) {
   }
   if (!isSupportedExt(extFromName(file.name))) {
     return Response.json(
-      { error: "Unsupported file type. Allowed: PDF, DOCX, TXT, MD" },
+      { error: "Unsupported file type. Allowed: TXT and MD" },
       { status: 400 },
     );
   }

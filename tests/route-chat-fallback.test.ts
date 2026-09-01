@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Control whether the (mocked) Gemini provider fails, simulating a 429.
 const ctrl = vi.hoisted(() => ({ geminiFails: true }));
@@ -27,6 +27,7 @@ vi.mock("@/lib/ai/providers", () => ({
 
 import { routeChat, planRoute } from "@/lib/ai/router";
 import type { ProviderName } from "@/lib/ai/types";
+import { recordSuccess } from "@/lib/ai/health";
 
 const AVAIL: Record<ProviderName, boolean> = {
   ollama: false,
@@ -34,6 +35,14 @@ const AVAIL: Record<ProviderName, boolean> = {
   openrouter: true,
   groq: false,
 };
+
+beforeEach(() => {
+  // The health store is intentionally process-local in production. Reset the
+  // test's selected Gemini model so a preceding fallback test cannot poison the
+  // next test (or another suite running in the same Vitest worker).
+  recordSuccess("gemini:2.0-flash");
+  ctrl.geminiFails = false;
+});
 
 describe("selected model is honored (attempted first)", () => {
   it("puts the selected model at the front of the chain", () => {

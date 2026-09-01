@@ -17,7 +17,8 @@
     "test:watch": "vitest",
     "predeploy-check": "bash scripts/predeploy.sh",
     "quality:report": "tsx scripts/quality-report.mts",
-    "quality:report:monthly": "tsx scripts/quality-report.mts --monthly"
+    "quality:report:monthly": "tsx scripts/quality-report.mts --monthly",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
@@ -37,14 +38,19 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.0.0",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
+    "esbuild": "^0.28.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5.7.0",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "esbuild": "$esbuild"
   }
 }

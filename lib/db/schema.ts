@@ -643,6 +643,22 @@ export const systemSettings = pgTable("system_settings", {
 export type SystemSetting = typeof systemSettings.$inferSelect;
 
 /* ------------------------------------------------------------------ */
+/* Runtime rate-limit buckets (shared across serverless instances)    */
+/* ------------------------------------------------------------------ */
+
+export const rateLimitBuckets = pgTable(
+  "rate_limit_buckets",
+  {
+    bucketKey: text("bucket_key").primaryKey(),
+    count: integer("count").notNull().default(0),
+    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  },
+  (t) => [index("rate_limit_buckets_expires_idx").on(t.expiresAt)],
+);
+
+export type RateLimitBucket = typeof rateLimitBuckets.$inferSelect;
+
+/* ------------------------------------------------------------------ */
 /* V1+ — Admin Notifications                                           */
 /* ------------------------------------------------------------------ */
 

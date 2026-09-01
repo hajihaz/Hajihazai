@@ -1,7 +1,9 @@
 import { auth } from "@/auth";
 import {
   addMessage,
+  addOwnedMessage,
   getConversation,
+  getMessage,
   listRecentMessages,
   setConversationTitle,
 } from "@/lib/db/queries";
@@ -153,10 +155,14 @@ export async function POST(req: Request) {
     modelId,
     level,
     regenerate,
+    userMessageId,
     brainId: clientBrainId,
     brainMode,
   } = await req.json();
   if (!conversationId || typeof message !== "string" || !message.trim()) {
+    return new Response("Bad request", { status: 400 });
+  }
+  if (regenerate && userMessageId !== undefined && typeof userMessageId !== "string") {
     return new Response("Bad request", { status: 400 });
   }
 
@@ -173,6 +179,17 @@ export async function POST(req: Request) {
     return new Response(`message exceeds ${MESSAGE_MAX_CHARS} characters`, {
       status: 413,
     });
+  }
+
+  // Regeneration is tied to a stable persisted user-message ID. Never infer the
+  // target from duplicate message text, which can regenerate the wrong turn.
+  let regenerateTargetId: string | null = null;
+  if (regenerate && typeof userMessageId === "string" && userMessageId) {
+    const target = await getMessage(session.user.id, userMessageId);
+    if (!target || target.conversationId !== conversationId || target.role !== "user") {
+      return new Response("Not found", { status: 404 });
+    }
+    regenerateTargetId = target.id;
   }
 
   // Reference resolution (Phase 3): if the message uses a pronoun with no named
@@ -328,7 +345,11 @@ export async function POST(req: Request) {
     // + renderConversationDigest below.
     listRecentMessages(conversationId, 40),
     !debug && !regenerate
-      ? addMessage({ conversationId, role: "user", content: message })
+      ? addOwnedMessage(session.user.id, {
+          conversationId,
+          role: "user",
+          content: message,
+        })
       : Promise.resolve(null),
     // Live lookup (Phase 2) — parallel with knowledge retrieval. Never throws;
     // any failure becomes a not-ok / empty result that the verification gate then
@@ -371,6 +392,9 @@ export async function POST(req: Request) {
   ]);
 
   const userMsg = userMsgResult;
+  if (!debug && !regenerate && !userMsg) {
+    return new Response("Not found", { status: 404 });
+  }
   const searchRes = live?.kind === "search" ? live.search : null;
   const websiteRes = live?.kind === "website" ? live.fetch : null;
   const projectInstructions = project?.instructions?.trim() ?? "";
@@ -539,11 +563,16 @@ export async function POST(req: Request) {
   // context only up to that message (not later turns).
   let effectiveHistory = history;
   if (regenerate) {
-    const target = message.trim();
-    for (let i = history.length - 1; i >= 0; i--) {
-      if (history[i].role === "user" && history[i].content.trim() === target) {
-        effectiveHistory = history.slice(0, i + 1);
-        break;
+    if (regenerateTargetId) {
+      const targetIndex = history.findIndex((row) => row.id === regenerateTargetId);
+      if (targetIndex >= 0) effectiveHistory = history.slice(0, targetIndex + 1);
+    } else {
+      // Backward-compatible fallback for older clients that did not send an ID.
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].role === "user" && history[i].content.trim() === message.trim()) {
+          effectiveHistory = history.slice(0, i + 1);
+          break;
+        }
       }
     }
   }
@@ -561,6 +590,7 @@ export async function POST(req: Request) {
     {
       regenerate,
       currentUserMessageId: userMsg?.id,
+      regenerateUserMessageId: regenerateTargetId,
     },
   );
 

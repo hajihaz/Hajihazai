@@ -1,6 +1,7 @@
 import { addKnowledgeAuditEntry } from "@/lib/admin/queries";
 
 const MIN_CONTENT_LENGTH = 20;
+const MAX_CONTENT_BYTES = 5 * 1024 * 1024;
 const MAX_URL_DENSITY = 0.3;
 const SPAM_PATTERNS = [
   /(.)\1{15,}/,
@@ -23,6 +24,9 @@ export function validateKnowledgeContent(content: string): SafetyResult | Safety
   }
   if (trimmed.length < MIN_CONTENT_LENGTH) {
     return { ok: false, error: `Content is too short (minimum ${MIN_CONTENT_LENGTH} characters)` };
+  }
+  if (Buffer.byteLength(trimmed, "utf8") > MAX_CONTENT_BYTES) {
+    return { ok: false, error: "Content exceeds the 5 MB limit" };
   }
 
   // Spam: repeated character flood

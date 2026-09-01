@@ -21,7 +21,16 @@ export async function POST(req: Request) {
   }
 
   // Block terminated / banned accounts before doing any DB writes
-  const blocked = await isEmailBlocked(email).catch(() => false);
+  let blocked: boolean;
+  try {
+    blocked = await isEmailBlocked(email);
+  } catch (err) {
+    console.error("[auth] blocked-account check failed:", err);
+    return Response.json(
+      { error: "Registration service temporarily unavailable" },
+      { status: 503 },
+    );
+  }
   if (blocked) {
     return Response.json(
       { error: "This email address is not allowed to register" },

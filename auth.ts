@@ -53,7 +53,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return false;
           }
         } catch (err) {
-          console.error("[auth] sign-in check failed (non-fatal):", err);
+          // Account security checks must fail closed: if the blocklist/profile
+          // lookup is unavailable, do not create a new authenticated session.
+          console.error("[auth] sign-in security check failed:", err);
+          return false;
         }
       }
       return true;

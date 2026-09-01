@@ -27,6 +27,9 @@ export async function POST(req: Request) {
   if (!["approve", "reject", "delete"].includes(action)) {
     return new Response("invalid action", { status: 400 });
   }
+  if (ids.length > 100) {
+    return new Response("A maximum of 100 memory IDs can be processed at once", { status: 413 });
+  }
 
   let affected;
   if (action === "approve") {
