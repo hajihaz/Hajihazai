@@ -73,7 +73,7 @@ console.log("── 2/4 live search provider ──");
   const allowKeyless = process.env.ALLOW_KEYLESS_WEB === "1";
   if (hasProductionGradeProvider()) ok(`production-grade provider configured: ${activeProvider()}`);
   else if (allowKeyless) ok(`no production-grade key, but ALLOW_KEYLESS_WEB=1 (provider=${activeProvider()} — current events will often REFUSE)`);
-  else bad("no production-grade search provider (set TAVILY_API_KEY / BRAVE_SEARCH_API_KEY / SERPER_API_KEY, or ALLOW_KEYLESS_WEB=1 to accept keyless)");
+  else bad("no production-grade search provider (set GROQ_API_KEY / TAVILY_API_KEY / BRAVE_SEARCH_API_KEY / SERPER_API_KEY, or ALLOW_KEYLESS_WEB=1 to accept keyless)");
 }
 
 /* 3) Real current-event search smoke. */

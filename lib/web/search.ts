@@ -11,6 +11,15 @@ import { rankAndFilter, type WebResult } from "./sources";
 import { getCached, setCached } from "./cache";
 
 const FETCH_TIMEOUT_MS = 8_000;
+
+// Explicit freshness language must never be satisfied by an older cache entry.
+// This is critical for questions like "current CM", "right now", or "refresh".
+const FRESHNESS_BYPASS_RE = /\b(current|currently|right now|as of (today|now)|refresh|just now|live)\b/i;
+
+export function shouldBypassCache(query: string): boolean {
+  return FRESHNESS_BYPASS_RE.test(query);
+}
+
 let lastSearchAt: number | null = null;
 
 export function getLastSearchAt(): number | null {
@@ -371,7 +380,8 @@ export async function webSearch(
   const q = query.trim();
   if (!q) return { results: [], provider: "none", cached: false };
 
-  const cached = getCached(q);
+  const bypassCache = shouldBypassCache(q);
+  const cached = bypassCache ? null : getCached(q);
   if (cached)
     return { results: cached, provider: activeProvider(), cached: true };
 

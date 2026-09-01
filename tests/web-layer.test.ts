@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { classifyQuery } from "@/lib/web/classify";
 import { rankAndFilter, tierOf, hostOf, type WebResult } from "@/lib/web/sources";
 import { cacheKindFor, getCached, setCached, resetCache, TTL_MS } from "@/lib/web/cache";
-import { hasProductionGradeProvider, activeProvider } from "@/lib/web/search";
+import { hasProductionGradeProvider, activeProvider, shouldBypassCache } from "@/lib/web/search";
 
 describe("classifyQuery", () => {
   it("routes live/real-time questions to web", () => {
@@ -74,6 +74,14 @@ describe("production provider gate", () => {
     process.env.TAVILY_API_KEY = "test-key";
     expect(hasProductionGradeProvider()).toBe(true);
     expect(activeProvider()).toBe("tavily");
+  });
+});
+
+describe("freshness cache bypass", () => {
+  it("bypasses cache for explicit current/refresh language", () => {
+    expect(shouldBypassCache("current Chief Minister of Tamil Nadu")).toBe(true);
+    expect(shouldBypassCache("refresh latest news now")).toBe(true);
+    expect(shouldBypassCache("Who founded AllBee?")).toBe(false);
   });
 });
 
