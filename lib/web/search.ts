@@ -23,6 +23,7 @@ export function shouldBypassCache(query: string): boolean {
 }
 
 let lastSearchAt: number | null = null;
+const IN_FLIGHT = new Map<string, Promise<WebSearchResult>>();
 
 export function getLastSearchAt(): number | null {
   return lastSearchAt;
@@ -31,6 +32,7 @@ export function getLastSearchAt(): number | null {
 /** Test helper: clear in-process search state without exposing cache internals. */
 export function resetWebSearchStateForTests(): void {
   lastSearchAt = null;
+  IN_FLIGHT.clear();
 }
 
 export function activeProvider():
@@ -424,18 +426,10 @@ export interface WebSearchResult {
  * Search the web for `query`. Returns ranked/trusted results (possibly empty).
  * Throws only on a hard provider failure — callers catch and fall back (Phase 8).
  */
-export async function webSearch(
-  query: string,
+async function searchUncached(
+  q: string,
   limit = 5,
 ): Promise<WebSearchResult> {
-  const q = query.trim();
-  if (!q) return { results: [], provider: "none", cached: false };
-
-  const bypassCache = shouldBypassCache(q);
-  const cached = bypassCache ? null : getCached(q);
-  if (cached)
-    return { results: cached, provider: activeProvider(), cached: true };
-
   const provider = activeProvider();
   const impl =
     provider === "tavily"
@@ -512,6 +506,31 @@ export async function webSearch(
   const ranked = rankAndFilter(evidence, limit);
   if (ranked.length) setCached(q, ranked);
   return { results: ranked, provider: effectiveProvider, cached: false };
+}
+
+export async function webSearch(
+  query: string,
+  limit = 5,
+): Promise<WebSearchResult> {
+  const q = query.trim();
+  if (!q) return { results: [], provider: "none", cached: false };
+
+  const bypassCache = shouldBypassCache(q);
+  const cached = bypassCache ? null : getCached(q);
+  if (cached)
+    return { results: cached, provider: activeProvider(), cached: true };
+
+  const key = `${q.toLowerCase()}\0${limit}`;
+  const existing = IN_FLIGHT.get(key);
+  if (existing) return existing;
+
+  const pending = searchUncached(q, limit);
+  IN_FLIGHT.set(key, pending);
+  try {
+    return await pending;
+  } finally {
+    if (IN_FLIGHT.get(key) === pending) IN_FLIGHT.delete(key);
+  }
 }
 
 /**
