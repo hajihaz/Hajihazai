@@ -4,6 +4,7 @@ import { getDocument } from "@/lib/db/knowledge-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { validateKnowledgeContent, logKnowledgeAction } from "@/lib/knowledge/safety";
 import { reindexKnowledgeDocument } from "@/lib/knowledge/reindex";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 async function requireUser() {
@@ -21,6 +22,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 async function validateWrite(req: Request, user: { userId: string; email: string }, id: string) {
+  const limited = await rateLimitResponse(`kb-content:${user.userId}`, 30, 60_000);
+  if (limited) return { response: limited };
   const perm = await assertKnowledgeWritePermission(user.email);
   if (!perm.ok) return { response: Response.json({ error: perm.error }, { status: 403 }) };
   const body = await req.json().catch(() => null);
@@ -71,6 +74,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const user = await requireUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`kb-content:${user.userId}`, 30, 60_000);
+  if (limited) return limited;
   const perm = await assertKnowledgeWritePermission(user.email);
   if (!perm.ok) return Response.json({ error: perm.error }, { status: 403 });
   const { id } = await params;

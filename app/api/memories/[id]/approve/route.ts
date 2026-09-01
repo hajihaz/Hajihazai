@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { approveMemory } from "@/lib/db/memory-queries";
 import { embedMemory } from "@/lib/memory/embed-memory";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 export async function POST(
   _req: Request,
@@ -10,6 +11,8 @@ export async function POST(
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const limited = await rateLimitResponse(`memory-approval:${session.user.id}`, 30, 60_000);
+  if (limited) return limited;
   const { id } = await params;
 
   // Null → not found, not owned, or not currently pending.

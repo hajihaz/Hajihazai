@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { createDocument, listDocuments } from "@/lib/db/knowledge-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { validateKnowledgeContent, logKnowledgeAction } from "@/lib/knowledge/safety";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
@@ -20,6 +21,9 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const limited = await rateLimitResponse(`knowledge-create:${session.user.id}`, 30, 60_000);
+  if (limited) return limited;
 
   const perm = await assertKnowledgeWritePermission(session.user.email);
   if (!perm.ok) {

@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { deleteDocument, getDocument } from "@/lib/db/knowledge-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 export async function GET(
@@ -28,6 +29,9 @@ export async function DELETE(
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const limited = await rateLimitResponse(`knowledge-delete:${session.user.id}`, 30, 60_000);
+  if (limited) return limited;
+
   const perm = await assertKnowledgeWritePermission(session.user.email);
   if (!perm.ok) {
     return Response.json({ error: perm.error }, { status: 403 });

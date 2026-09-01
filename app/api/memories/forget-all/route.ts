@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { forgetAllMemories } from "@/lib/db/memory-queries";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 /**
  * Delete EVERY memory for the current user.
@@ -10,6 +11,9 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const limited = await rateLimitResponse(`memory-forget-all:${session.user.id}`, 5, 60_000);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => null);
   if (body?.confirm !== true) {
