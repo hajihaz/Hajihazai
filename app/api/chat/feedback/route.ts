@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { setMessageFeedback } from "@/lib/db/queries";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 /**
  * Phase 5 — assistant-message feedback (👍/👎). Stores the rating on the message
@@ -9,6 +10,9 @@ import { setMessageFeedback } from "@/lib/db/queries";
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
+
+  const limited = await rateLimitResponse(`chat-feedback:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
 
   const { messageId, value } = await req.json().catch(() => ({}));
   if (typeof messageId !== "string" || (value !== "helpful" && value !== "not_helpful")) {

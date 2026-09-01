@@ -5,6 +5,7 @@ import {
   bulkReject,
 } from "@/lib/db/memory-queries";
 import { embedMemory } from "@/lib/memory/embed-memory";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 /**
  * Bulk actions on the user's own memories.
@@ -16,6 +17,9 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const limited = await rateLimitResponse(`memory-bulk:${session.user.id}`, 30, 60_000);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => null);
   const action = body?.action;

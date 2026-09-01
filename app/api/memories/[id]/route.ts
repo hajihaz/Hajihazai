@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { deleteMemory, updateMemory } from "@/lib/db/memory-queries";
 import { embedMemory } from "@/lib/memory/embed-memory";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 export async function PATCH(
   req: Request,
@@ -11,6 +12,8 @@ export async function PATCH(
     return new Response("Unauthorized", { status: 401 });
   }
   const { id } = await params;
+  const limited = await rateLimitResponse(`memory-mutation:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => null);
   const content = body?.content;
@@ -51,6 +54,8 @@ export async function DELETE(
     return new Response("Unauthorized", { status: 401 });
   }
   const { id } = await params;
+  const limited = await rateLimitResponse(`memory-mutation:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
 
   const deleted = await deleteMemory(session.user.id, id);
   if (!deleted) {

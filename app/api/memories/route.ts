@@ -6,6 +6,7 @@ import {
   memoryStats,
 } from "@/lib/db/memory-queries";
 import { embedMemory } from "@/lib/memory/embed-memory";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
   const stats = await memoryStats(session.user.id);
   // Strip the embedding vector from list responses (kept server-side only).
   const safe = memories.map(({ embedding, ...rest }) => rest);
-  return Response.json({ memories: safe, stats });
+  return Response.json({ memories: safe, stats }, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 export async function POST(req: Request) {
@@ -37,6 +38,9 @@ export async function POST(req: Request) {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+
+  const limited = await rateLimitResponse(`memory-create:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => null);
   const content = body?.content;
