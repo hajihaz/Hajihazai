@@ -38,7 +38,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const checked = await validateWrite(req, user, id);
   if ("response" in checked) return checked.response;
   const content = await createContent(user.userId, id, checked.body.content);
-  if (!content) return new Response("Not found", { status: 404 });
+  if (!content) {
+    const existing = await getContent(user.userId, id);
+    return existing
+      ? new Response("Content already exists; use PATCH to replace it", { status: 409 })
+      : new Response("Not found", { status: 404 });
+  }
   const reindexed = await reindexKnowledgeDocument(user.userId, id);
   if (!reindexed) return new Response("Could not index document", { status: 500 });
   void logKnowledgeAction({ userId: user.userId, email: user.email, action: "create_content", documentId: id, documentTitle: checked.doc.title, contentAfter: checked.body.content });

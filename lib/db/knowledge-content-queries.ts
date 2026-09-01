@@ -42,8 +42,9 @@ export async function createContent(
   const [row] = await db
     .insert(knowledgeContent)
     .values({ documentId, content })
+    .onConflictDoNothing({ target: knowledgeContent.documentId })
     .returning();
-  return row;
+  return row ?? null;
 }
 
 export async function updateContent(

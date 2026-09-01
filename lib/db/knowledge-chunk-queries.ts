@@ -29,23 +29,26 @@ export async function createChunks(
 ) {
   if (!(await ownedDocument(userId, documentId))) return null;
 
-  // Idempotent regeneration: clear prior chunks first.
-  await db
-    .delete(knowledgeChunk)
-    .where(eq(knowledgeChunk.documentId, documentId));
+  // Replace the searchable index atomically. A failed insert must never leave
+  // the document with a partially regenerated chunk set.
+  return db.transaction(async (tx) => {
+    await tx
+      .delete(knowledgeChunk)
+      .where(eq(knowledgeChunk.documentId, documentId));
 
-  if (chunks.length === 0) return [];
+    if (chunks.length === 0) return [];
 
-  return db
-    .insert(knowledgeChunk)
-    .values(
-      chunks.map((c) => ({
-        documentId,
-        chunkIndex: c.chunkIndex,
-        content: c.content,
-      })),
-    )
-    .returning();
+    return tx
+      .insert(knowledgeChunk)
+      .values(
+        chunks.map((c) => ({
+          documentId,
+          chunkIndex: c.chunkIndex,
+          content: c.content,
+        })),
+      )
+      .returning();
+  });
 }
 
 export async function listChunks(userId: string, documentId: string) {

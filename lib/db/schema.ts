@@ -303,7 +303,9 @@ export const knowledgeContent = pgTable(
     createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
   },
-  (t) => [index("knowledge_content_document_idx").on(t.documentId)],
+  (t) => [
+    uniqueIndex("knowledge_content_document_unique_idx").on(t.documentId),
+  ],
 );
 
 export const knowledgeContentRelations = relations(

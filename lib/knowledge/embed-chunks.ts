@@ -38,7 +38,11 @@ export async function embedDocumentChunks(userId: string, documentId: string) {
   let dimensions = 0;
   for (const c of chunks) {
     const result = await embed(c.content);
-    await storeChunkEmbedding(userId, documentId, c.id, result.embedding);
+    if (result.embedding.length !== 768) {
+      throw new Error(`Embedding dimension mismatch: expected 768, got ${result.embedding.length}`);
+    }
+    const stored = await storeChunkEmbedding(userId, documentId, c.id, result.embedding);
+    if (!stored) throw new Error(`Chunk ${c.id} disappeared during embedding`);
     embedded++;
     dimensions = result.dimensions;
   }
