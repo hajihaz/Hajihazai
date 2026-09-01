@@ -52,6 +52,11 @@ describe.skipIf(!hasDb)("knowledge content storage (db)", () => {
     const del = await content.deleteContent(A, doc.id);
     expect(del?.documentId).toBe(doc.id);
     expect(await content.getContent(A, doc.id)).toBeNull();
+    const chunks = await db
+      .select()
+      .from(schema.knowledgeChunk)
+      .where(eq(schema.knowledgeChunk.documentId, doc.id));
+    expect(chunks).toHaveLength(0);
   });
 
   it("cascade-deletes content when the document is deleted", async () => {

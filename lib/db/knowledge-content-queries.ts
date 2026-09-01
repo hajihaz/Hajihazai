@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "./index";
-import { knowledgeContent, knowledgeDocument } from "./schema";
+import { knowledgeChunk, knowledgeContent, knowledgeDocument } from "./schema";
 
 /**
  * Phase 7.1 — Document content storage (single text blob per document).
@@ -62,9 +62,21 @@ export async function updateContent(
 
 export async function deleteContent(userId: string, documentId: string) {
   if (!(await ownedDocument(userId, documentId))) return null;
-  const [row] = await db
-    .delete(knowledgeContent)
-    .where(eq(knowledgeContent.documentId, documentId))
-    .returning();
-  return row ?? null;
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .delete(knowledgeContent)
+      .where(eq(knowledgeContent.documentId, documentId))
+      .returning();
+    if (!row) return null;
+
+    // Content is the canonical source for the searchable index. Once it is
+    // deleted, retaining old chunks would make retrieval answer from stale data.
+    // Delete chunks (including pgvector embeddings) in the same transaction so
+    // the canonical content and searchable index cannot diverge on failure.
+    await tx
+      .delete(knowledgeChunk)
+      .where(eq(knowledgeChunk.documentId, documentId));
+
+    return row;
+  });
 }
