@@ -25,10 +25,16 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const q = url.searchParams.get("q") ?? "";
-  const limit = Math.min(Number(url.searchParams.get("limit")) || 10, 50);
+  const requestedLimit = Number(url.searchParams.get("limit"));
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(Math.max(Math.trunc(requestedLimit), 1), 50)
+    : 10;
   const thresholdParam = Number(url.searchParams.get("threshold"));
+  // Never allow the client to weaken the calibrated retrieval floor.
+  // A caller may request a stricter threshold, but not bypass relevance checks
+  // with negative/zero values that turn semantic search into broad disclosure.
   const threshold = Number.isFinite(thresholdParam)
-    ? thresholdParam
+    ? Math.min(Math.max(thresholdParam, DEFAULT_DOC_SIMILARITY_THRESHOLD), 1)
     : DEFAULT_DOC_SIMILARITY_THRESHOLD;
 
   if (!q.trim()) {
