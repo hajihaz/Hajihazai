@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { getContent } from "@/lib/db/knowledge-content-queries";
 import { getDocument } from "@/lib/db/knowledge-queries";
-import { createChunks } from "@/lib/db/knowledge-chunk-queries";
+import { createChunks, KnowledgeContentChangedError } from "@/lib/db/knowledge-chunk-queries";
 import { chunkDocument } from "@/lib/knowledge/chunk";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { rateLimitResponse } from "@/lib/ratelimit";
@@ -34,7 +34,18 @@ export async function POST(
   }
 
   const chunks = chunkDocument(content.content);
-  const saved = await createChunks(session.user.id, id, chunks);
+  let saved;
+  try {
+    saved = await createChunks(session.user.id, id, chunks, content.updatedAt);
+  } catch (error) {
+    if (error instanceof KnowledgeContentChangedError) {
+      return Response.json(
+        { error: "Document content changed while chunking; please retry." },
+        { status: 409 },
+      );
+    }
+    throw error;
+  }
   if (saved === null) {
     return new Response("Not found", { status: 404 });
   }

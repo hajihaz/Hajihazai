@@ -1,6 +1,6 @@
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "./index";
-import { knowledgeChunk, knowledgeDocument } from "./schema";
+import { knowledgeChunk, knowledgeContent, knowledgeDocument } from "./schema";
 import type { Chunk } from "@/lib/knowledge/chunk";
 
 /**
@@ -22,16 +22,42 @@ async function ownedDocument(userId: string, documentId: string) {
 }
 
 /** Replace any existing chunks for the document with the given ordered set. */
+export class KnowledgeContentChangedError extends Error {
+  constructor() {
+    super("Knowledge content changed while rebuilding chunks");
+    this.name = "KnowledgeContentChangedError";
+  }
+}
+
 export async function createChunks(
   userId: string,
   documentId: string,
   chunks: Chunk[],
+  expectedContentUpdatedAt?: Date,
 ) {
   if (!(await ownedDocument(userId, documentId))) return null;
 
   // Replace the searchable index atomically. A failed insert must never leave
   // the document with a partially regenerated chunk set.
   return db.transaction(async (tx) => {
+    // When rebuilding from canonical content, lock and verify that exact
+    // content revision before replacing the index. This closes the race where
+    // an older reindex could resurrect stale chunks after a content update or
+    // deletion.
+    if (expectedContentUpdatedAt) {
+      const [current] = await tx
+        .select({ updatedAt: knowledgeContent.updatedAt })
+        .from(knowledgeContent)
+        .where(eq(knowledgeContent.documentId, documentId))
+        .for("update");
+      if (
+        !current ||
+        current.updatedAt.getTime() !== expectedContentUpdatedAt.getTime()
+      ) {
+        throw new KnowledgeContentChangedError();
+      }
+    }
+
     await tx
       .delete(knowledgeChunk)
       .where(eq(knowledgeChunk.documentId, documentId));
