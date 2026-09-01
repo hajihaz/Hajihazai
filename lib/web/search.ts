@@ -463,6 +463,7 @@ export async function webSearch(
 export async function webSearchMany(
   queries: string[],
   limit = 5,
+  maxParallel = 2,
 ): Promise<WebSearchResult> {
   const unique = [
     ...new Set(queries.map((q) => q.trim()).filter(Boolean)),
@@ -470,9 +471,12 @@ export async function webSearchMany(
   if (unique.length === 0)
     return { results: [], provider: "none", cached: false };
 
-  const settled = await Promise.allSettled(
-    unique.map((q) => webSearch(q, limit)),
-  );
+  const concurrency = Math.max(1, Math.min(Math.floor(maxParallel), unique.length));
+  const settled: PromiseSettledResult<WebSearchResult>[] = [];
+  for (let i = 0; i < unique.length; i += concurrency) {
+    const batch = unique.slice(i, i + concurrency);
+    settled.push(...await Promise.allSettled(batch.map((q) => webSearch(q, limit))));
+  }
   const byUrl = new Map<string, WebResult>();
   let provider = "none";
   let cached = true;
