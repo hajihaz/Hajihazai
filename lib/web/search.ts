@@ -466,20 +466,16 @@ export async function webSearch(
     }
   }
   if (lastError) {
+    // In production, never downgrade a real provider failure to keyless scraping.
+    // Current-event verification must either use a configured production-grade
+    // provider or return no evidence and let the caller refuse.
+    if (process.env.NODE_ENV === "production") throw lastError;
     const error = lastError;
-
-    // Groq browser search is the preferred production provider, but a transient
-    // 429/provider outage must not make live verification brittle. Fall back to
-    // keyless search providers; the hard verification gate still refuses if
-    // these also return no usable evidence.
     if (provider !== "groq-browser") throw error;
-    console.warn("[web] groq-browser failed; trying DuckDuckGo fallback:", error);
+    console.warn("[web] groq-browser failed in non-production; trying DuckDuckGo fallback:", error);
     try {
       raw = await duckduckgo(q);
       effectiveProvider = "duckduckgo-fallback";
-      // Keep an independent news index as a second fallback/evidence source.
-      // This is especially important on Vercel where public HTML search endpoints
-      // can be intermittently challenged even though they work locally.
       try {
         const rss = await googleNewsRss(q);
         raw = [...raw, ...rss];
@@ -493,11 +489,10 @@ export async function webSearch(
     }
   }
 
-  // A search result without readable evidence is not verification. If Groq's
-  // browser-search metadata contains only empty snippets or blocked page-open
-  // messages, use DuckDuckGo as an independent evidence source before refusing.
+  // A search result without readable evidence is not verification. Keyless
+  // fallback is intentionally limited to non-production environments.
   let evidence = raw.filter((r) => r.snippet.trim().length >= 40);
-  if (!evidence.length && provider === "groq-browser") {
+  if (!evidence.length && provider === "groq-browser" && process.env.NODE_ENV !== "production") {
     try {
       const fallback = await duckduckgo(q);
       evidence = fallback.filter((r) => r.snippet.trim().length >= 40);
