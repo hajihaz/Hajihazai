@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { deleteDocument, getDocument } from "@/lib/db/knowledge-queries";
+import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 
 export async function GET(
   _req: Request,
@@ -25,6 +26,10 @@ export async function DELETE(
   const session = await auth();
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
+  }
+  const perm = await assertKnowledgeWritePermission(session.user.email);
+  if (!perm.ok) {
+    return Response.json({ error: perm.error }, { status: 403 });
   }
   const { id } = await params;
 
