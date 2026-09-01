@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { getProject, updateProject, deleteProject } from "@/lib/db/project-queries";
 import { listProjectConversations } from "@/lib/db/queries";
 import { listProjectDocuments } from "@/lib/db/knowledge-queries";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 const NAME_MAX = 100;
 const TEXT_MAX = 4000;
@@ -42,6 +43,9 @@ export async function PATCH(
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
 
+  const limited = await rateLimitResponse(`project-mutation:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
+
   const body = await req.json().catch(() => null);
   const patch: { name?: string; description?: string | null; instructions?: string | null } = {};
   if (typeof body?.name === "string") {
@@ -64,6 +68,9 @@ export async function DELETE(
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
+  const limited = await rateLimitResponse(`project-mutation:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
+
   const ok = await deleteProject(session.user.id, id);
   if (!ok) return new Response("Not found", { status: 404 });
   return new Response(null, { status: 204 });

@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { getUserNotifications, markNotificationRead } from "@/lib/admin/queries";
+import { rateLimitResponse } from "@/lib/ratelimit";
 
 export async function GET() {
   const session = await auth();
@@ -12,6 +13,9 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
+
+  const limited = await rateLimitResponse(`notifications:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
 
   const body = await req.json().catch(() => ({}));
   const id = body.id;
