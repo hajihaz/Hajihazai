@@ -1,4 +1,4 @@
-import { getActiveMemories } from "./retrieve";
+import { getActiveMemories, searchMemories } from "./retrieve";
 import { rankMemories } from "./ranking";
 import { fuseMemoryRanks } from "./rank-fusion";
 import { buildMemoryBlock } from "./context-format";
@@ -76,8 +76,7 @@ export async function buildMemoryContext(
       console.warn("[memory] semantic search failed; preserving keyword results:", err);
       return [] as Awaited<ReturnType<typeof semanticSearch>>;
     });
-    const keywordPromise = getActiveMemories(userId)
-      .then((active) => rankMemories(active, query, Date.now()))
+    const keywordPromise = searchMemories(userId, query)
       .catch((err) => {
         console.warn("[memory] keyword search failed; preserving semantic results:", err);
         return [];

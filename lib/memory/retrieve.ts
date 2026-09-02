@@ -1,7 +1,7 @@
-import { and, eq, or, lte, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, ilike, lte, or, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { userMemory } from "@/lib/db/schema";
-import { rankMemories } from "./ranking";
+import { rankMemories, significantTokens } from "./ranking";
 
 /**
  * Memory retrieval — ACTIVE memories only (pending + deleted are excluded).
@@ -33,9 +33,50 @@ export async function getActiveMemories(userId: string) {
     ));
 }
 
+/**
+ * Fetch only keyword candidates before doing the exact token-boundary ranking in
+ * application code. This preserves ranking semantics while avoiding transfer of
+ * every active memory for ordinary query searches.
+ */
+async function getKeywordCandidates(userId: string, q: string) {
+  const tokens = significantTokens(q);
+  if (tokens.length === 0) return [];
+
+  const variants = new Set(tokens);
+  for (const token of tokens) {
+    if (token.length > 4 && token.endsWith("es")) variants.add(token.slice(0, -2));
+    if (token.length > 3 && token.endsWith("s")) variants.add(token.slice(0, -1));
+  }
+
+  const now = new Date();
+  return db
+    .select({
+      id: userMemory.id,
+      type: userMemory.type,
+      content: userMemory.content,
+      status: userMemory.status,
+      validFrom: userMemory.validFrom,
+      validUntil: userMemory.validUntil,
+      updatedAt: userMemory.updatedAt,
+    })
+    .from(userMemory)
+    .where(and(
+      eq(userMemory.userId, userId),
+      eq(userMemory.status, "active"),
+      lte(userMemory.validFrom, now),
+      or(isNull(userMemory.validUntil), gt(userMemory.validUntil, now)),
+      or(...[...variants].map((token) => ilike(userMemory.content, `%${token}%`))),
+    ));
+}
+
 export async function searchMemories(userId: string, q?: string) {
-  const active = await getActiveMemories(userId);
-  return rankMemories(active, q, Date.now());
+  const now = Date.now();
+  if (!q?.trim()) {
+    const active = await getActiveMemories(userId);
+    return rankMemories(active, q, now);
+  }
+  const candidates = await getKeywordCandidates(userId, q);
+  return rankMemories(candidates, q, now);
 }
 
 /** Debug variant: also reports what was excluded and why. */
