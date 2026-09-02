@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, isNull, sql } from "drizzle-orm";
 import { db } from "./index";
 import { knowledgeChunk, knowledgeDocument } from "./schema";
 
@@ -48,16 +48,20 @@ export async function getChunkEmbeddingStatus(
 ) {
   if (!(await ownedDocument(userId, documentId))) return null;
 
-  const rows = await db
-    .select({ embedding: knowledgeChunk.embedding })
+  // Count in Postgres instead of loading every 768-dimensional vector into the
+  // server just to determine whether it exists. This matters for large docs.
+  const [row] = await db
+    .select({
+      total: count(),
+      embedded: sql<number>`count(*) filter (where ${knowledgeChunk.embedding} is not null)`.mapWith(Number),
+    })
     .from(knowledgeChunk)
     .where(eq(knowledgeChunk.documentId, documentId));
 
-  const total = rows.length;
-  const embedded = rows.filter(
-    (r) => Array.isArray(r.embedding) && r.embedding.length > 0,
-  ).length;
-  return { total, embedded };
+  return {
+    total: Number(row?.total ?? 0),
+    embedded: Number(row?.embedded ?? 0),
+  };
 }
 
 /** Chunks belonging to a document that the user owns (for embedding). */

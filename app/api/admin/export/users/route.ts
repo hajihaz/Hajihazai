@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { adminExportUsers } from "@/lib/admin/queries";
 
 function toCSV(rows: Record<string, unknown>[]): string {
@@ -20,6 +21,8 @@ function toCSV(rows: Record<string, unknown>[]): string {
 export async function GET() {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-export-users:${sess.adminId}`, 5, 60_000);
+  if (limited) return limited;
 
   const rows = await adminExportUsers();
   const csv = toCSV(

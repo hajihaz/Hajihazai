@@ -21,5 +21,5 @@ export async function POST(req: Request) {
   }
 
   const deleted = await forgetAllMemories(session.user.id);
-  return Response.json({ deleted: deleted.length });
+  return Response.json({ deleted });
 }

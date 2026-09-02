@@ -229,10 +229,16 @@ export async function bulkDelete(userId: string, ids: string[]) {
     .returning();
 }
 
-/** Delete EVERY memory for the user (right-to-be-forgotten). */
-export async function forgetAllMemories(userId: string) {
-  return db
-    .delete(userMemory)
-    .where(eq(userMemory.userId, userId))
-    .returning();
+/** Delete EVERY memory for the user (right-to-be-forgotten) without materializing all deleted rows. */
+export async function forgetAllMemories(userId: string): Promise<number> {
+  const result = await db.execute(sql`
+    WITH deleted AS (
+      DELETE FROM ${userMemory}
+      WHERE ${userMemory.userId} = ${userId}
+      RETURNING 1
+    )
+    SELECT count(*)::int AS count FROM deleted
+  `);
+  const row = result.rows[0] as { count?: number | string } | undefined;
+  return Number(row?.count ?? 0);
 }

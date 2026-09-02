@@ -32,6 +32,7 @@ import { getRetrievalAnalytics, computeRetrievalAnalytics, type RetrievalAnalyti
 // Admin list endpoints are bounded to prevent accidental giant responses.
 const ADMIN_LIST_LIMIT = 500;
 const BLOCKED_EMAIL_LIST_LIMIT = 500;
+const ADMIN_EXPORT_USER_LIMIT = 10_000;
 
 export async function countAdmins(): Promise<number> {
   const [row] = await db.select({ count: count() }).from(admins);
@@ -772,7 +773,8 @@ export async function adminExportUsers() {
     })
     .from(users)
     .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .orderBy(desc(userProfiles.createdAt));
+    .orderBy(desc(userProfiles.createdAt))
+    .limit(ADMIN_EXPORT_USER_LIMIT);
 }
 
 export async function adminExportAuditLog() {

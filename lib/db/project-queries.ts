@@ -9,7 +9,8 @@ export async function listSystemProjects(userId: string): Promise<Project[]> {
   return db
     .select()
     .from(projects)
-    .where(and(eq(projects.userId, userId), eq(projects.isSystem, true)));
+    .where(and(eq(projects.userId, userId), eq(projects.isSystem, true)))
+    .limit(PROJECT_LIST_LIMIT);
 }
 
 /**
