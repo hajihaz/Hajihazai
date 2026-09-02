@@ -6,7 +6,11 @@ import { brains, knowledgeDocument, knowledgeChunk, type Brain, type NewBrain } 
 const BRAIN_LIST_LIMIT = 200;
 
 export async function listBrains(): Promise<Brain[]> {
-  return db.select().from(brains).orderBy(brains.isSystem, brains.name).limit(BRAIN_LIST_LIMIT);
+  return db
+    .select()
+    .from(brains)
+    .orderBy(brains.isSystem, brains.name)
+    .limit(BRAIN_LIST_LIMIT);
 }
 
 export async function getBrainById(id: string): Promise<Brain | null> {

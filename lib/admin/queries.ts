@@ -52,7 +52,8 @@ export async function listAdmins() {
       createdBy: admins.createdBy,
     })
     .from(admins)
-    .orderBy(desc(admins.createdAt));
+    .orderBy(desc(admins.createdAt))
+    .limit(ADMIN_LIST_LIMIT);
 }
 
 export async function createAdmin(input: {
@@ -267,7 +268,8 @@ export async function adminListKnowledgeWithBrain() {
     .leftJoin(projects, eq(projects.id, knowledgeDocument.projectId))
     .leftJoin(brains, eq(brains.id, knowledgeDocument.brainId))
     .leftJoin(users, eq(users.id, knowledgeDocument.userId))
-    .orderBy(desc(knowledgeDocument.createdAt));
+    .orderBy(desc(knowledgeDocument.createdAt))
+    .limit(ADMIN_LIST_LIMIT);
 }
 
 /* ----------------------------- user management ----------------------------- */
