@@ -26,14 +26,26 @@ const TIMEOUT_COOLDOWN_MS = 30_000;
 const PROBE_TIMEOUT_MS = 8_000;
 const PROBE_COOLDOWN_MS = 60_000;
 const SHARED_READ_COOLDOWN_MS = 2_000;
+const SHARED_SUCCESS_WRITE_COOLDOWN_MS = 60_000;
 
 const store = new Map<string, ModelHealth>();
 let lastProbeAll = 0;
 let lastSharedRead = 0;
+const lastSharedSuccessWrite = new Map<string, number>();
 
 export function recordSuccess(modelId: string, latencyMs?: number): void {
-  const health: ModelHealth = { modelId, healthy: true, checkedAt: Date.now(), latencyMs };
+  const now = Date.now();
+  const previous = store.get(modelId);
+  const health: ModelHealth = { modelId, healthy: true, checkedAt: now, latencyMs };
   store.set(modelId, health);
+
+  // Successful requests are common; persist failures immediately, but coalesce
+  // healthy-state writes so normal traffic does not turn every chat into a DB write.
+  // A successful recovery after a local/shared failure is still written immediately.
+  const lastWrite = lastSharedSuccessWrite.get(modelId) ?? 0;
+  const recovered = previous?.healthy === false;
+  if (!recovered && now - lastWrite < SHARED_SUCCESS_WRITE_COOLDOWN_MS) return;
+  lastSharedSuccessWrite.set(modelId, now);
   void persistSharedHealth(health).catch((error) => {
     console.warn(`[health] shared success persistence failed: ${error instanceof Error ? error.message : String(error)}`);
   });

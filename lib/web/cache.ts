@@ -29,8 +29,21 @@ export function cacheKindFor(query: string): CacheKind {
 }
 
 interface Entry { value: WebResult[]; expiresAt: number; kind: CacheKind }
+const MAX_ENTRIES = 500;
 const STORE = new Map<string, Entry>();
 let hits = 0, misses = 0;
+
+/** Remove expired entries and enforce a hard per-instance memory bound. */
+function compact(now = Date.now()): void {
+  for (const [key, entry] of STORE) {
+    if (entry.expiresAt <= now) STORE.delete(key);
+  }
+  while (STORE.size > MAX_ENTRIES) {
+    const oldest = STORE.keys().next().value as string | undefined;
+    if (oldest === undefined) break;
+    STORE.delete(oldest);
+  }
+}
 
 const keyFor = (query: string) => query.trim().toLowerCase();
 
@@ -43,8 +56,13 @@ export function getCached(query: string, now = Date.now()): WebResult[] | null {
 }
 
 export function setCached(query: string, value: WebResult[], now = Date.now()): void {
+  compact(now);
+  const key = keyFor(query);
   const kind = cacheKindFor(query);
-  STORE.set(keyFor(query), { value, kind, expiresAt: now + TTL_MS[kind] });
+  // Refreshing an existing key moves it to the newest position for FIFO eviction.
+  STORE.delete(key);
+  STORE.set(key, { value, kind, expiresAt: now + TTL_MS[kind] });
+  compact(now);
 }
 
 export function cacheStats(now = Date.now()) {
@@ -56,6 +74,9 @@ export function cacheStats(now = Date.now()) {
   const total = hits + misses;
   return { entries: live, hits, misses, hitRate: total ? hits / total : 0, byKind };
 }
+
+/** Test helper / diagnostics. */
+export function cacheMaxEntries(): number { return MAX_ENTRIES; }
 
 /** Test helper. */
 export function resetCache(): void { STORE.clear(); hits = 0; misses = 0; }

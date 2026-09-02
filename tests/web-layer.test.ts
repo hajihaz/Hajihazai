@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { classifyQuery } from "@/lib/web/classify";
 import { rankAndFilter, tierOf, hostOf, type WebResult } from "@/lib/web/sources";
-import { cacheKindFor, getCached, setCached, resetCache, TTL_MS } from "@/lib/web/cache";
+import { cacheKindFor, getCached, setCached, resetCache, TTL_MS, cacheMaxEntries } from "@/lib/web/cache";
 import { hasProductionGradeProvider, activeProvider, shouldBypassCache } from "@/lib/web/search";
 
 describe("classifyQuery", () => {
@@ -134,6 +134,15 @@ describe("cache", () => {
   it("is case-insensitive on the key", () => {
     setCached("Reliance Share Price", [{ title: "t", url: "u", snippet: "s", timestamp: "" }], 0);
     expect(getCached("reliance share price", 1000)).toHaveLength(1);
+  });
+  it("bounds per-instance entries and evicts the oldest key", () => {
+    const total = cacheMaxEntries() + 25;
+    for (let i = 0; i < total; i++) {
+      setCached(`unique cache query ${i}`, [{ title: "t", url: "u", snippet: "s", timestamp: "" }], 1_000_000);
+    }
+    expect(cacheMaxEntries()).toBe(500);
+    expect(getCached("unique cache query 0", 1_000_000)).toBeNull();
+    expect(getCached(`unique cache query ${total - 1}`, 1_000_000)).toHaveLength(1);
   });
   it("does not treat a smaller cached result set as sufficient for a larger request", async () => {
     const src = await import("@/lib/web/search");
