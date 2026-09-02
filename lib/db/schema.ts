@@ -60,7 +60,10 @@ export const sessions = pgTable("session", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   expires: timestamp("expires", { mode: "date" }).notNull(),
-});
+}, (t) => [
+  index("session_user_idx").on(t.userId),
+  index("session_expires_idx").on(t.expires),
+]);
 
 export const verificationTokens = pgTable(
   "verificationToken",
@@ -504,6 +507,7 @@ export const passwordResetTokens = pgTable(
   (t) => [
     index("password_reset_user_idx").on(t.userId),
     index("password_reset_expires_idx").on(t.expiresAt),
+    index("password_reset_used_idx").on(t.usedAt),
   ],
 );
 
@@ -536,7 +540,10 @@ export const adminSessions = pgTable(
     expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
   },
-  (t) => [index("admin_sessions_admin_idx").on(t.adminId)],
+  (t) => [
+    index("admin_sessions_admin_idx").on(t.adminId),
+    index("admin_sessions_expires_idx").on(t.expiresAt),
+  ],
 );
 
 export type AdminSession = typeof adminSessions.$inferSelect;
