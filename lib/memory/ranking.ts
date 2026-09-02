@@ -65,14 +65,20 @@ export function significantTokens(q: string): string[] {
 export function matchesQuery(content: string, q?: string): boolean {
   if (!q || !q.trim()) return true;
   const c = content.toLowerCase();
-  if (c.includes(q.trim().toLowerCase())) return true;
+  const normalizedQuery = q.trim().toLowerCase();
   const toks = significantTokens(q);
+  // Phrase matching is useful for multi-word names, but a one-word query must
+  // still use token boundaries so "art" cannot match "party".
+  if (toks.length >= 2 && c.includes(normalizedQuery)) return true;
   if (toks.length === 0) return false;
+  // Match whole content words rather than arbitrary substrings. Substring matching
+  // makes short query terms such as "art" match unrelated words like "party".
+  const contentTokens = new Set(c.split(/[^a-z0-9]+/).filter(Boolean));
   return toks.some((tok) => {
-    if (c.includes(tok)) return true;
+    if (contentTokens.has(tok)) return true;
     // Light plural fold: check "-es" before "-s" ("buses"→"bus", "goals"→"goal").
-    if (tok.length > 4 && tok.endsWith("es") && c.includes(tok.slice(0, -2))) return true;
-    if (tok.length > 3 && tok.endsWith("s") && c.includes(tok.slice(0, -1))) return true;
+    if (tok.length > 4 && tok.endsWith("es") && contentTokens.has(tok.slice(0, -2))) return true;
+    if (tok.length > 3 && tok.endsWith("s") && contentTokens.has(tok.slice(0, -1))) return true;
     return false;
   });
 }

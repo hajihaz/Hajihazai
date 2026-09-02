@@ -42,3 +42,12 @@ describe("memory retrieval rank fusion", () => {
     expect(first.map((h) => h.id)).toEqual(second.map((h) => h.id));
   });
 });
+
+
+describe("memory keyword boundary matching", () => {
+  it("does not treat a short token as an arbitrary substring", async () => {
+    const { matchesQuery } = await import("@/lib/memory/ranking");
+    expect(matchesQuery("party planning notes", "art")).toBe(false);
+    expect(matchesQuery("art collection notes", "art")).toBe(true);
+  });
+});
