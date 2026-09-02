@@ -10,14 +10,26 @@ import { rankMemories } from "./ranking";
  */
 
 export async function getActiveMemories(userId: string) {
+  // Retrieval/ranking never needs the 768-dim vector or management-only fields.
+  // Avoid selecting the embedding for every active memory on each chat request;
+  // semanticSearch already reads vectors directly through pgvector.
+  const now = new Date();
   return db
-    .select()
+    .select({
+      id: userMemory.id,
+      type: userMemory.type,
+      content: userMemory.content,
+      status: userMemory.status,
+      validFrom: userMemory.validFrom,
+      validUntil: userMemory.validUntil,
+      updatedAt: userMemory.updatedAt,
+    })
     .from(userMemory)
     .where(and(
       eq(userMemory.userId, userId),
       eq(userMemory.status, "active"),
-      lte(userMemory.validFrom, new Date()),
-      or(isNull(userMemory.validUntil), gt(userMemory.validUntil, new Date())),
+      lte(userMemory.validFrom, now),
+      or(isNull(userMemory.validUntil), gt(userMemory.validUntil, now)),
     ));
 }
 
