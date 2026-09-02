@@ -1,5 +1,6 @@
 import { getActiveMemories } from "./retrieve";
 import { rankMemories } from "./ranking";
+import { fuseMemoryRanks } from "./rank-fusion";
 import { buildMemoryBlock } from "./context-format";
 import {
   semanticSearch,
@@ -51,32 +52,35 @@ export async function buildMemoryContext(
   let items: Array<{ id: string; type: string; content: string }> = [];
   let fallbackUsed = false;
 
-  // Primary: semantic retrieval on the current message.
-  // Wrapped in catch — if the embedding provider is unavailable (quota, network),
-  // fall through to keyword search rather than returning empty context.
+  // Hybrid retrieval: semantic + keyword tiers run in parallel. Semantic search
+  // can miss exact names/brands, while keyword search can miss paraphrases.
+  // RRF combines their ranks without mixing incompatible score scales.
   if (query) {
-    const hits = await semanticSearch(
+    const semanticPromise = semanticSearch(
       userId,
       query,
       SEMANTIC_LIMIT,
       DEFAULT_SIMILARITY_THRESHOLD,
     ).catch((err) => {
-      console.warn("[memory] semantic search failed, using keyword fallback:", err);
+      console.warn("[memory] semantic search failed; preserving keyword results:", err);
       return [] as Awaited<ReturnType<typeof semanticSearch>>;
     });
-    items = hits.map((h) => ({ id: h.id, type: h.type, content: h.content }));
-  }
+    const keywordPromise = getActiveMemories(userId)
+      .then((active) => rankMemories(active, query, Date.now()))
+      .catch((err) => {
+        console.warn("[memory] keyword search failed; preserving semantic results:", err);
+        return [];
+      });
 
-  // Fallback: keyword/type+recency retrieval over active memories.
-  // Pass the actual query so only keyword-relevant memories are included. If the
-  // query matches no memory, inject NOTHING — previously this dumped EVERY active
-  // memory ("let the LLM filter"), which surfaced unrelated profile data on
-  // low-information turns. When no query is given, rankMemories returns all
-  // (intentional for non-chat callers like the memory page).
-  if (items.length === 0) {
+    const [semanticHits, keywordHits] = await Promise.all([semanticPromise, keywordPromise]);
+    const fused = fuseMemoryRanks(semanticHits, keywordHits);
+    items = fused.map((h) => ({ id: h.id, type: h.type, content: h.content }));
+    fallbackUsed = semanticHits.length === 0;
+  } else {
+    // No query is intentional for non-chat callers such as the memory page.
     fallbackUsed = true;
     const active = await getActiveMemories(userId);
-    const ranked = rankMemories(active, query, Date.now());
+    const ranked = rankMemories(active, undefined, Date.now());
     items = ranked.map((m) => ({ id: m.id, type: m.type, content: m.content }));
   }
 
