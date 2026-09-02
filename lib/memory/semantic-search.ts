@@ -1,4 +1,4 @@
-import { and, cosineDistance, desc, eq, gt, isNotNull, sql } from "drizzle-orm";
+import { and, cosineDistance, desc, eq, gt, isNotNull, lte, or, isNull, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { userMemory } from "@/lib/db/schema";
 import { embed } from "@/lib/ai/embeddings/router";
@@ -50,6 +50,8 @@ export async function semanticSearch(
       and(
         eq(userMemory.userId, userId), // user isolation
         eq(userMemory.status, "active"), // active only (excludes pending/deleted)
+        lte(userMemory.validFrom, new Date()),
+        or(isNull(userMemory.validUntil), gt(userMemory.validUntil, new Date())),
         isNotNull(userMemory.embedding),
         gt(similarity, threshold), // similarity threshold
       ),
