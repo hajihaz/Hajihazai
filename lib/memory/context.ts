@@ -11,6 +11,7 @@ import {
   type DocumentSearchHit,
 } from "@/lib/knowledge/semantic-search";
 import { keywordDocumentSearch } from "@/lib/knowledge/keyword-search";
+import { fuseKnowledgeRanks } from "@/lib/knowledge/rank-fusion";
 
 const DEFAULT_BUDGET_TOKENS = 800;
 const SEMANTIC_LIMIT = 10;
@@ -210,16 +211,7 @@ async function searchScope(
     keywordPromise,
   ]);
 
-  // Merge: semantic first (quality-ranked), then keyword-only additions (coverage).
-  const seen = new Set<string>();
-  const merged: DocumentSearchHit[] = [];
-  for (const h of semanticHits) {
-    if (!seen.has(h.chunkId)) { seen.add(h.chunkId); merged.push(h); }
-  }
-  for (const h of keywordHits) {
-    if (!seen.has(h.chunkId)) { seen.add(h.chunkId); merged.push(h); }
-  }
-  return merged;
+  return fuseKnowledgeRanks(semanticHits, keywordHits, query);
 }
 
 /**
