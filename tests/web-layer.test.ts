@@ -135,4 +135,31 @@ describe("cache", () => {
     setCached("Reliance Share Price", [{ title: "t", url: "u", snippet: "s", timestamp: "" }], 0);
     expect(getCached("reliance share price", 1000)).toHaveLength(1);
   });
+  it("does not treat a smaller cached result set as sufficient for a larger request", async () => {
+    const src = await import("@/lib/web/search");
+    const originalFetch = globalThis.fetch;
+    const originalKey = process.env.GROQ_API_KEY;
+    let calls = 0;
+    try {
+      process.env.GROQ_API_KEY = "test-key";
+      globalThis.fetch = (async () => {
+        calls++;
+        const results = Array.from({ length: 3 }, (_, i) => ({
+          title: `Source ${i}`,
+          url: `https://example.gov/source-${i}`,
+          content: "Official evidence with enough readable text for verification.",
+        }));
+        return new Response(JSON.stringify({ choices: [{ message: { executed_tools: [{ type: "browser_search", search_results: { results } }] } }] }), { status: 200 });
+      }) as typeof fetch;
+      src.resetWebSearchStateForTests();
+      await src.webSearch("cache limit test", 1);
+      const larger = await src.webSearch("cache limit test", 3);
+      expect(calls).toBe(2);
+      expect(larger.results).toHaveLength(3);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (originalKey === undefined) delete process.env.GROQ_API_KEY; else process.env.GROQ_API_KEY = originalKey;
+      src.resetWebSearchStateForTests();
+    }
+  });
 });

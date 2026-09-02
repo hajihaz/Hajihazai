@@ -517,8 +517,11 @@ export async function webSearch(
 
   const bypassCache = shouldBypassCache(q);
   const cached = bypassCache ? null : getCached(q);
-  if (cached)
-    return { results: cached, provider: activeProvider(), cached: true };
+  // The cache key is query-only, while callers may request different result
+  // limits. Reuse a cached entry only when it contains enough results; otherwise
+  // perform a fresh search rather than silently returning an undersized set.
+  if (cached && cached.length >= limit)
+    return { results: cached.slice(0, limit), provider: activeProvider(), cached: true };
 
   const key = `${q.toLowerCase()}\0${limit}`;
   const existing = IN_FLIGHT.get(key);
