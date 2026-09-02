@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { getUserNotifications, markNotificationRead } from "@/lib/admin/queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 export async function GET() {
@@ -17,6 +18,9 @@ export async function POST(req: Request) {
 
   const limited = await rateLimitResponse(`notifications:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => ({}));
   const id = body.id;

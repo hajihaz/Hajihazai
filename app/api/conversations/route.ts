@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { createConversation, listConversations } from "@/lib/db/queries";
 import { getProject } from "@/lib/db/project-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 export async function GET() {
   const session = await auth();
@@ -29,6 +30,9 @@ export async function POST(req: Request) {
   if (limited) return limited;
 
   // Optional: create the chat inside a project the user owns.
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
+
   const body = await req.json().catch(() => null);
   const projectId = typeof body?.projectId === "string" ? body.projectId : null;
   if (projectId) {

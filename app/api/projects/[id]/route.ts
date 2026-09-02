@@ -3,6 +3,7 @@ import { getProject, updateProject, deleteProject } from "@/lib/db/project-queri
 import { listProjectConversations } from "@/lib/db/queries";
 import { listProjectDocuments } from "@/lib/db/knowledge-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const NAME_MAX = 100;
@@ -46,6 +47,9 @@ export async function PATCH(
 
   const limited = await rateLimitResponse(`project-mutation:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const patch: { name?: string; description?: string | null; instructions?: string | null } = {};

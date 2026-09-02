@@ -1,6 +1,6 @@
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { db } from "./index";
-import { userProfiles, users, passwordResetTokens, type UserProfile } from "./schema";
+import { userProfiles, users, passwordResetTokens, sessions, type UserProfile } from "./schema";
 
 /** Username/password credentials + password-reset token data layer. */
 
@@ -27,6 +27,19 @@ export async function getLoginProfile(
       sql`lower(${userProfiles.email}) = lower(${id}) OR lower(${userProfiles.username}) = lower(${id})`,
     );
   return row ?? null;
+}
+
+/** Revoke all sessions for a user except the currently presented token.
+ * Used after password changes so previously issued sessions cannot remain valid.
+ */
+export async function revokeOtherSessions(userId: string, currentSessionToken?: string | null): Promise<void> {
+  await db
+    .delete(sessions)
+    .where(
+      currentSessionToken
+        ? and(eq(sessions.userId, userId), sql`${sessions.sessionToken} <> ${currentSessionToken}`)
+        : eq(sessions.userId, userId),
+    );
 }
 
 export async function setUserPassword(

@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
+import { getCurrentSessionToken } from "@/lib/auth/session";
 import { getProfile } from "@/lib/db/profile-queries";
-import { setUserPassword } from "@/lib/db/credential-queries";
+import { revokeOtherSessions, setUserPassword } from "@/lib/db/credential-queries";
 import { hashPassword, verifyPassword, validatePassword } from "@/lib/auth/password";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
@@ -36,5 +37,6 @@ export async function POST(req: Request) {
   }
 
   await setUserPassword(session.user.id, await hashPassword(pw.value));
+  await revokeOtherSessions(session.user.id, await getCurrentSessionToken());
   return Response.json({ ok: true });
 }

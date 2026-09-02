@@ -3,6 +3,7 @@ import { listTools } from "@/lib/tools/registry";
 import { executeDetectedToolCall } from "@/lib/tools/tool-calling";
 import { recordToolInvocation } from "@/lib/db/tool-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 /** List available tools (developer convenience). */
 export async function GET() {
@@ -22,6 +23,9 @@ export async function POST(req: Request) {
 
   const limited = await rateLimitResponse(`tools:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const tool = body?.tool;

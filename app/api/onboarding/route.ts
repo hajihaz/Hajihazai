@@ -11,6 +11,7 @@ import {
 } from "@/lib/db/profile-queries";
 import { submitToSheet } from "@/lib/onboarding/sheets";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 /** Complete onboarding: { username, mobileNumber, countryCode }. */
 export async function POST(req: Request) {
@@ -21,6 +22,9 @@ export async function POST(req: Request) {
 
   const limited = await rateLimitResponse(`onboarding:${session.user.id}`, 20, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
 

@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { listConversations } from "@/lib/db/queries";
 import { extractMemories } from "@/lib/memory/extract";
 import { rateLimitAsync } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 // Extraction calls an LLM — cap it per user to limit cost/abuse.
 const EXTRACT_LIMIT = 5;
@@ -33,10 +34,8 @@ export async function POST(req: Request) {
     });
   }
 
-  const contentLength = Number(req.headers.get("content-length") ?? "0");
-  if (contentLength > 50_000) {
-    return new Response("Request body is too large", { status: 413 });
-  }
+  const oversized = rejectOversizedBody(req, 50000);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const preview = body?.preview === true;

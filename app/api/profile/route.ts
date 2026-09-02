@@ -3,6 +3,7 @@ import { getProfile } from "@/lib/db/profile-queries";
 import { updateUsername } from "@/lib/db/credential-queries";
 import { validateUsername } from "@/lib/onboarding/validate";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 export async function GET() {
@@ -29,6 +30,9 @@ export async function PATCH(req: Request) {
 
   const limited = await rateLimitResponse(`profile:${session.user.id}`, 20, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const uname = validateUsername(body?.username);

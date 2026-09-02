@@ -5,6 +5,7 @@ import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { validateKnowledgeContent, logKnowledgeAction } from "@/lib/knowledge/safety";
 import { reindexKnowledgeDocument } from "@/lib/knowledge/reindex";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 async function requireUser() {
@@ -28,6 +29,9 @@ async function validateWrite(req: Request, user: { userId: string; email: string
   if (limited) return { response: limited } as const;
   const perm = await assertKnowledgeWritePermission(user.email);
   if (!perm.ok) return { response: Response.json({ error: perm.error }, { status: 403 }) } as const;
+  const oversized = rejectOversizedBody(req, 6291456);
+  if (oversized) return { response: oversized } as const;
+
   const body = await req.json().catch(() => null);
   if (typeof body?.content !== "string") return { response: new Response("content is required", { status: 400 }) } as const;
   const safety = validateKnowledgeContent(body.content);

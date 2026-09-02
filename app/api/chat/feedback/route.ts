@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { setMessageFeedback } from "@/lib/db/queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 /**
  * Phase 5 — assistant-message feedback (👍/👎). Stores the rating on the message
@@ -13,6 +14,9 @@ export async function POST(req: Request) {
 
   const limited = await rateLimitResponse(`chat-feedback:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const { messageId, value } = await req.json().catch(() => ({}));
   if (typeof messageId !== "string" || (value !== "helpful" && value !== "not_helpful")) {

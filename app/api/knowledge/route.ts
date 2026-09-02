@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { createDocument, listDocuments } from "@/lib/db/knowledge-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { logKnowledgeAction } from "@/lib/knowledge/safety";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
@@ -31,6 +32,9 @@ export async function POST(req: Request) {
   if (!perm.ok) {
     return Response.json({ error: perm.error }, { status: 403 });
   }
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const title = body?.title;

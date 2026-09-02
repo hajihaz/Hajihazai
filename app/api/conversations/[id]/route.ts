@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { deleteConversation, renameConversation } from "@/lib/db/queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 const TITLE_MAX = 120;
 
@@ -16,6 +17,9 @@ export async function PATCH(
   const limited = await rateLimitResponse(`conversation-mutation:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
   const { id } = await params;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const raw = typeof body?.title === "string" ? body.title.trim() : "";

@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { listProjects, createProject } from "@/lib/db/project-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const NAME_MAX = 100;
@@ -19,6 +20,9 @@ export async function POST(req: Request) {
 
   const limited = await rateLimitResponse(`projects:${session.user.id}`, 30, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const name = typeof body?.name === "string" ? body.name.trim() : "";

@@ -27,6 +27,15 @@ export function isSecureRequest(req: Request): boolean {
   }
 }
 
+export async function getCurrentSessionToken(): Promise<string | null> {
+  const store = await cookies();
+  return (
+    store.get("__Secure-authjs.session-token")?.value ??
+    store.get("authjs.session-token")?.value ??
+    null
+  );
+}
+
 export async function createUserSession(userId: string, secure: boolean): Promise<void> {
   const token = randomBytes(32).toString("hex");
   const expires = new Date(Date.now() + SESSION_TTL_MS);

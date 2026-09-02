@@ -6,6 +6,7 @@ import {
 } from "@/lib/db/memory-queries";
 import { embedMemory } from "@/lib/memory/embed-memory";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 /**
  * Bulk actions on the user's own memories.
@@ -21,10 +22,8 @@ export async function POST(req: Request) {
   const limited = await rateLimitResponse(`memory-bulk:${session.user.id}`, 30, 60_000);
   if (limited) return limited;
 
-  const contentLength = Number(req.headers.get("content-length") ?? "0");
-  if (contentLength > 100_000) {
-    return new Response("Request body is too large", { status: 413 });
-  }
+  const oversized = rejectOversizedBody(req, 100_000);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const action = body?.action;

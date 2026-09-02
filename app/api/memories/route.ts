@@ -7,6 +7,7 @@ import {
 } from "@/lib/db/memory-queries";
 import { embedMemory } from "@/lib/memory/embed-memory";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 export async function GET(req: Request) {
   const session = await auth();
@@ -46,6 +47,9 @@ export async function POST(req: Request) {
   if (contentLength > 100_000) {
     return new Response("Request body is too large", { status: 413 });
   }
+
+  const oversized = rejectOversizedBody(req, 100000);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const content = body?.content;

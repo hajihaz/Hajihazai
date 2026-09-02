@@ -23,7 +23,7 @@ import {
   type KnowledgeAuditLog,
   type Notification,
 } from "@/lib/db/schema";
-import { isUniqueViolation } from "@/lib/db/credential-queries";
+import { isUniqueViolation, revokeOtherSessions } from "@/lib/db/credential-queries";
 import { hashPassword } from "@/lib/auth/password";
 import { getRetrievalAnalytics, computeRetrievalAnalytics, type RetrievalAnalytics } from "@/lib/admin/analytics";
 
@@ -390,6 +390,7 @@ export async function adminResetUserPassword(userId: string, newPassword: string
     .set({ passwordHash: hash, updatedAt: new Date() })
     .where(eq(userProfiles.userId, userId))
     .returning();
+  if (row) await revokeOtherSessions(userId);
   return !!row;
 }
 

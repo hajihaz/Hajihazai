@@ -1,4 +1,4 @@
-import { consumeResetToken, setUserPassword } from "@/lib/db/credential-queries";
+import { consumeResetToken, revokeOtherSessions, setUserPassword } from "@/lib/db/credential-queries";
 import { hashPassword, hashToken, validatePassword } from "@/lib/auth/password";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rateLimitIdentity, rejectOversizedBody } from "@/lib/auth/request";
@@ -27,5 +27,6 @@ export async function POST(req: Request) {
   }
 
   await setUserPassword(userId, await hashPassword(pw.value));
+  await revokeOtherSessions(userId);
   return Response.json({ ok: true });
 }

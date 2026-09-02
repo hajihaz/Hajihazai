@@ -24,7 +24,7 @@ export async function POST(
   if (!ok) return Response.json({ error: "User not found" }, { status: 404 });
 
   // Revoke sessions immediately when disabling
-  if (disabled) void adminRevokeUserSessions(id).catch(() => null);
+  if (disabled) await adminRevokeUserSessions(id).catch(() => null);
 
   const user = await adminGetUserDetail(id).catch(() => null);
   if (user?.email) {

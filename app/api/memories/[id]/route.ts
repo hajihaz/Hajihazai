@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { deleteMemory, updateMemory } from "@/lib/db/memory-queries";
 import { embedMemory } from "@/lib/memory/embed-memory";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 export async function PATCH(
   req: Request,
@@ -14,6 +15,9 @@ export async function PATCH(
   const { id } = await params;
   const limited = await rateLimitResponse(`memory-mutation:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 65536);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const content = body?.content;

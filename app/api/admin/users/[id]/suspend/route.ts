@@ -22,7 +22,7 @@ export async function POST(
   if (suspend) {
     await adminSuspendUser(id);
     // Revoke active sessions so the effect is immediate
-    void adminRevokeUserSessions(id).catch(() => null);
+    await adminRevokeUserSessions(id).catch(() => null);
   } else {
     await adminRestoreUser(id);
   }
