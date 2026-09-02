@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planIntelligence } from "../lib/ai/intelligence-planner";
+import { planIntelligence, shouldRequestBrainClarification } from "../lib/ai/intelligence-planner";
 import { levelForIntelligenceDepth } from "../lib/ai/levels";
 
 describe("intelligence planner", () => {
@@ -69,5 +69,23 @@ describe("clarification policy", () => {
     expect(p.webIntent).toBe("internal");
     expect(p.brainSlug).toBeNull();
     expect(p.retrieveKnowledge).toBe(false);
+  });
+});
+
+describe("brain clarification targeting", () => {
+  it("only requests clarification for genuinely domain-specific unrouted questions", () => {
+    expect(shouldRequestBrainClarification("What should I focus on next?", {
+      webIntent: "internal", retrieveMemory: true, brainMode: "smart", multiBrains: [],
+    })).toBe(false);
+    expect(shouldRequestBrainClarification("Who is the founder?", {
+      webIntent: "internal", retrieveMemory: true, brainMode: "smart", multiBrains: [],
+    })).toBe(true);
+  });
+
+  it("never requests brain clarification for live-web, manual, or multi-brain turns", () => {
+    const base = { retrieveMemory: true };
+    expect(shouldRequestBrainClarification("Who is the founder?", { ...base, webIntent: "web", brainMode: "smart", multiBrains: [] })).toBe(false);
+    expect(shouldRequestBrainClarification("Who is the founder?", { ...base, webIntent: "internal", brainMode: "manual", multiBrains: [] })).toBe(false);
+    expect(shouldRequestBrainClarification("Who is the founder?", { ...base, webIntent: "internal", brainMode: "smart", multiBrains: ["allbee", "suplaykart"] })).toBe(false);
   });
 });

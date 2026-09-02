@@ -56,7 +56,7 @@ import {
   renderConversationDigest,
 } from "@/lib/ai/conversation-summary";
 import { sanitizeQueryForLog } from "@/lib/admin/analytics";
-import { planIntelligence } from "@/lib/ai/intelligence-planner";
+import { planIntelligence, shouldRequestBrainClarification } from "@/lib/ai/intelligence-planner";
 
 const CHAT_RATE_LIMIT = 30;
 const CHAT_RATE_WINDOW_MS = 60_000;
@@ -313,7 +313,7 @@ export async function POST(req: Request) {
   const isMulti = multiBrains.length >= 2;
   const wantKnowledge = intelligencePlan.retrieveKnowledge;
   const clarifyBlock =
-    smartUnrouted && !isMulti && wantRetrieval
+    smartUnrouted && shouldRequestBrainClarification(message, { webIntent, retrieveMemory: wantRetrieval, brainMode: effectiveBrainMode, multiBrains })
       ? 'SYSTEM: The smart router could not confidently pick a knowledge brain for this message. If the message is an ambiguous role or entity reference — e.g. "founder", "CEO", "ownership", "owner" — without naming a company, ask which company or organization they mean (for example: "Founder of what?", "CEO of which company?", "Ownership of which organization?"). If it clearly refers to the user\'s specific businesses (AllBee, Suplaykart), personal/family life, or law, ask which area they mean. Otherwise answer normally from general knowledge.'
       : "";
 

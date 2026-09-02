@@ -34,6 +34,8 @@ export interface IntelligencePlan {
 
 const RESEARCH_RE =
   /\b(research|investigate|deep dive|deep-dive|thoroughly|comprehensive|in depth|in-depth|verify|fact[- ]check|cross[- ]check|sources?|evidence)\b/i;
+const CLARIFICATION_RE = /\b(founder|co-founder|ceo|chief executive|owner|ownership|shareholder|director|who is the (founder|owner|ceo)|whose (company|business|ownership)|his|her|their)\b/i;
+
 const QUICK_RE =
   /^(hi+|hey+|hello+|thanks?|thank you|ok|okay|cool|nice|great|awesome|perfect|bye|goodbye|who are you)[\s!.?,…)]*$/i;
 
@@ -96,6 +98,11 @@ function buildReasoningInstructions(
       "- Keep the response short and conversational; do not over-research small talk.",
     );
   return lines.join("\n");
+}
+
+export function shouldRequestBrainClarification(message: string, opts: { webIntent: WebIntent; retrieveMemory: boolean; brainMode: BrainMode; multiBrains: string[] }): boolean {
+  if (opts.webIntent !== "internal" || !opts.retrieveMemory || opts.brainMode !== "smart" || opts.multiBrains.length >= 2) return false;
+  return CLARIFICATION_RE.test(message);
 }
 
 export function planIntelligence(
