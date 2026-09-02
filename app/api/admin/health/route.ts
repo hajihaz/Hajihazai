@@ -65,7 +65,12 @@ export async function GET() {
     checkProvider("Groq", "https://api.groq.com/openai/v1/models", process.env.GROQ_API_KEY),
     checkProvider("OpenRouter", "https://openrouter.ai/api/v1/models", process.env.OPENROUTER_API_KEY),
     geminiKey
-      ? checkProvider("Google Gemini", `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(geminiKey)}`, geminiKey, {})
+      ? checkProvider(
+          "Google Gemini",
+          "https://generativelanguage.googleapis.com/v1beta/models",
+          geminiKey,
+          { "x-goog-api-key": geminiKey },
+        )
       : checkProvider("Google Gemini", "https://generativelanguage.googleapis.com/v1beta/models", undefined),
   ]);
 

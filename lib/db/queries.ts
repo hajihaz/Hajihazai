@@ -2,6 +2,8 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { db } from "./index";
 import { conversations, messages } from "./schema";
 
+const PROJECT_LIST_LIMIT = 200;
+
 /* ----------------------------- Conversations ----------------------------- */
 
 export async function listConversations(userId: string) {
@@ -25,7 +27,7 @@ export async function createConversation(
   return row;
 }
 
-/** Chats that belong to a specific project (ownership-scoped). */
+/** Chats that belong to a specific project (ownership-scoped and bounded). */
 export async function listProjectConversations(
   userId: string,
   projectId: string,
@@ -39,7 +41,8 @@ export async function listProjectConversations(
         eq(conversations.projectId, projectId),
       ),
     )
-    .orderBy(desc(conversations.updatedAt));
+    .orderBy(desc(conversations.updatedAt))
+    .limit(PROJECT_LIST_LIMIT);
 }
 
 /** Fetch a conversation only if it belongs to the given user (ownership guard). */
@@ -159,7 +162,6 @@ export async function addOwnedMessage(
   if (!owned) return null;
   return addMessage(input);
 }
-
 
 /**
  * Record 👍/👎 feedback on an assistant message the user owns. Merges into the

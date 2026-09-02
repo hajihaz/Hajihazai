@@ -6,6 +6,8 @@ type SourceType = "pdf" | "text" | "website" | "note";
 type DocStatus = "processing" | "active" | "failed";
 type DocVisibility = "private" | "global";
 
+const DOCUMENT_LIST_LIMIT = 200;
+
 /**
  * Phase 7.0 — Knowledge Base document registry (foundation only).
  * Every function is scoped by userId so a user can only ever touch their own
@@ -18,7 +20,8 @@ export async function listDocuments(userId: string) {
     .select()
     .from(knowledgeDocument)
     .where(eq(knowledgeDocument.userId, userId))
-    .orderBy(desc(knowledgeDocument.updatedAt));
+    .orderBy(desc(knowledgeDocument.updatedAt))
+    .limit(DOCUMENT_LIST_LIMIT);
 }
 
 export async function getDocument(userId: string, id: string) {
@@ -70,7 +73,8 @@ export async function listProjectDocuments(userId: string, projectId: string) {
         eq(knowledgeDocument.projectId, projectId),
       ),
     )
-    .orderBy(desc(knowledgeDocument.updatedAt));
+    .orderBy(desc(knowledgeDocument.updatedAt))
+    .limit(DOCUMENT_LIST_LIMIT);
 }
 
 export async function updateDocumentStatus(
