@@ -130,6 +130,35 @@ describe.skipIf(!hasDb)("pgvector storage & isolation (db)", () => {
     expect(after[0].embedding).toBeNull();
   });
 
+  it("does not allow a stale embedding write after a concurrent edit", async () => {
+    const [m] = await db
+      .insert(schema.userMemory)
+      .values({ userId: A, content: "Original race-sensitive fact", status: "active" })
+      .returning();
+    const snapshot = { updatedAt: m.updatedAt, content: m.content };
+
+    await updateMemory(A, m.id, { content: "Newer race-sensitive fact" });
+
+    const staleVector = Array.from({ length: 768 }, () => 0);
+    const rows = await db
+      .update(schema.userMemory)
+      .set({ embedding: staleVector })
+      .where(
+        (await import("drizzle-orm")).and(
+          (await import("drizzle-orm")).eq(schema.userMemory.id, m.id),
+          (await import("drizzle-orm")).eq(schema.userMemory.userId, A),
+          (await import("drizzle-orm")).eq(schema.userMemory.updatedAt, snapshot.updatedAt),
+          (await import("drizzle-orm")).eq(schema.userMemory.content, snapshot.content),
+          (await import("drizzle-orm")).eq(schema.userMemory.status, "active"),
+        ),
+      )
+      .returning({ id: schema.userMemory.id });
+
+    expect(rows).toHaveLength(0);
+    const after = await rawSql`select embedding from user_memory where id=${m.id}`;
+    expect(after[0].embedding).toBeNull();
+  });
+
   it("embedMemory refuses a non-owner (isolation)", async () => {
     const [am] = await db
       .insert(schema.userMemory)

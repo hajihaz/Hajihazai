@@ -33,20 +33,32 @@ export async function searchWithDiagnostics(userId: string, q?: string) {
     .from(userMemory)
     .where(eq(userMemory.userId, userId));
 
-  const active = all.filter((m) => m.status === "active");
-  const results = rankMemories(active, q, Date.now());
+  const now = new Date();
+  const active = all.filter(
+    (m) =>
+      m.status === "active" &&
+      m.validFrom <= now &&
+      (m.validUntil === null || m.validUntil > now),
+  );
+  const results = rankMemories(active, q, now.getTime());
   const resultIds = new Set(results.map((r) => r.id));
 
   const excluded = all
     .filter((m) => !resultIds.has(m.id))
-    .map((m) => ({
-      id: m.id,
-      type: m.type,
-      content: m.content,
-      status: m.status,
-      // pending/deleted → status; otherwise an active row that didn't match q.
-      reason: m.status !== "active" ? m.status : "no-match",
-    }));
+    .map((m) => {
+      let reason: string;
+      if (m.status !== "active") reason = m.status;
+      else if (m.validFrom > now) reason = "not-yet-valid";
+      else if (m.validUntil !== null && m.validUntil <= now) reason = "expired";
+      else reason = "no-match";
+      return {
+        id: m.id,
+        type: m.type,
+        content: m.content,
+        status: m.status,
+        reason,
+      };
+    });
 
   return { query: q ?? "", results, excluded };
 }

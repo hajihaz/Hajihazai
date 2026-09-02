@@ -89,6 +89,38 @@ describe.skipIf(!hasDb)("memory ownership & isolation (db)", () => {
     await db.delete(schema.users).where(inArray(schema.users.id, [uc.id]));
   });
 
+  it("diagnostics applies temporal validity and explains excluded active memories", async () => {
+    const stamp = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+    const [ud] = await db
+      .insert(schema.users)
+      .values({ email: `vitest-D-${stamp}@example.com` })
+      .returning();
+
+    const active = await q.createMemory(ud.id, { content: "currently valid coffee fact", status: "active" });
+    const expired = await q.createMemory(ud.id, { content: "expired coffee fact", status: "active" });
+    const future = await q.createMemory(ud.id, { content: "future coffee fact", status: "active" });
+
+    const now = Date.now();
+    await db
+      .update(schema.userMemory)
+      .set({ validUntil: new Date(now - 60_000) })
+      .where((await import("drizzle-orm")).eq(schema.userMemory.id, expired.id));
+    await db
+      .update(schema.userMemory)
+      .set({ validFrom: new Date(now + 60_000) })
+      .where((await import("drizzle-orm")).eq(schema.userMemory.id, future.id));
+
+    const diag = await retrieve.searchWithDiagnostics(ud.id, "coffee");
+    expect(diag.results.some((m: any) => m.id === active.id)).toBe(true);
+    expect(diag.results.some((m: any) => m.id === expired.id)).toBe(false);
+    expect(diag.results.some((m: any) => m.id === future.id)).toBe(false);
+    expect(diag.excluded.find((m: any) => m.id === expired.id)?.reason).toBe("expired");
+    expect(diag.excluded.find((m: any) => m.id === future.id)?.reason).toBe("not-yet-valid");
+
+    const { inArray } = await import("drizzle-orm");
+    await db.delete(schema.users).where(inArray(schema.users.id, [ud.id]));
+  });
+
   it("forget-all wipes only the calling user", async () => {
     await q.createMemory(B, { content: "B again", status: "active" });
     await q.forgetAllMemories(B);
