@@ -80,4 +80,11 @@ describe("knowledge text extraction", () => {
     expect((await extractText("pdf", Buffer.from("not-a-pdf"))).ok).toBe(false);
     expect((await extractText("docx", Buffer.from("not-a-docx"))).ok).toBe(false);
   });
+
+  it("rejects excessively large extracted text", async () => {
+    const { extractText, MAX_EXTRACTED_CHARS } = await import("@/lib/knowledge/extract");
+    const result = await extractText("txt", Buffer.alloc(MAX_EXTRACTED_CHARS + 1, "a"));
+    expect(result.ok).toBe(false);
+    expect(result.ok ? "" : result.error).toContain("too much extracted text");
+  });
 });
