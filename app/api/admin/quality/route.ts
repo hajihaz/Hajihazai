@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { loadRetrievalEvents } from "@/lib/admin/analytics";
 import { computeQualityDashboard } from "@/lib/admin/quality";
 import { computeKnowledgeBacklog, recommendContent, analyzeFeedback } from "@/lib/admin/insights";
@@ -12,6 +13,8 @@ import { getBrainHealth } from "@/lib/admin/brain-health";
 export async function GET() {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const readLimited = await rateLimitResponse(`admin-read:${sess.adminId}`, 60, 60_000);
+  if (readLimited) return readLimited;
 
   const events = await loadRetrievalEvents(56, 20_000).catch(() => null);
   if (!events) return new Response("Failed to load quality data", { status: 500 });
