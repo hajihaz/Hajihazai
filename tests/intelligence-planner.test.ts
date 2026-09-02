@@ -55,3 +55,19 @@ describe("intelligence depth → model level", () => {
     expect(levelForIntelligenceDepth("research")).toBe("medium");
   });
 });
+
+describe("clarification policy", () => {
+  it("does not treat pure live-web queries as brain clarification candidates", () => {
+    const p = planIntelligence("Who is the current Chief Minister of Tamil Nadu?");
+    expect(p.webIntent).toBe("web");
+    expect(p.brainSlug).toBeNull();
+    expect(p.searchWeb).toBe(true);
+  });
+
+  it("still leaves genuinely unrouted internal questions eligible for clarification", () => {
+    const p = planIntelligence("What should I focus on next?");
+    expect(p.webIntent).toBe("internal");
+    expect(p.brainSlug).toBeNull();
+    expect(p.retrieveKnowledge).toBe(false);
+  });
+});

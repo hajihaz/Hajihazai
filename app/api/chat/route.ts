@@ -403,6 +403,13 @@ export async function POST(req: Request) {
   // assistant message's metadata column and later aggregated by the admin
   // dashboard (brain usage, clarifications, zero-result/failed retrievals, top
   // docs, top queries). Non-PII beyond a truncated echo of the user's own query.
+  // A smart route may be unrouted even for pure live-web questions. Those
+  // queries deliberately suppress the internal clarification hint because the
+  // live-web layer can answer them without choosing a private knowledge brain.
+  // Keep telemetry/UI semantics aligned with what the user actually sees.
+  const clarificationRequested =
+    !!clarifyBlock && webIntent !== "web" && webIntent !== "website";
+
   const retrievalMeta = {
     kind: "retrieval" as const,
     brainSlug: resolvedBrainSlug,
@@ -416,7 +423,7 @@ export async function POST(req: Request) {
       : memory.fallbackUsed
         ? "keyword-fallback"
         : "semantic",
-    wasClarify: !!clarifyBlock,
+    wasClarify: clarificationRequested,
     wasZeroResult: wantKnowledge && knowledge.count === 0,
     sources: [...new Set(knowledge.chunks.map((c) => c.title))],
     query: sanitizeQueryForLog(message),
@@ -725,7 +732,7 @@ export async function POST(req: Request) {
           // Phase 7 — clarification quick-action options (non-admin safe). Business
           // roles ("CEO", "ownership") apply only to the companies; "founder" and
           // generic prompts also include Haji.
-          clarify: clarifyBlock
+          clarify: clarificationRequested
             ? {
                 options: /\b(ceo|ownership|owner)\b/i.test(message)
                   ? ["AllBee", "Suplaykart"]
@@ -747,7 +754,7 @@ export async function POST(req: Request) {
                   brainMatched: route?.matchedKeywords ?? null,
                   brainReason:
                     route?.reason ??
-                    (clarifyBlock ? "clarification requested" : null),
+                    (clarificationRequested ? "clarification requested" : null),
                   knowledgeCount: knowledge.count,
                   memoryCount: memory.count,
                   // Reuse the single source-of-truth provenance computed above.
