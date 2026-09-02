@@ -25,7 +25,8 @@ export async function getLoginProfile(
     .from(userProfiles)
     .where(
       sql`lower(${userProfiles.email}) = lower(${id}) OR lower(${userProfiles.username}) = lower(${id})`,
-    );
+    )
+    .limit(1);
   return row ?? null;
 }
 
