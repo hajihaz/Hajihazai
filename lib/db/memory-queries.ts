@@ -41,7 +41,7 @@ export async function createMemory(
 export async function updateMemory(
   userId: string,
   id: string,
-  input: { type?: string; content?: string; confidence?: number; validUntil?: Date | null; supersededBy?: string | null },
+  input: { type?: string; content?: string; confidence?: number; validUntil?: Date | null },
 ) {
   const [row] = await db
     .update(userMemory)
@@ -58,7 +58,6 @@ export async function updateMemory(
         : {}),
       ...(input.confidence !== undefined ? { confidence: Math.max(0, Math.min(100, Math.round(input.confidence))) } : {}),
       ...(input.validUntil !== undefined ? { validUntil: input.validUntil } : {}),
-      ...(input.supersededBy !== undefined ? { supersededBy: input.supersededBy } : {}),
       updatedAt: new Date(),
     })
     .where(and(eq(userMemory.id, id), eq(userMemory.userId, userId)))
@@ -114,6 +113,22 @@ export async function existingMemoryContents(userId: string) {
 
 /** Mark an existing memory as superseded by a newer memory. History remains intact. */
 export async function supersedeMemory(userId: string, oldId: string, newId: string, at = new Date()) {
+  if (oldId === newId) return null;
+
+  // The replacement must belong to the same user and already be active.
+  // Keep the reference scoped to the same tenant so lifecycle history can never
+  // point at another user's memory (or an arbitrary/nonexistent ID).
+  const [replacement] = await db
+    .select({ id: userMemory.id })
+    .from(userMemory)
+    .where(and(
+      eq(userMemory.id, newId),
+      eq(userMemory.userId, userId),
+      eq(userMemory.status, "active"),
+    ))
+    .limit(1);
+  if (!replacement) return null;
+
   const [row] = await db
     .update(userMemory)
     .set({ validUntil: at, supersededBy: newId, updatedAt: at })

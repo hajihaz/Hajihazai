@@ -121,6 +121,22 @@ describe.skipIf(!hasDb)("memory ownership & isolation (db)", () => {
     await db.delete(schema.users).where(inArray(schema.users.id, [ud.id]));
   });
 
+  it("supersede requires a same-user active replacement", async () => {
+    const old = await q.createMemory(A, { content: "old lifecycle fact", status: "active" });
+    const replacement = await q.createMemory(A, { content: "new lifecycle fact", status: "active" });
+    const other = await q.createMemory(B, { content: "other tenant replacement", status: "active" });
+
+    expect(await q.supersedeMemory(A, old.id, other.id)).toBeNull();
+    expect((await q.listAllMemories(A)).find((m: any) => m.id === old.id)?.supersededBy).toBeNull();
+
+    const at = new Date(Date.now() - 1);
+    const superseded = await q.supersedeMemory(A, old.id, replacement.id, at);
+    expect(superseded?.supersededBy).toBe(replacement.id);
+    expect(superseded?.validUntil?.getTime()).toBe(at.getTime());
+
+    expect(await q.supersedeMemory(A, replacement.id, replacement.id)).toBeNull();
+  });
+
   it("forget-all wipes only the calling user", async () => {
     await q.createMemory(B, { content: "B again", status: "active" });
     await q.forgetAllMemories(B);
