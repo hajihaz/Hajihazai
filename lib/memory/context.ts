@@ -157,14 +157,18 @@ export function mergeBrainChunks(
   return merged;
 }
 
-/** Pure block builder — greedily include chunks while staying within budget. */
+/**
+ * Pure block builder — greedily include chunks while staying within budget.
+ * Skip an oversized candidate instead of stopping the scan, because later
+ * relevant chunks may still fit within the hard context cap.
+ */
 export function buildKnowledgeBlock(
   hits: DocumentSearchHit[],
   maxChars: number = KNOWLEDGE_MAX_CHARS,
 ): { block: string; used: DocumentSearchHit[]; count: number } {
   const used: DocumentSearchHit[] = [];
   for (const h of hits) {
-    if (renderKnowledgeBlock([...used, h]).length > maxChars) break;
+    if (renderKnowledgeBlock([...used, h]).length > maxChars) continue;
     used.push(h);
   }
   if (used.length === 0) return { block: "", used: [], count: 0 };

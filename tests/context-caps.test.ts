@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { buildMemoryBlock, MEMORY_GUARD } from "@/lib/memory/context-format";
 import { fuseKnowledgeRanks } from "@/lib/knowledge/rank-fusion";
+import { buildKnowledgeBlock } from "@/lib/memory/context";
 
 describe("memory block hard char cap (Phase 9.0)", () => {
   it("never exceeds the 1000-char cap", () => {
@@ -15,6 +16,23 @@ describe("memory block hard char cap (Phase 9.0)", () => {
   it("still includes the injection guard", () => {
     const { block } = buildMemoryBlock([{ content: "Owns Acme" }], 400, 1000);
     expect(block.startsWith(MEMORY_GUARD)).toBe(true);
+  });
+
+  it("skips an oversized early chunk and still includes later chunks that fit", () => {
+    const oversized = {
+      chunkId: "huge", documentId: "doc-huge", title: "Huge",
+      content: "x".repeat(2500), similarity: 0.99,
+    };
+    const useful = {
+      chunkId: "useful", documentId: "doc-useful", title: "Useful",
+      content: "The relevant answer is here.", similarity: 0.8,
+    };
+    const { block, used, count } = buildKnowledgeBlock([oversized, useful], 1000);
+    expect(count).toBe(1);
+    expect(used.map((h) => h.chunkId)).toEqual(["useful"]);
+    expect(block).toContain("The relevant answer is here.");
+    expect(block).not.toContain("x".repeat(100));
+    expect(block.length).toBeLessThanOrEqual(1000);
   });
 });
 
