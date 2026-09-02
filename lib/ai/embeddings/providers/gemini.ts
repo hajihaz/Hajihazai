@@ -24,6 +24,7 @@ export const geminiEmbeddingProvider: EmbeddingProvider = {
         // Pin output dimension to the canonical size.
         outputDimensionality: 768,
       }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`Gemini embeddings error ${res.status}`);
 

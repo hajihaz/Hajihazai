@@ -92,6 +92,7 @@ export const groqProvider: Provider = {
         stream: false,
         ...(opts?.jsonSchema ? { response_format: { type: "json_object" } } : {}),
       }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`Groq error ${res.status}`);
     const data = await res.json();
@@ -105,6 +106,7 @@ export const groqProvider: Provider = {
         method: "POST",
         headers: authHeaders(),
         body: JSON.stringify({ model, messages, ...modelParams(model), stream: true }),
+        signal: AbortSignal.timeout(30_000),
       });
       if (res.status !== 429 || attempt === 1) break;
       const retryAfter = Number(res.headers.get("retry-after") ?? "2");
@@ -172,6 +174,7 @@ export const groqProvider: Provider = {
           },
         })),
       }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`Groq error ${res.status}`);
     const data = await res.json();

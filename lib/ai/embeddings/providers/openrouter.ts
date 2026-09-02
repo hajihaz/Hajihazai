@@ -23,6 +23,7 @@ export const openrouterEmbeddingProvider: EmbeddingProvider = {
         "X-Title": "HajiHaz AI",
       },
       body: JSON.stringify({ model, input: text }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`OpenRouter embeddings error ${res.status}`);
 

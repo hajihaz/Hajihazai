@@ -430,6 +430,7 @@ export async function removeBlockedEmail(id: string): Promise<boolean> {
 /* ------------------------- knowledge permissions -------------------------- */
 
 const DEFAULT_PERMITTED_EMAILS = ["iamhajihaz@gmail.com", "now.kuddosahib@gmail.com"];
+const KNOWLEDGE_PERMISSION_LIST_LIMIT = 500;
 
 export async function listKnowledgePermissions(opts?: { search?: string }) {
   const search = opts?.search?.trim();
@@ -437,7 +438,8 @@ export async function listKnowledgePermissions(opts?: { search?: string }) {
     .select()
     .from(knowledgePermissions)
     .where(search ? ilike(knowledgePermissions.email, `%${search}%`) : undefined)
-    .orderBy(desc(knowledgePermissions.createdAt));
+    .orderBy(desc(knowledgePermissions.createdAt))
+    .limit(KNOWLEDGE_PERMISSION_LIST_LIMIT);
 }
 
 export async function isKnowledgeWritePermitted(email: string): Promise<boolean> {

@@ -37,6 +37,7 @@ export const openrouterProvider: Provider = {
         reasoning: { exclude: true },
         ...(opts?.jsonSchema ? { response_format: { type: "json_object" } } : {}),
       }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`OpenRouter error ${res.status}`);
 
@@ -62,6 +63,7 @@ export const openrouterProvider: Provider = {
         stream: true,
         reasoning: { exclude: true },
       }),
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new Error(`OpenRouter stream error ${res.status}`);
     if (!res.body) throw new Error("OpenRouter: no response body");
@@ -128,6 +130,7 @@ export const openrouterProvider: Provider = {
           },
         })),
       }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`OpenRouter error ${res.status}`);
     const data = await res.json();

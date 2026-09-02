@@ -45,6 +45,7 @@ export const geminiProvider: Provider = {
           ? { generationConfig: { responseMimeType: "application/json" } }
           : {}),
       }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`Gemini error ${res.status}`);
 
@@ -91,6 +92,7 @@ export const geminiProvider: Provider = {
         ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
         tools: [{ functionDeclarations }],
       }),
+      signal: AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`Gemini error ${res.status}`);
     const data = await res.json();

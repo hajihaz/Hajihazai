@@ -3,9 +3,10 @@ import { db } from "./index";
 import { brains, knowledgeDocument, knowledgeChunk, type Brain, type NewBrain } from "./schema";
 
 /** Brain data layer — brains are global (no user scope); only admins create them. */
+const BRAIN_LIST_LIMIT = 200;
 
 export async function listBrains(): Promise<Brain[]> {
-  return db.select().from(brains).orderBy(brains.isSystem, brains.name);
+  return db.select().from(brains).orderBy(brains.isSystem, brains.name).limit(BRAIN_LIST_LIMIT);
 }
 
 export async function getBrainById(id: string): Promise<Brain | null> {
@@ -91,5 +92,6 @@ export async function listBrainsForPicker() {
   return db
     .select({ id: brains.id, name: brains.name, slug: brains.slug, icon: brains.icon, color: brains.color })
     .from(brains)
-    .orderBy(desc(brains.isSystem), brains.name);
+    .orderBy(desc(brains.isSystem), brains.name)
+    .limit(BRAIN_LIST_LIMIT);
 }

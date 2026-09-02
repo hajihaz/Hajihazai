@@ -66,6 +66,7 @@ async function getAccessToken(serviceEmail: string, privateKeyPem: string): Prom
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
       assertion: jwt,
     }),
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!res.ok) {
@@ -90,6 +91,7 @@ async function appendRow(
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
     body: JSON.stringify({ values: [values] }),
+    signal: AbortSignal.timeout(8_000),
   });
 
   if (!res.ok) {

@@ -16,6 +16,7 @@ export const ollamaEmbeddingProvider: EmbeddingProvider = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model, prompt: text }),
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new Error(`Ollama embeddings error ${res.status}`);
     const data = await res.json();
