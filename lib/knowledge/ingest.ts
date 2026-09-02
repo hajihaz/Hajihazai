@@ -1,4 +1,4 @@
-import { createDocument, deleteDocument } from "@/lib/db/knowledge-queries";
+import { createDocument, deleteDocument, updateDocumentStatus } from "@/lib/db/knowledge-queries";
 import { createContent } from "@/lib/db/knowledge-content-queries";
 import { createChunks } from "@/lib/db/knowledge-chunk-queries";
 import { chunkDocument } from "./chunk";
@@ -45,14 +45,17 @@ export async function ingestDocument(
     projectId: input.projectId ?? null,
     brainId: input.brainId ?? null,
     visibility: input.visibility ?? "private",
+    status: "processing",
   });
 
   try {
     const content = await createContent(userId, doc.id, text);
     if (!content) throw new Error("failed to store document content");
     const chunks = chunkDocument(text);
-    const storedChunks = await createChunks(userId, doc.id, chunks);
+    const storedChunks = await createChunks(userId, doc.id, chunks, content.content);
     if (storedChunks === null) throw new Error("failed to store document chunks");
+    const activated = await updateDocumentStatus(userId, doc.id, "active");
+    if (!activated) throw new Error("failed to activate document");
 
     // Best-effort embedding for semantic search. Keyword retrieval works without
     // it, so a down embedding provider never blocks ingestion or retrieval.
@@ -103,14 +106,17 @@ export async function ingestText(
     category: input.category ?? null,
     brainId: input.brainId ?? null,
     visibility: input.visibility ?? "private",
+    status: "processing",
   });
 
   try {
     const content = await createContent(userId, doc.id, text);
     if (!content) throw new Error("failed to store document content");
     const chunks = chunkDocument(text);
-    const storedChunks = await createChunks(userId, doc.id, chunks);
+    const storedChunks = await createChunks(userId, doc.id, chunks, content.content);
     if (storedChunks === null) throw new Error("failed to store document chunks");
+    const activated = await updateDocumentStatus(userId, doc.id, "active");
+    if (!activated) throw new Error("failed to activate document");
 
     try {
       await embedDocumentChunks(userId, doc.id);

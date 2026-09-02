@@ -43,6 +43,13 @@ describe.skipIf(!hasDb)("knowledge ingestion (db)", () => {
         .where(eq(schema.knowledgeDocument.id, r.documentId));
       expect(doc.projectId).toBe(projId);
       expect(doc.userId).toBe(A);
+      expect(doc.status).toBe("active");
+
+      const chunks = await db
+        .select()
+        .from(schema.knowledgeChunk)
+        .where(eq(schema.knowledgeChunk.documentId, r.documentId));
+      expect(chunks.length).toBe(r.chunks);
     }
   });
 
