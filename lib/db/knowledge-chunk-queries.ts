@@ -33,27 +33,24 @@ export async function createChunks(
   userId: string,
   documentId: string,
   chunks: Chunk[],
-  expectedContentUpdatedAt?: Date,
+  expectedContent?: string,
 ) {
   if (!(await ownedDocument(userId, documentId))) return null;
 
   // Replace the searchable index atomically. A failed insert must never leave
   // the document with a partially regenerated chunk set.
   return db.transaction(async (tx) => {
-    // When rebuilding from canonical content, lock and verify that exact
-    // content revision before replacing the index. This closes the race where
-    // an older reindex could resurrect stale chunks after a content update or
-    // deletion.
-    if (expectedContentUpdatedAt) {
+    // When rebuilding from canonical content, lock and verify the exact
+    // content snapshot before replacing the index. Comparing the canonical
+    // text (rather than a JS Date) avoids millisecond-precision races when two
+    // mutations happen within the same timestamp bucket.
+    if (expectedContent !== undefined) {
       const [current] = await tx
-        .select({ updatedAt: knowledgeContent.updatedAt })
+        .select({ content: knowledgeContent.content })
         .from(knowledgeContent)
         .where(eq(knowledgeContent.documentId, documentId))
         .for("update");
-      if (
-        !current ||
-        current.updatedAt.getTime() !== expectedContentUpdatedAt.getTime()
-      ) {
+      if (!current || current.content !== expectedContent) {
         throw new KnowledgeContentChangedError();
       }
     }

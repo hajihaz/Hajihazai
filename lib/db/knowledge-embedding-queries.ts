@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db } from "./index";
 import { knowledgeChunk, knowledgeDocument } from "./schema";
 
@@ -67,4 +67,18 @@ export async function listOwnedChunks(userId: string, documentId: string) {
     .select({ id: knowledgeChunk.id, content: knowledgeChunk.content })
     .from(knowledgeChunk)
     .where(eq(knowledgeChunk.documentId, documentId));
+}
+
+/** Only chunks still missing a vector; used by retryable indexing. */
+export async function listOwnedUnembeddedChunks(userId: string, documentId: string) {
+  if (!(await ownedDocument(userId, documentId))) return null;
+  return db
+    .select({ id: knowledgeChunk.id, content: knowledgeChunk.content })
+    .from(knowledgeChunk)
+    .where(
+      and(
+        eq(knowledgeChunk.documentId, documentId),
+        isNull(knowledgeChunk.embedding),
+      ),
+    );
 }

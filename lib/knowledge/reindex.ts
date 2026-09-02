@@ -12,7 +12,7 @@ export async function reindexKnowledgeDocument(userId: string, documentId: strin
   const chunks = chunkDocument(text);
   let stored;
   try {
-    stored = await createChunks(userId, documentId, chunks, content.updatedAt);
+    stored = await createChunks(userId, documentId, chunks, content.content);
   } catch (error) {
     if (error instanceof KnowledgeContentChangedError) {
       // A newer content mutation owns the index now. Do not overwrite it with
@@ -24,12 +24,16 @@ export async function reindexKnowledgeDocument(userId: string, documentId: strin
   if (stored === null) return null;
 
   let embedded = 0;
+  let failed = 0;
   try {
     const result = await embedDocumentChunks(userId, documentId);
     embedded = result?.embedded ?? 0;
+    failed = result?.failed ?? 0;
   } catch (error) {
+    // Database failures still abort the reindex; provider failures are isolated
+    // per chunk by embedDocumentChunks so successful vectors remain usable.
     console.warn("[knowledge] reindex embedding failed; keyword retrieval remains available:", error);
   }
 
-  return { chunks: stored.length, embedded };
+  return { chunks: stored.length, embedded, failed };
 }

@@ -46,6 +46,25 @@ describe.skipIf(!hasDb)("knowledge content storage (db)", () => {
     expect((await content.getContent(A, doc.id))?.content).toBe("updated text");
   });
 
+  it("invalidates derived chunks atomically when content changes", async () => {
+    const doc = await docs.createDocument(A, { title: "Invalidate index" });
+    await content.createContent(A, doc.id, "old canonical text");
+    await db.insert(schema.knowledgeChunk).values({
+      documentId: doc.id,
+      chunkIndex: 0,
+      content: "old canonical text",
+    });
+
+    const updated = await content.updateContent(A, doc.id, "new canonical text");
+    expect(updated?.content).toBe("new canonical text");
+
+    const chunks = await db
+      .select()
+      .from(schema.knowledgeChunk)
+      .where(eq(schema.knowledgeChunk.documentId, doc.id));
+    expect(chunks).toHaveLength(0);
+  });
+
   it("deletes content", async () => {
     const doc = await docs.createDocument(A, { title: "Doc 2" });
     await content.createContent(A, doc.id, "to remove");

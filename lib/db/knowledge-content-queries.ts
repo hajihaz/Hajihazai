@@ -53,12 +53,24 @@ export async function updateContent(
   content: string,
 ) {
   if (!(await ownedDocument(userId, documentId))) return null;
-  const [row] = await db
-    .update(knowledgeContent)
-    .set({ content, updatedAt: new Date() })
-    .where(eq(knowledgeContent.documentId, documentId))
-    .returning();
-  return row ?? null;
+
+  // Content is the canonical source for retrieval. Invalidate the derived
+  // chunk/vector index in the SAME transaction as the content mutation so
+  // readers can never observe the new content alongside old searchable data.
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(knowledgeContent)
+      .set({ content, updatedAt: new Date() })
+      .where(eq(knowledgeContent.documentId, documentId))
+      .returning();
+    if (!row) return null;
+
+    await tx
+      .delete(knowledgeChunk)
+      .where(eq(knowledgeChunk.documentId, documentId));
+
+    return row;
+  });
 }
 
 export async function deleteContent(userId: string, documentId: string) {

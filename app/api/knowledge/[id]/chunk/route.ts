@@ -36,7 +36,7 @@ export async function POST(
   const chunks = chunkDocument(content.content);
   let saved;
   try {
-    saved = await createChunks(session.user.id, id, chunks, content.updatedAt);
+    saved = await createChunks(session.user.id, id, chunks, content.content);
   } catch (error) {
     if (error instanceof KnowledgeContentChangedError) {
       return Response.json(

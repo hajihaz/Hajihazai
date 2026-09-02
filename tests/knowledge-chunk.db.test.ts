@@ -56,6 +56,29 @@ describe.skipIf(!hasDb)("knowledge chunk storage (db)", () => {
     expect(listed.length).toBe(second.length);
   });
 
+  it("rejects a stale content snapshot without replacing the current index", async () => {
+    const doc = await docs.createDocument(A, { title: "Stale snapshot" });
+    const content = await (await import("@/lib/db/knowledge-content-queries")).createContent(
+      A,
+      doc.id,
+      "current",
+    );
+    await chunkQ.createChunks(A, doc.id, [{ chunkIndex: 0, content: "current" }], "current");
+
+    await (await import("@/lib/db/knowledge-content-queries")).updateContent(
+      A,
+      doc.id,
+      "newer",
+    );
+
+    await expect(
+      chunkQ.createChunks(A, doc.id, [{ chunkIndex: 0, content: "stale" }], content.content),
+    ).rejects.toThrow(chunkQ.KnowledgeContentChangedError);
+
+    const listed = await chunkQ.listChunks(A, doc.id);
+    expect(listed).toHaveLength(0);
+  });
+
   it("cascade-deletes chunks when the document is deleted", async () => {
     const doc = await docs.createDocument(A, { title: "Cascade doc" });
     const saved = await chunkQ.createChunks(

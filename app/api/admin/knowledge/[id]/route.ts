@@ -4,9 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { knowledgeDocument, knowledgeContent } from "@/lib/db/schema";
 import { updateContent, createContent } from "@/lib/db/knowledge-content-queries";
-import { createChunks } from "@/lib/db/knowledge-chunk-queries";
-import { chunkDocument } from "@/lib/knowledge/chunk";
-import { embedDocumentChunks } from "@/lib/knowledge/embed-chunks";
+import { reindexKnowledgeDocument } from "@/lib/knowledge/reindex";
 
 export async function GET(
   _req: Request,
@@ -71,14 +69,11 @@ export async function PATCH(
       await createContent(doc.userId, id, text);
     }
 
-    // createChunks is idempotent: clears old chunks then inserts new ones.
-    const chunks = chunkDocument(text);
-    await createChunks(doc.userId, id, chunks);
-
-    try {
-      await embedDocumentChunks(doc.userId, id);
-    } catch (err) {
-      console.warn("[knowledge] re-embed failed (keyword retrieval still works):", err);
+    // Use the canonical reindex path so admin writes get the same stale-index
+    // race protection and best-effort embedding recovery as user writes.
+    const reindexed = await reindexKnowledgeDocument(doc.userId, id);
+    if (!reindexed) {
+      return Response.json({ error: "Content changed while indexing; retry." }, { status: 409 });
     }
   }
 
