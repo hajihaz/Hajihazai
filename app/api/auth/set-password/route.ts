@@ -3,6 +3,7 @@ import { getProfile } from "@/lib/db/profile-queries";
 import { setUserPassword } from "@/lib/db/credential-queries";
 import { hashPassword, verifyPassword, validatePassword } from "@/lib/auth/password";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 
 /**
  * Set or change the signed-in user's password. Google-only users (no existing
@@ -15,6 +16,9 @@ export async function POST(req: Request) {
 
   const limited = await rateLimitResponse(`set-password:${session.user.id}`, 10, 60_000);
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
   const pw = validatePassword(body?.password);

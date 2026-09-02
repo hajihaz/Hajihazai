@@ -2,12 +2,15 @@ import { getLoginProfile } from "@/lib/db/credential-queries";
 import { verifyPassword } from "@/lib/auth/password";
 import { createUserSession, isSecureRequest } from "@/lib/auth/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
-import { rateLimitIdentity } from "@/lib/auth/request";
+import { rateLimitIdentity, rejectOversizedBody } from "@/lib/auth/request";
 import { isEmailBlocked } from "@/lib/admin/queries";
 import { syncEventToSheets } from "@/lib/google-sheets";
 
 /** Username/email + password login. Mints an Auth.js-compatible DB session. */
 export async function POST(req: Request) {
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
+
   const body = await req.json().catch(() => null);
   const identifier = typeof body?.identifier === "string" ? body.identifier.trim() : "";
   const password = typeof body?.password === "string" ? body.password : "";

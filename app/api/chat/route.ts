@@ -19,6 +19,7 @@ import {
 import { isModelUsable } from "@/lib/ai/health";
 import { isAdmin } from "@/lib/auth/admin";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { isMaintenanceMode, isWebSearchEnabled } from "@/lib/system-settings";
 import { classifyQuery, extractUrl, type WebIntent } from "@/lib/web/classify";
 import { webSearchMany } from "@/lib/web/search";
@@ -148,6 +149,9 @@ export async function POST(req: Request) {
     CHAT_RATE_WINDOW_MS,
   );
   if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
 
   const {
     conversationId,

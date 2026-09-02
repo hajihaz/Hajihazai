@@ -21,3 +21,18 @@ export function rateLimitIdentity(req: Request, scope: string, identity?: string
   const normalized = identity?.trim().toLowerCase().slice(0, 256) ?? "";
   return normalized ? `${scope}:ip:${ip}:id:${normalized}` : `${scope}:ip:${ip}`;
 }
+
+
+/** Reject oversized request bodies before JSON parsing to avoid unnecessary memory work.
+ * Content-Length is the only size signal available before consuming the body.
+ */
+export function rejectOversizedBody(req: Request, maxBytes: number): Response | null {
+  const raw = req.headers.get("content-length");
+  if (!raw) return null;
+  const length = Number(raw);
+  if (!Number.isFinite(length) || length < 0) {
+    return new Response("Invalid Content-Length", { status: 400 });
+  }
+  if (length > maxBytes) return new Response("Request body is too large", { status: 413 });
+  return null;
+}

@@ -2,13 +2,16 @@ import { getLoginProfile, createResetToken } from "@/lib/db/credential-queries";
 import { generateToken } from "@/lib/auth/password";
 import { sendPasswordResetEmail } from "@/lib/email/send";
 import { rateLimitResponse } from "@/lib/ratelimit";
-import { rateLimitIdentity } from "@/lib/auth/request";
+import { rateLimitIdentity, rejectOversizedBody } from "@/lib/auth/request";
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /** Request a password reset by username or email. Always returns a generic
  *  success so attackers can't enumerate which accounts exist. */
 export async function POST(req: Request) {
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
+
   const body = await req.json().catch(() => null);
   const identifier = typeof body?.identifier === "string" ? body.identifier.trim() : "";
 

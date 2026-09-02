@@ -3,7 +3,7 @@ import { hashPassword, validatePassword } from "@/lib/auth/password";
 import { createUserSession, isSecureRequest } from "@/lib/auth/session";
 import { validateUsername } from "@/lib/onboarding/validate";
 import { rateLimitResponse } from "@/lib/ratelimit";
-import { rateLimitIdentity } from "@/lib/auth/request";
+import { rateLimitIdentity, rejectOversizedBody } from "@/lib/auth/request";
 import { isEmailBlocked } from "@/lib/admin/queries";
 import { syncUserToSheets } from "@/lib/google-sheets";
 
@@ -11,6 +11,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Create a username/password account (in addition to Google). */
 export async function POST(req: Request) {
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
+
   const body = await req.json().catch(() => null);
 
   const uname = validateUsername(body?.username);

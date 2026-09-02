@@ -2,10 +2,14 @@ import { getAdminByUsername } from "@/lib/admin/queries";
 import { createAdminSession } from "@/lib/admin/session";
 import { verifyPassword } from "@/lib/auth/password";
 import { isSecureRequest } from "@/lib/auth/session";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { rateLimitResponse } from "@/lib/ratelimit";
 
 /** Admin portal login. Anyone may attempt; only valid admins get a session. */
 export async function POST(req: Request) {
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
+
   const body = await req.json().catch(() => null);
   const username = typeof body?.username === "string" ? body.username.trim() : "";
   const password = typeof body?.password === "string" ? body.password : "";
