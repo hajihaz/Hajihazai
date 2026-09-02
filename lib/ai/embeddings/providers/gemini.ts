@@ -13,9 +13,12 @@ export const geminiEmbeddingProvider: EmbeddingProvider = {
     const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!key) throw new Error("Gemini: GOOGLE_GENERATIVE_AI_API_KEY missing");
 
-    const res = await fetch(`${ENDPOINT}/${model}:embedContent?key=${key}`, {
+    const res = await fetch(`${ENDPOINT}/${model}:embedContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key,
+      },
       body: JSON.stringify({
         content: { parts: [{ text }] },
         // Pin output dimension to the canonical size.

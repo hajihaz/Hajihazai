@@ -31,9 +31,12 @@ export const geminiProvider: Provider = {
         parts: [{ text: m.content }],
       }));
 
-    const res = await fetch(`${ENDPOINT}/${model}:generateContent?key=${key}`, {
+    const res = await fetch(`${ENDPOINT}/${model}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key,
+      },
       body: JSON.stringify({
         contents,
         ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
@@ -77,9 +80,12 @@ export const geminiProvider: Provider = {
       return { name: t.name, description: t.description, parameters: params };
     });
 
-    const res = await fetch(`${ENDPOINT}/${model}:generateContent?key=${key}`, {
+    const res = await fetch(`${ENDPOINT}/${model}:generateContent`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": key,
+      },
       body: JSON.stringify({
         contents,
         ...(system ? { systemInstruction: { parts: [{ text: system }] } } : {}),
