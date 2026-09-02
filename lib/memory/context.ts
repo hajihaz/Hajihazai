@@ -185,22 +185,29 @@ async function searchScope(
   projectId: string | null | undefined,
   brainId?: string | null,
 ): Promise<DocumentSearchHit[]> {
+  const semanticPromise = semanticDocumentSearch(
+    userId,
+    query,
+    KNOWLEDGE_LIMIT,
+    DEFAULT_DOC_SIMILARITY_THRESHOLD,
+    { projectId, brainId },
+  ).catch((err) => {
+    console.warn("[knowledge] semantic search error:", err);
+    return [] as DocumentSearchHit[];
+  });
+
+  const keywordPromise = keywordDocumentSearch(userId, query, {
+    projectId,
+    brainId,
+    limit: KNOWLEDGE_LIMIT,
+  }).catch((err) => {
+    console.warn("[knowledge] keyword search error; preserving semantic results:", err);
+    return [] as DocumentSearchHit[];
+  });
+
   const [semanticHits, keywordHits] = await Promise.all([
-    semanticDocumentSearch(
-      userId,
-      query,
-      KNOWLEDGE_LIMIT,
-      DEFAULT_DOC_SIMILARITY_THRESHOLD,
-      { projectId, brainId },
-    ).catch((err) => {
-      console.warn("[knowledge] semantic search error:", err);
-      return [] as DocumentSearchHit[];
-    }),
-    keywordDocumentSearch(userId, query, {
-      projectId,
-      brainId,
-      limit: KNOWLEDGE_LIMIT,
-    }),
+    semanticPromise,
+    keywordPromise,
   ]);
 
   // Merge: semantic first (quality-ranked), then keyword-only additions (coverage).
