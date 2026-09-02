@@ -1,4 +1,6 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { getBrainById, updateBrain, deleteBrain } from "@/lib/db/brain-queries";
 
 export async function GET(
@@ -7,6 +9,8 @@ export async function GET(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
   const brain = await getBrainById(id);
@@ -20,8 +24,13 @@ export async function PATCH(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
+
   const body = await req.json();
   const updated = await updateBrain(id, {
     ...(body.name ? { name: body.name.trim() } : {}),
@@ -40,6 +49,8 @@ export async function DELETE(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
   const brain = await getBrainById(id);

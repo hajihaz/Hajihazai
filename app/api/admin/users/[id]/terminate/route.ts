@@ -1,4 +1,6 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { adminGetUserDetail, adminTerminateUser } from "@/lib/admin/queries";
 import { syncEventToSheets } from "@/lib/google-sheets";
 
@@ -8,6 +10,8 @@ export async function POST(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
   const user = await adminGetUserDetail(id);

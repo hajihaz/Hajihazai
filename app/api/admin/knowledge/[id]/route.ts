@@ -1,4 +1,6 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { adminDeleteKnowledge } from "@/lib/admin/queries";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
@@ -12,6 +14,8 @@ export async function GET(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
   const { id } = await params;
 
   const [doc] = await db
@@ -34,6 +38,10 @@ export async function PATCH(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
   const { id } = await params;
   const { title, category, brainId, content, visibility } = await req.json();
 
@@ -86,6 +94,8 @@ export async function DELETE(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
   const { id } = await params;
   const ok = await adminDeleteKnowledge(id);
   if (!ok) return Response.json({ error: "Not found" }, { status: 404 });

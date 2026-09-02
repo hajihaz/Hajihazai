@@ -1,4 +1,6 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { adminResetUserPassword } from "@/lib/admin/queries";
 
 export async function POST(
@@ -7,8 +9,13 @@ export async function POST(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
+
   const body = await req.json().catch(() => ({}));
   const newPassword = typeof body.password === "string" ? body.password.trim() : "";
 

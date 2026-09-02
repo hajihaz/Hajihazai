@@ -1,9 +1,13 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { listKnowledgePermissions, addKnowledgePermission } from "@/lib/admin/queries";
 
 export async function GET(req: Request) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const search = new URL(req.url).searchParams.get("search") ?? undefined;
   const rows = await listKnowledgePermissions({ search });
@@ -13,6 +17,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
 
   const body = await req.json().catch(() => ({}));
   const email = typeof body.email === "string" ? body.email.trim() : "";

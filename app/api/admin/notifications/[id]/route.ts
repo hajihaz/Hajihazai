@@ -1,4 +1,6 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import {
   adminGetNotification,
   adminSendNotification,
@@ -11,6 +13,8 @@ export async function GET(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
   const notif = await adminGetNotification(id);
@@ -24,6 +28,8 @@ export async function DELETE(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
   await adminDeleteNotification(id);
@@ -37,6 +43,8 @@ export async function POST(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
   try {

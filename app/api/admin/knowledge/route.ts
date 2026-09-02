@@ -1,10 +1,14 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import { adminListKnowledge, adminListKnowledgeWithBrain } from "@/lib/admin/queries";
 import { ingestText } from "@/lib/knowledge/ingest";
 
 export async function GET(req: Request) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const url = new URL(req.url);
   const withBrain = url.searchParams.get("withBrain") === "1";
@@ -17,6 +21,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
 
   const { userId, projectId, brainId, title, category, content, visibility } = await req.json();
 

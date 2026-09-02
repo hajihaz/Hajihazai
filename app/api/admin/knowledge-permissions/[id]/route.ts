@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { removeKnowledgePermission } from "@/lib/admin/queries";
 
 export async function DELETE(
@@ -7,6 +8,8 @@ export async function DELETE(
 ) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const { id } = await params;
   const ok = await removeKnowledgePermission(id);

@@ -1,4 +1,6 @@
 import { requireAdmin } from "@/lib/admin/session";
+import { rateLimitResponse } from "@/lib/ratelimit";
+import { rejectOversizedBody } from "@/lib/auth/request";
 import {
   listBrains,
   createBrain,
@@ -9,6 +11,8 @@ import {
 export async function GET(req: Request) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
 
   const url = new URL(req.url);
   const view = url.searchParams.get("view");
@@ -29,6 +33,11 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  if (limited) return limited;
+
+  const oversized = rejectOversizedBody(req, 64 * 1024);
+  if (oversized) return oversized;
 
   const { name, slug, description, icon, color, isSystem } = await req.json();
   if (!name?.trim() || !slug?.trim()) {
