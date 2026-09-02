@@ -43,8 +43,9 @@ export function buildMemoryBlock<T extends BlockItem>(
     const line = `- ${formatted}`;
     const lineTokens = approxTokens(line) + 1; // +1 for the newline
     const lineChars = line.length + 1;
-    // Stop on either the token budget OR the hard character cap.
-    if (tokens + lineTokens > budgetTokens || chars + lineChars > maxChars) break;
+    // Skip an oversized candidate rather than stopping the scan: one pathological
+    // memory must not hide later relevant memories that still fit the hard cap.
+    if (tokens + lineTokens > budgetTokens || chars + lineChars > maxChars) continue;
     tokens += lineTokens;
     chars += lineChars;
     lines.push(line);

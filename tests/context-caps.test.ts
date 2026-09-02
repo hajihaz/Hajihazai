@@ -18,6 +18,17 @@ describe("memory block hard char cap (Phase 9.0)", () => {
     expect(block.startsWith(MEMORY_GUARD)).toBe(true);
   });
 
+  it("skips an oversized early memory and still includes a later memory that fits", () => {
+    const oversized = { content: "x".repeat(2500) };
+    const useful = { content: "The relevant user preference is here" };
+    const { block, used, count } = buildMemoryBlock([oversized, useful], 1000, 1000);
+    expect(count).toBe(1);
+    expect(used).toEqual([useful]);
+    expect(block).toContain("The relevant user preference is here.");
+    expect(block).not.toContain("x".repeat(100));
+    expect(block.length).toBeLessThanOrEqual(1000);
+  });
+
   it("skips an oversized early chunk and still includes later chunks that fit", () => {
     const oversized = {
       chunkId: "huge", documentId: "doc-huge", title: "Huge",
