@@ -4,6 +4,8 @@ import { userMemory } from "./schema";
 
 type MemoryStatus = "pending" | "active" | "deleted";
 
+const MEMORY_LIST_LIMIT = 500;
+
 /**
  * Phase 5 — Memory data layer.
  * Every function is scoped by userId so a user can only ever touch their own
@@ -16,7 +18,8 @@ export async function listMemories(userId: string) {
     .select()
     .from(userMemory)
     .where(and(eq(userMemory.userId, userId), ne(userMemory.status, "deleted")))
-    .orderBy(desc(userMemory.updatedAt));
+    .orderBy(desc(userMemory.updatedAt))
+    .limit(MEMORY_LIST_LIMIT);
 }
 
 export async function createMemory(
@@ -155,7 +158,8 @@ export async function listAllMemories(userId: string) {
     .select()
     .from(userMemory)
     .where(eq(userMemory.userId, userId))
-    .orderBy(desc(userMemory.updatedAt));
+    .orderBy(desc(userMemory.updatedAt))
+    .limit(MEMORY_LIST_LIMIT);
 }
 
 export interface MemoryStats {

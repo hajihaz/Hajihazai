@@ -31,10 +31,11 @@ import { getRetrievalAnalytics, computeRetrievalAnalytics, type RetrievalAnalyti
 
 // Admin list endpoints are bounded to prevent accidental giant responses.
 const ADMIN_LIST_LIMIT = 500;
+const BLOCKED_EMAIL_LIST_LIMIT = 500;
 
 export async function countAdmins(): Promise<number> {
-  const rows = await db.select({ id: admins.id }).from(admins);
-  return rows.length;
+  const [row] = await db.select({ count: count() }).from(admins);
+  return Number(row?.count ?? 0);
 }
 
 export async function getAdminByUsername(username: string): Promise<Admin | null> {
@@ -399,7 +400,8 @@ export async function listBlockedEmails(opts?: { search?: string }) {
     .select()
     .from(blockedEmails)
     .where(search ? ilike(blockedEmails.email, `%${search}%`) : undefined)
-    .orderBy(desc(blockedEmails.createdAt));
+    .orderBy(desc(blockedEmails.createdAt))
+    .limit(BLOCKED_EMAIL_LIST_LIMIT);
 }
 
 export async function isEmailBlocked(email: string): Promise<boolean> {

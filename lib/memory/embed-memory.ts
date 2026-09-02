@@ -81,7 +81,8 @@ export async function memoryEmbeddingStatus(userId: string) {
     })
     .from(userMemory)
     .where(eq(userMemory.userId, userId))
-    .orderBy(desc(userMemory.updatedAt));
+    .orderBy(desc(userMemory.updatedAt))
+    .limit(500);
 
   return rows.map((r) => ({
     id: r.id,

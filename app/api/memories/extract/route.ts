@@ -33,6 +33,11 @@ export async function POST(req: Request) {
     });
   }
 
+  const contentLength = Number(req.headers.get("content-length") ?? "0");
+  if (contentLength > 50_000) {
+    return new Response("Request body is too large", { status: 413 });
+  }
+
   const body = await req.json().catch(() => null);
   const preview = body?.preview === true;
   let conversationId = body?.conversationId;

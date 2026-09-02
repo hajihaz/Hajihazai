@@ -21,6 +21,11 @@ export async function POST(req: Request) {
   const limited = await rateLimitResponse(`memory-bulk:${session.user.id}`, 30, 60_000);
   if (limited) return limited;
 
+  const contentLength = Number(req.headers.get("content-length") ?? "0");
+  if (contentLength > 100_000) {
+    return new Response("Request body is too large", { status: 413 });
+  }
+
   const body = await req.json().catch(() => null);
   const action = body?.action;
   const ids = body?.ids;
