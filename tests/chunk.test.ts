@@ -34,6 +34,24 @@ describe("chunkDocument (pure)", () => {
     expect(headOfSecond).toBe(tailOfFirst);
   });
 
+  it("prefers a natural whitespace boundary for prose", () => {
+    const sentence = Array.from({ length: 90 }, (_, i) =>
+      `Paragraph ${i} contains meaningful retrieval context.`
+    ).join(" ");
+    const chunks = chunkDocument(sentence, 300, 60);
+    expect(chunks.length).toBeGreaterThan(1);
+    // The first chunk should end at whitespace rather than splitting a word.
+    expect(/\s$/.test(chunks[0].content)).toBe(true);
+    // The next chunk starts at a word boundary.
+    expect(/^[A-Za-z0-9]/.test(chunks[1].content)).toBe(true);
+  });
+
+  it("keeps fixed windows when there is no usable boundary", () => {
+    const text = "x".repeat(2500);
+    const chunks = chunkDocument(text, 1000, 200);
+    expect(chunks.map((c) => c.content.length)).toEqual([1000, 1000, 900]);
+  });
+
   it("returns a single chunk for short content", () => {
     const chunks = chunkDocument("short text");
     expect(chunks.length).toBe(1);

@@ -30,11 +30,39 @@ export function chunkDocument(
 
   const chunks: Chunk[] = [];
   let index = 0;
-  for (let start = 0; start < text.length; start += step) {
-    const slice = text.slice(start, start + size);
+  let start = 0;
+
+  while (start < text.length) {
+    const targetEnd = Math.min(start + size, text.length);
+    let end = targetEnd;
+
+    // Keep natural-language chunks intact when there is a useful boundary near
+    // the target. For minified/code-like text with no whitespace, retain the
+    // exact fixed-size window so chunking remains deterministic and bounded.
+    if (targetEnd < text.length) {
+      const minBoundary = start + Math.floor(size * 0.7);
+      const window = text.slice(minBoundary, targetEnd);
+      const boundary = [...window].reduce((best, char, i) =>
+        /\s/.test(char) ? minBoundary + i + 1 : best,
+        -1,
+      );
+      if (boundary > start) end = boundary;
+    }
+
+    const slice = text.slice(start, end);
     chunks.push({ chunkIndex: index, content: slice });
     index++;
-    if (start + size >= text.length) break; // last window reached the end
+    if (end >= text.length) break;
+
+    // Preserve approximately the configured overlap, but never begin the next
+    // chunk halfway through a word. Advancing to the next whitespace boundary
+    // slightly reduces overlap and improves embedding/retrieval coherence.
+    const desiredStart = Math.max(start + 1, end - overlap);
+    let nextStart = desiredStart;
+    while (nextStart < end && !/\s/.test(text[nextStart])) nextStart++;
+    while (nextStart < end && /\s/.test(text[nextStart])) nextStart++;
+    start = nextStart > desiredStart && nextStart < end ? nextStart : desiredStart;
   }
+
   return chunks;
 }
