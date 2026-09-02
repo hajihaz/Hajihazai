@@ -47,7 +47,15 @@ export async function updateMemory(
     .update(userMemory)
     .set({
       ...(input.type !== undefined ? { type: input.type } : {}),
-      ...(input.content !== undefined ? { content: input.content } : {}),
+      ...(input.content !== undefined
+        ? {
+            content: input.content,
+            // Content changes invalidate the old vector immediately. The API
+            // re-embeds afterward; if embedding fails, semantic retrieval must
+            // not silently use a vector generated from different text.
+            embedding: null,
+          }
+        : {}),
       ...(input.confidence !== undefined ? { confidence: Math.max(0, Math.min(100, Math.round(input.confidence))) } : {}),
       ...(input.validUntil !== undefined ? { validUntil: input.validUntil } : {}),
       ...(input.supersededBy !== undefined ? { supersededBy: input.supersededBy } : {}),

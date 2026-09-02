@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { updateMemory } from "@/lib/db/memory-queries";
 
 // DB + Ollama-backed vector storage tests. Skipped without DATABASE_URL.
 // The embedding model (Ollama nomic-embed-text) is probed in beforeAll; if
@@ -107,6 +108,26 @@ describe.skipIf(!hasDb)("pgvector storage & isolation (db)", () => {
     // B's memory must remain unembedded (NULL).
     const bRows = await rawSql`select embedding from user_memory where id=${bm.id}`;
     expect(bRows[0].embedding).toBeNull();
+  });
+
+  it("invalidates the old embedding when memory content changes", async () => {
+    if (!ollamaReady) {
+      console.warn("  (skipped embedding generation — nomic-embed-text absent)");
+      return;
+    }
+    const [m] = await db
+      .insert(schema.userMemory)
+      .values({ userId: A, content: "Original semantic fact", status: "active" })
+      .returning();
+
+    await svc.embedMemory(A, m.id);
+    const before = await rawSql`select embedding from user_memory where id=${m.id}`;
+    expect(before[0].embedding).not.toBeNull();
+
+    const updated = await updateMemory(A, m.id, { content: "Replacement semantic fact" });
+    expect(updated?.content).toBe("Replacement semantic fact");
+    const after = await rawSql`select embedding from user_memory where id=${m.id}`;
+    expect(after[0].embedding).toBeNull();
   });
 
   it("embedMemory refuses a non-owner (isolation)", async () => {
