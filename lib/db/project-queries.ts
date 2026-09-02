@@ -2,6 +2,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "./index";
 import { projects, conversations, type Project } from "./schema";
 
+const PROJECT_LIST_LIMIT = 200;
+
 /** System projects (isSystem = true) inject knowledge into ALL user chats. */
 export async function listSystemProjects(userId: string): Promise<Project[]> {
   return db
@@ -20,7 +22,8 @@ export async function listProjects(userId: string): Promise<Project[]> {
     .select()
     .from(projects)
     .where(eq(projects.userId, userId))
-    .orderBy(desc(projects.updatedAt));
+    .orderBy(desc(projects.updatedAt))
+    .limit(PROJECT_LIST_LIMIT);
 }
 
 export async function getProject(

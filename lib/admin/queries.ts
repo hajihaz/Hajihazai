@@ -29,6 +29,9 @@ import { getRetrievalAnalytics, computeRetrievalAnalytics, type RetrievalAnalyti
 
 /** Admin data layer. Admin identity is DB-driven (no ADMIN_EMAILS env). */
 
+// Admin list endpoints are bounded to prevent accidental giant responses.
+const ADMIN_LIST_LIMIT = 500;
+
 export async function countAdmins(): Promise<number> {
   const rows = await db.select({ id: admins.id }).from(admins);
   return rows.length;
@@ -104,11 +107,16 @@ export async function adminListUsers() {
     })
     .from(users)
     .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
-    .orderBy(desc(userProfiles.createdAt));
+    .orderBy(desc(userProfiles.createdAt))
+    .limit(ADMIN_LIST_LIMIT);
 }
 
 export async function adminListProjects() {
-  return db.select().from(projects).orderBy(desc(projects.createdAt));
+  return db
+    .select()
+    .from(projects)
+    .orderBy(desc(projects.createdAt))
+    .limit(ADMIN_LIST_LIMIT);
 }
 
 export async function adminListDocuments() {
@@ -123,7 +131,8 @@ export async function adminListDocuments() {
       createdAt: knowledgeDocument.createdAt,
     })
     .from(knowledgeDocument)
-    .orderBy(desc(knowledgeDocument.createdAt));
+    .orderBy(desc(knowledgeDocument.createdAt))
+    .limit(ADMIN_LIST_LIMIT);
 }
 
 /** Knowledge documents enriched with user email and project name. */
@@ -144,7 +153,8 @@ export async function adminListKnowledge() {
     .from(knowledgeDocument)
     .leftJoin(projects, eq(projects.id, knowledgeDocument.projectId))
     .leftJoin(users, eq(users.id, knowledgeDocument.userId))
-    .orderBy(desc(knowledgeDocument.createdAt));
+    .orderBy(desc(knowledgeDocument.createdAt))
+    .limit(ADMIN_LIST_LIMIT);
 }
 
 /** Admin can delete any knowledge document (no ownership restriction). */
@@ -171,7 +181,8 @@ export async function adminListProjectsWithUsers() {
     })
     .from(projects)
     .leftJoin(users, eq(users.id, projects.userId))
-    .orderBy(desc(projects.createdAt));
+    .orderBy(desc(projects.createdAt))
+    .limit(ADMIN_LIST_LIMIT);
 }
 
 /**
@@ -186,7 +197,8 @@ export async function adminListProjectsForPicker() {
       userId: projects.userId,
     })
     .from(projects)
-    .orderBy(projects.name);
+    .orderBy(projects.name)
+    .limit(ADMIN_LIST_LIMIT);
 }
 
 /* ----------------------------- analytics ------------------------------- */
