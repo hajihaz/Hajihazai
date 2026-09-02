@@ -7,6 +7,9 @@ const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
+  const readLimited = await rateLimitResponse(`notifications-read:${session.user.id}`, 120, 60_000);
+  if (readLimited) return readLimited;
+
 
   const items = await getUserNotifications(session.user.id);
   return Response.json({ notifications: items }, { headers: PRIVATE_NO_STORE });

@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import {
   semanticDocumentSearch,
   DEFAULT_DOC_SIMILARITY_THRESHOLD,
@@ -12,6 +13,9 @@ export async function GET(req: Request) {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const readLimited = await rateLimitResponse(`knowledge-search-read:${session.user.id}`, 60, 60_000);
+  if (readLimited) return readLimited;
+
 
   // Each query embeds text via the model — cap per user.
   const limited = await rateLimitAsync(`kb-search:${session.user.id}`, 30, 60_000);

@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { getConversation, listMessages } from "@/lib/db/queries";
 
 export async function GET(
@@ -10,6 +11,9 @@ export async function GET(
     return new Response("Unauthorized", { status: 401 });
   }
   const { id } = await params;
+  const readLimited = await rateLimitResponse(`conversation-messages-read:${session.user.id}`, 120, 60_000);
+  if (readLimited) return readLimited;
+
 
   // Ownership guard before returning any messages.
   const convo = await getConversation(session.user.id, id);

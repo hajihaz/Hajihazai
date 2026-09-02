@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { getDocument } from "@/lib/db/knowledge-queries";
 import { getChunkEmbeddingStatus } from "@/lib/db/knowledge-embedding-queries";
 import { embedDocumentChunks } from "@/lib/knowledge/embed-chunks";
@@ -49,6 +50,9 @@ export async function GET(
     return new Response("Unauthorized", { status: 401 });
   }
   const { id } = await params;
+  const readLimited = await rateLimitResponse(`kb-embed-read:${session.user.id}`, 120, 60_000);
+  if (readLimited) return readLimited;
+
 
   const limited = await rateLimitAsync(`kb-embed-status:${session.user.id}`, 60, 60_000);
   if (!limited.ok) {

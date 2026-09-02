@@ -9,6 +9,9 @@ const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
+  const readLimited = await rateLimitResponse(`profile-read:${session.user.id}`, 120, 60_000);
+  if (readLimited) return readLimited;
+
   const p = await getProfile(session.user.id);
   if (!p) return new Response("Not found", { status: 404 });
   return Response.json({

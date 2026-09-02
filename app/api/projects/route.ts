@@ -10,6 +10,9 @@ const TEXT_MAX = 4000;
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
+  const readLimited = await rateLimitResponse(`projects-read:${session.user.id}`, 120, 60_000);
+  if (readLimited) return readLimited;
+
   const rows = await listProjects(session.user.id);
   return Response.json({ projects: rows }, { headers: PRIVATE_NO_STORE });
 }

@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { listLevels, defaultLevel } from "@/lib/ai/levels";
 import { refreshSharedHealth } from "@/lib/ai/health";
 
@@ -14,6 +15,9 @@ export async function GET() {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const readLimited = await rateLimitResponse(`models-read:${session.user.id}`, 120, 60_000);
+  if (readLimited) return readLimited;
+
 
   await refreshSharedHealth();
   const levels = listLevels();

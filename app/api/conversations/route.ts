@@ -9,6 +9,9 @@ export async function GET() {
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
+  const readLimited = await rateLimitResponse(`conversations-read:${session.user.id}`, 120, 60_000);
+  if (readLimited) return readLimited;
+
   const rows = await listConversations(session.user.id);
   return Response.json({
     conversations: rows.map((c) => ({
