@@ -39,7 +39,7 @@ export interface RetrievalEvent {
   confidence: number | null;
   knowledgeCount: number;
   memoryCount: number;
-  retrievalMethod: "none" | "keyword-fallback" | "semantic";
+  retrievalMethod: "none" | "keyword-fallback" | "semantic" | "hybrid";
   wasClarify: boolean;
   wasZeroResult: boolean;
   sources: string[];
@@ -57,7 +57,7 @@ export type DayCount = { date: string; count: number };
 export interface RetrievalAnalytics {
   totalTurns: number;
   brainUsage: Array<{ brain: string; count: number }>;
-  retrievalMethods: { semantic: number; keywordFallback: number; none: number };
+  retrievalMethods: { semantic: number; keywordFallback: number; hybrid: number; none: number };
   clarification: { count: number; rate: number };
   zeroResults: { count: number; rate: number; recentQueries: string[] };
   /** Turns that wanted knowledge but retrieved nothing (== zeroResults.count). */
@@ -96,13 +96,14 @@ export function aggregateBrainUsage(events: RetrievalEvent[]): Array<{ brain: st
 }
 
 export function aggregateRetrievalMethods(events: RetrievalEvent[]) {
-  let semantic = 0, keywordFallback = 0, none = 0;
+  let semantic = 0, keywordFallback = 0, hybrid = 0, none = 0;
   for (const e of events) {
     if (e.retrievalMethod === "semantic") semantic++;
     else if (e.retrievalMethod === "keyword-fallback") keywordFallback++;
+    else if (e.retrievalMethod === "hybrid") hybrid++;
     else none++;
   }
-  return { semantic, keywordFallback, none };
+  return { semantic, keywordFallback, hybrid, none };
 }
 
 export function aggregateClarification(events: RetrievalEvent[]) {

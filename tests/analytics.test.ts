@@ -44,7 +44,7 @@ describe("retrieval analytics aggregators", () => {
       ev({ retrievalMethod: "semantic" }), ev({ retrievalMethod: "semantic" }),
       ev({ retrievalMethod: "keyword-fallback" }), ev({ retrievalMethod: "none" }),
     ]);
-    expect(m).toEqual({ semantic: 2, keywordFallback: 1, none: 1 });
+    expect(m).toEqual({ semantic: 2, keywordFallback: 1, hybrid: 0, none: 1 });
   });
 
   it("computes clarification count and rate", () => {

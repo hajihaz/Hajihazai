@@ -73,7 +73,7 @@ type Analytics = {
   retrieval?: {
     totalTurns: number;
     brainUsage: Array<{ brain: string; count: number }>;
-    retrievalMethods: { semantic: number; keywordFallback: number; none: number };
+    retrievalMethods: { semantic: number; keywordFallback: number; hybrid: number; none: number };
     clarification: { count: number; rate: number };
     zeroResults: { count: number; rate: number; recentQueries: string[] };
     failedRetrievals: number;
@@ -880,6 +880,7 @@ export default function AdminPortal() {
                   { label: "Failed / Zero-result", value: `${analytics.retrieval.failedRetrievals} (${Math.round(analytics.retrieval.zeroResults.rate * 100)}%)` },
                   { label: "Semantic hits", value: analytics.retrieval.retrievalMethods.semantic },
                   { label: "Keyword fallback", value: analytics.retrieval.retrievalMethods.keywordFallback },
+                  { label: "Hybrid", value: analytics.retrieval.retrievalMethods.hybrid },
                   { label: "Helpful %", value: analytics.retrieval.feedback.total ? `${Math.round(analytics.retrieval.feedback.helpfulRate * 100)}% (${analytics.retrieval.feedback.total})` : "—" },
                   { label: "👍 / 👎", value: `${analytics.retrieval.feedback.helpful} / ${analytics.retrieval.feedback.notHelpful}` },
                   { label: "Avg latency", value: analytics.retrieval.latency.count ? `${analytics.retrieval.latency.avgMs} ms` : "—" },

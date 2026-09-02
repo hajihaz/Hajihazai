@@ -236,6 +236,7 @@ export async function POST(req: Request) {
     memories: [] as Awaited<ReturnType<typeof buildMemoryContext>>["memories"],
     count: 0,
     fallbackUsed: false,
+    retrievalMethod: "none" as const,
   };
   const EMPTY_KNOWLEDGE = {
     block: "",
@@ -420,9 +421,7 @@ export async function POST(req: Request) {
     memoryCount: memory.count,
     retrievalMethod: !wantKnowledge
       ? "none"
-      : memory.fallbackUsed
-        ? "keyword-fallback"
-        : "semantic",
+      : memory.retrievalMethod,
     wasClarify: clarificationRequested,
     wasZeroResult: wantKnowledge && knowledge.count === 0,
     sources: [...new Set(knowledge.chunks.map((c) => c.title))],
