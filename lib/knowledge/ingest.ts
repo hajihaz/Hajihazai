@@ -33,7 +33,7 @@ export async function ingestDocument(
   }
 
   const ext = extFromName(input.filename);
-  const extracted = extractText(ext, input.buffer);
+  const extracted = await extractText(ext, input.buffer);
   if (!extracted.ok) return { ok: false, error: extracted.error };
 
   const text = extracted.text.trim();

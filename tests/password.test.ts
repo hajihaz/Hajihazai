@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { describe, it, expect } from "vitest";
 import {
   hashPassword,
@@ -46,20 +47,37 @@ describe("password hashing + tokens", () => {
 describe("knowledge text extraction", () => {
   it("reads TXT and MD natively", async () => {
     const { extractText } = await import("@/lib/knowledge/extract");
-    expect(extractText("txt", Buffer.from("hello")).ok).toBe(true);
-    const md = extractText("md", Buffer.from("# hi"));
+    expect((await extractText("txt", Buffer.from("hello"))).ok).toBe(true);
+    const md = await extractText("md", Buffer.from("# hi"));
     expect(md.ok && md.text).toBe("# hi");
   });
 
-  it("rejects PDF/DOCX (parser not configured) and unknown types", async () => {
+  it("extracts text from PDF and DOCX", async () => {
     const { extractText, extFromName, isSupportedExt } = await import(
       "@/lib/knowledge/extract"
     );
-    expect(extractText("pdf", Buffer.from("%PDF")).ok).toBe(false);
-    expect(extractText("docx", Buffer.from("x")).ok).toBe(false);
-    expect(extractText("exe", Buffer.from("x")).ok).toBe(false);
+    const pdf = await extractText(
+      "pdf",
+      fs.readFileSync("tests/fixtures/knowledge-fixture.pdf"),
+    );
+    expect(pdf.ok && pdf.text).toContain("HajiHaz PDF fixture");
+
+    const docx = await extractText(
+      "docx",
+      fs.readFileSync("tests/fixtures/knowledge-fixture.docx"),
+    );
+    expect(docx.ok && docx.text).toContain("Walking on imported air");
+
+    expect((await extractText("exe", Buffer.from("x"))).ok).toBe(false);
     expect(extFromName("a.b.TXT")).toBe("txt");
     expect(isSupportedExt("pdf")).toBe(true);
+    expect(isSupportedExt("docx")).toBe(true);
     expect(isSupportedExt("exe")).toBe(false);
+  });
+
+  it("returns a safe error for malformed PDF/DOCX input", async () => {
+    const { extractText } = await import("@/lib/knowledge/extract");
+    expect((await extractText("pdf", Buffer.from("not-a-pdf"))).ok).toBe(false);
+    expect((await extractText("docx", Buffer.from("not-a-docx"))).ok).toBe(false);
   });
 });

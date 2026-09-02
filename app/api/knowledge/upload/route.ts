@@ -26,7 +26,7 @@ export async function POST(req: Request) {
   }
   if (!isSupportedExt(extFromName(file.name))) {
     return Response.json(
-      { error: "Unsupported file type. Allowed: TXT and MD" },
+      { error: "Unsupported file type. Allowed: PDF, DOCX, TXT, and MD" },
       { status: 400 },
     );
   }

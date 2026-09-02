@@ -121,7 +121,7 @@ export default function ProjectWorkspace({
           </button>
         </form>
         <p className="text-xs text-muted-foreground">
-          TXT and MD supported now (PDF/DOCX once a parser is configured). Max 5MB.
+          PDF, DOCX, TXT, and MD supported. Max 5MB.
         </p>
         {uploadMsg ? <p className="text-xs text-muted-foreground">{uploadMsg}</p> : null}
         <div className="overflow-hidden rounded-lg border">
