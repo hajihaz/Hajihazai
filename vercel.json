@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/db-maintenance",
+      "schedule": "17 3 * * *"
+    }
+  ]
+}

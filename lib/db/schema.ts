@@ -393,7 +393,10 @@ export const toolInvocation = pgTable(
     error: text("error"),
     createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
   },
-  (t) => [index("tool_invocation_user_idx").on(t.userId)],
+  (t) => [
+    index("tool_invocation_user_idx").on(t.userId),
+    index("tool_invocation_created_idx").on(t.createdAt),
+  ],
 );
 
 export type ToolInvocation = typeof toolInvocation.$inferSelect;

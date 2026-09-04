@@ -1,0 +1,1 @@
+CREATE INDEX "tool_invocation_created_idx" ON "tool_invocation" USING btree ("createdAt");
