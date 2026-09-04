@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { randomBytes } from "node:crypto";
-import { eq } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { adminSessions } from "@/lib/db/schema";
 
@@ -17,6 +17,9 @@ export async function createAdminSession(
   adminId: string,
   secure: boolean,
 ): Promise<void> {
+  // Admin logins are infrequent; reclaim expired sessions using the indexed
+  // expiry column without touching any still-valid admin session.
+  await db.delete(adminSessions).where(lt(adminSessions.expiresAt, new Date()));
   const token = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + ADMIN_TTL_MS);
   await db.insert(adminSessions).values({ token, adminId, expiresAt });
@@ -37,7 +40,11 @@ export async function getAdminSession(): Promise<{ adminId: string } | null> {
     .select()
     .from(adminSessions)
     .where(eq(adminSessions.token, token));
-  if (!row || row.expiresAt.getTime() < Date.now()) return null;
+  if (!row) return null;
+  if (row.expiresAt.getTime() < Date.now()) {
+    await db.delete(adminSessions).where(eq(adminSessions.token, token));
+    return null;
+  }
   return { adminId: row.adminId };
 }
 

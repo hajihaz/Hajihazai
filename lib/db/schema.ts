@@ -507,7 +507,6 @@ export const passwordResetTokens = pgTable(
   (t) => [
     index("password_reset_user_idx").on(t.userId),
     index("password_reset_expires_idx").on(t.expiresAt),
-    index("password_reset_used_idx").on(t.usedAt),
   ],
 );
 

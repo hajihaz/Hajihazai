@@ -1,4 +1,4 @@
-import { and, eq, gt, isNull, sql } from "drizzle-orm";
+import { and, eq, gt, isNull, lt, sql } from "drizzle-orm";
 import { db } from "./index";
 import { userProfiles, users, passwordResetTokens, sessions, type UserProfile } from "./schema";
 
@@ -103,6 +103,9 @@ export async function createResetToken(
   tokenHash: string,
   expiresAt: Date,
 ): Promise<void> {
+  // Reset requests are rare; use the expiry index to reclaim old tokens before
+  // inserting a new one. This does not touch any unexpired or active token.
+  await db.delete(passwordResetTokens).where(lt(passwordResetTokens.expiresAt, new Date()));
   await db.insert(passwordResetTokens).values({ userId, tokenHash, expiresAt });
 }
 

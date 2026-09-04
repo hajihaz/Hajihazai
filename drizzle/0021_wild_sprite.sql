@@ -1,0 +1,1 @@
+DROP INDEX "password_reset_used_idx";
