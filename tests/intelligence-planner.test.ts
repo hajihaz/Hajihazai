@@ -20,6 +20,22 @@ describe("intelligence planner", () => {
     expect(p.researchQueries).toEqual([p.retrievalQuery]);
   });
 
+  it.each([
+    "Who is the current industrial minister of Tamil Nadu?",
+    "Who is the current finance minister of Tamil Nadu?",
+    "Who is the current industry minister of Tamil Nadu?",
+    "Who is PM of India?",
+    "Who is president of USA?",
+    "Who is CM of TN?",
+  ])("routes current office-holder query to live web: %s", (query) => {
+    const p = planIntelligence(query);
+    expect(p.webIntent).toBe("web");
+    expect(p.requiresLiveVerification).toBe(true);
+    expect(p.searchWeb).toBe(true);
+    expect(p.retrieveKnowledge).toBe(false);
+    expect(p.brainSlug).toBeNull();
+  });
+
   it("plans internal business questions for knowledge retrieval", () => {
     const p = planIntelligence("What are Suplaykart's current revenue plans?");
     expect(p.retrieveMemory).toBe(true);
