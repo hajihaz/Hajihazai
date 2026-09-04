@@ -1,6 +1,5 @@
 /** Text extraction for uploaded knowledge documents. */
 
-import { PDFParse } from "pdf-parse";
 import mammoth from "mammoth";
 
 export const SUPPORTED_EXTS = ["pdf", "docx", "txt", "md"] as const;
@@ -31,8 +30,12 @@ export async function extractText(
   }
 
   if (ext === "pdf") {
-    let parser: PDFParse | null = null;
+    let parser: import("pdf-parse").PDFParse | null = null;
     try {
+      // pdf-parse/pdfjs-dist can evaluate browser canvas globals (DOMMatrix) at
+      // module load under some server bundlers. Keep it out of the module graph
+      // for routes that only need TXT/MD/DOCX, and execute it only for PDFs.
+      const { PDFParse } = await import("pdf-parse");
       parser = new PDFParse({ data: buf });
       const result = await parser.getText();
       return acceptExtractedText(result.text);

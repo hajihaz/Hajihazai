@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   // Keep Turbopack rooted at HajiHazai even though a stray user-level
   // package-lock.json exists in ~/; this removes ambiguous workspace detection.
   turbopack: { root: process.cwd() },
+  // pdf-parse pulls pdfjs-dist/canvas dependencies that should execute in Node
+  // only when a PDF is actually parsed, not while unrelated server routes load.
+  serverExternalPackages: ["pdf-parse"],
   async headers() {
     return [
       {
