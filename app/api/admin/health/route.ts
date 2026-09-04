@@ -59,7 +59,7 @@ async function checkProvider(
 export async function GET() {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
-  const readLimited = await rateLimitResponse(`admin-read:${sess.adminId}`, 30, 60_000);
+  const readLimited = await rateLimitResponse(`admin-read:health:${sess.adminId}`, 30, 60_000);
   if (readLimited) return readLimited;
 
   const geminiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;

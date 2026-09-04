@@ -6,7 +6,7 @@ import { listBlockedEmails, addBlockedEmail } from "@/lib/admin/queries";
 export async function GET(req: Request) {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
-  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  const limited = await rateLimitResponse(`admin-read:blocked-emails:${sess.adminId}`, 60, 60_000);
   if (limited) return limited;
 
   const search = new URL(req.url).searchParams.get("search") ?? undefined;

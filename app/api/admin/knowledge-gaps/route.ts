@@ -11,7 +11,7 @@ import { getKnowledgeGaps } from "@/lib/admin/analytics";
 export async function GET() {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
-  const readLimited = await rateLimitResponse(`admin-read:${sess.adminId}`, 60, 60_000);
+  const readLimited = await rateLimitResponse(`admin-read:knowledge-gaps:${sess.adminId}`, 60, 60_000);
   if (readLimited) return readLimited;
   const gaps = await getKnowledgeGaps().catch(() => ({
     zeroResultQueries: [], clarificationQueries: [], lowConfidenceQueries: [], missingTopicSuggestions: [],

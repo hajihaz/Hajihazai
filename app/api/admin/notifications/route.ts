@@ -9,7 +9,7 @@ import {
 export async function GET() {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
-  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  const limited = await rateLimitResponse(`admin-read:notifications:${sess.adminId}`, 60, 60_000);
   if (limited) return limited;
 
   const rows = await adminListNotifications();

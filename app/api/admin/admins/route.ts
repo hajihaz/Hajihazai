@@ -7,7 +7,7 @@ import { hashPassword, validatePassword } from "@/lib/auth/password";
 export async function GET() {
   const sess = await requireAdmin();
   if (!sess) return new Response("Unauthorized", { status: 401 });
-  const limited = await rateLimitResponse(`admin-mutation:${sess.adminId}`, 60, 60_000);
+  const limited = await rateLimitResponse(`admin-read:admins:${sess.adminId}`, 60, 60_000);
   if (limited) return limited;
   return Response.json({ admins: await listAdmins() });
 }
