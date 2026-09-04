@@ -1,5 +1,7 @@
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { Agent, interceptors } from "undici";
+import type { Dispatcher } from "undici";
 
 /**
  * Website fetch + readable-text extraction for "summarize <url>" (Rule #3).
@@ -120,15 +122,43 @@ function isBlockedHost(hostname: string): boolean {
   return isIP(h) > 0 ? isPrivateIp(h) : false;
 }
 
-/** Resolve a hostname and reject if any current DNS answer is non-public. */
-async function assertPublicDestination(url: string): Promise<void> {
+/**
+ * Resolve a hostname once and return the exact public address to which this
+ * request must connect. Pinning this answer into the HTTP client's DNS lookup
+ * closes the validation→connection DNS-rebinding window.
+ */
+async function resolvePublicDestination(url: string): Promise<{ address: string; family: 4 | 6 }> {
   const hostname = new URL(url).hostname.replace(/^\[|\]$/g, "");
   if (isBlockedHost(hostname)) throw new Error("the destination is not public");
-  if (isIP(hostname)) return;
+  const family = isIP(hostname);
+  if (family === 4 || family === 6) return { address: hostname, family };
+
   const addresses = await lookup(hostname, { all: true, verbatim: true });
   if (!addresses.length || addresses.some(({ address }) => isPrivateIp(address))) {
     throw new Error("the destination resolves to a non-public host");
   }
+  const preferred = addresses.find(({ family }) => family === 4) ?? addresses[0];
+  if (preferred.family !== 4 && preferred.family !== 6) {
+    throw new Error("the destination resolved to an unsupported address family");
+  }
+  return { address: preferred.address, family: preferred.family };
+}
+
+/**
+ * Create a dispatcher whose DNS lookup can only return the already-validated
+ * address. The original hostname remains the TLS SNI/Host name.
+ */
+function createPinnedDispatcher(pinned: { address: string; family: 4 | 6 }): Dispatcher {
+  return new Agent().compose(
+    interceptors.dns({
+      dualStack: false,
+      affinity: pinned.family,
+      maxTTL: 0,
+      lookup: (_origin, _options, callback) => {
+        callback(null, [{ address: pinned.address, family: pinned.family, ttl: 0 }]);
+      },
+    }),
+  );
 }
 
 
@@ -203,17 +233,27 @@ export async function fetchWebsite(rawUrl: string): Promise<WebsiteFetchResult> 
   const timer = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
   try {
     for (let redirects = 0; redirects <= 5; redirects++) {
-      await assertPublicDestination(url);
-      const res = await fetch(url, {
-        signal: ctrl.signal,
-        redirect: "manual",
-        headers: {
-          "User-Agent": UA,
-          Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
-        },
-      });
+      const pinned = await resolvePublicDestination(url);
+      const dispatcher = createPinnedDispatcher(pinned);
+      let res: Response;
+      try {
+        const fetchInit = {
+          signal: ctrl.signal,
+          redirect: "manual" as const,
+          dispatcher,
+          headers: {
+            "User-Agent": UA,
+            Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.5",
+          },
+        } as RequestInit & { dispatcher: Dispatcher };
+        res = await fetch(url, fetchInit);
+      } catch (err) {
+        await dispatcher.close().catch(() => undefined);
+        throw err;
+      }
 
-      if ([301, 302, 303, 307, 308].includes(res.status)) {
+      try {
+        if ([301, 302, 303, 307, 308].includes(res.status)) {
         const location = res.headers.get("location");
         if (!location) return { ok: false, reason: "the site returned an invalid redirect" };
         const nextUrl = normalizeUrl(new URL(location, url).toString());
@@ -273,7 +313,6 @@ export async function fetchWebsite(rawUrl: string): Promise<WebsiteFetchResult> 
         return { ok: false, reason: "the page returned no readable text (it may be JavaScript-rendered or empty)" };
       }
 
-      await assertPublicDestination(url);
       return {
         ok: true,
         url: normalizeUrl(rawUrl)!,
@@ -281,6 +320,9 @@ export async function fetchWebsite(rawUrl: string): Promise<WebsiteFetchResult> 
         title,
         text: text.slice(0, MAX_TEXT_CHARS),
       };
+      } finally {
+        await dispatcher.close().catch(() => undefined);
+      }
     }
     return { ok: false, reason: "too many redirects" };
   } catch (err) {

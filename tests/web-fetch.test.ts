@@ -2,8 +2,16 @@
  * Website fetch + extraction (Rule #3) — SSRF guard, HTML→text, failure mapping.
  * global.fetch is mocked; no real network.
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { lookup } from "node:dns/promises";
 import { normalizeUrl, htmlToText, fetchWebsite } from "@/lib/web/fetch-url";
+
+vi.mock("node:dns/promises", () => ({ lookup: vi.fn() }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(lookup).mockResolvedValue([{ address: "93.184.216.34", family: 4 }]);
+});
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -111,6 +119,32 @@ describe("fetchWebsite", () => {
     const r = await fetchWebsite("example.com");
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.reason).toContain("non-public");
+  });
+
+  it("pins the validated DNS answer so a later private re-resolution cannot win", async () => {
+    vi.mocked(lookup)
+      .mockResolvedValueOnce([{ address: "93.184.216.34", family: 4 }])
+      .mockResolvedValueOnce([{ address: "127.0.0.1", family: 4 }]);
+    mockFetch({
+      bodyText:
+        "<title>Stable</title><body><p>This page remains reachable through the validated public address.</p></body>",
+    });
+
+    const r = await fetchWebsite("https://rebind.example.test/");
+    expect(r.ok).toBe(true);
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lookup).toHaveBeenCalledWith("rebind.example.test", { all: true, verbatim: true });
+  });
+
+  it("rejects a DNS hostname when any answer is private", async () => {
+    vi.mocked(lookup).mockResolvedValue([
+      { address: "93.184.216.34", family: 4 },
+      { address: "192.168.1.10", family: 4 },
+    ]);
+    const spy = mockFetch({ bodyText: "<body><p>should not fetch</p></body>" });
+    const r = await fetchWebsite("https://mixed.example.test/");
+    expect(r.ok).toBe(false);
+    expect(spy).not.toHaveBeenCalled();
   });
 
   it("refuses (never throws) when fetch rejects", async () => {
