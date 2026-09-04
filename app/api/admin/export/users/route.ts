@@ -24,7 +24,7 @@ export async function GET() {
   const limited = await rateLimitResponse(`admin-export-users:${sess.adminId}`, 5, 60_000);
   if (limited) return limited;
 
-  const rows = await adminExportUsers();
+  const { rows, total, truncated } = await adminExportUsers();
   const csv = toCSV(
     rows.map((r) => ({
       id: r.id,
@@ -42,6 +42,10 @@ export async function GET() {
     headers: {
       "Content-Type": "text/csv",
       "Content-Disposition": `attachment; filename="users-${new Date().toISOString().slice(0, 10)}.csv"`,
+      "X-Export-Count": String(rows.length),
+      "X-Export-Total": String(total),
+      "X-Export-Truncated": String(truncated),
+      "Access-Control-Expose-Headers": "X-Export-Count, X-Export-Total, X-Export-Truncated",
     },
   });
 }

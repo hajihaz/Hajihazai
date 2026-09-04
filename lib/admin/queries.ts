@@ -758,7 +758,8 @@ export async function adminGetEnhancedUserDetail(userId: string) {
 /* ------------------------------------------------------------------ */
 
 export async function adminExportUsers() {
-  return db
+  const [rows, total] = await Promise.all([
+    db
     .select({
       id: users.id,
       email: userProfiles.email,
@@ -775,7 +776,10 @@ export async function adminExportUsers() {
     .from(users)
     .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
     .orderBy(desc(userProfiles.createdAt))
-    .limit(ADMIN_EXPORT_USER_LIMIT);
+    .limit(ADMIN_EXPORT_USER_LIMIT),
+    db.select({ count: count() }).from(users).innerJoin(userProfiles, eq(userProfiles.userId, users.id)),
+  ]);
+  return { rows, total: Number(total[0]?.count ?? 0), truncated: Number(total[0]?.count ?? 0) > rows.length };
 }
 
 export async function adminExportAuditLog() {

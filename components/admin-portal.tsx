@@ -214,6 +214,8 @@ export default function AdminPortal() {
   const [userSearch, setUserSearch] = useState("");
   const [userSearchInput, setUserSearchInput] = useState("");
   const [userLoading, setUserLoading] = useState(false);
+  const [userExporting, setUserExporting] = useState(false);
+  const [userExportNotice, setUserExportNotice] = useState<string | null>(null);
 
   /* blocked emails tab */
   const [blockedEmails, setBlockedEmails] = useState<BlockedEmail[]>([]);
@@ -356,6 +358,37 @@ export default function AdminPortal() {
       setUserTotal(d.total ?? 0);
       setUserPage(page);
     } finally { setUserLoading(false); }
+  }
+
+  async function exportUsers() {
+    setUserExporting(true);
+    setUserExportNotice(null);
+    try {
+      const res = await fetch("/api/admin/export/users");
+      if (!res.ok) {
+        setUserExportNotice(`Export failed (${res.status}).`);
+        return;
+      }
+      const blob = await res.blob();
+      const count = Number(res.headers.get("X-Export-Count") ?? 0);
+      const total = Number(res.headers.get("X-Export-Total") ?? count);
+      const truncated = res.headers.get("X-Export-Truncated") === "true";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `users-${new Date().toISOString().slice(0, 10)}.csv`;
+      link.click();
+      URL.revokeObjectURL(url);
+      setUserExportNotice(
+        truncated
+          ? `Partial export: ${count.toLocaleString()} of ${total.toLocaleString()} users exported.`
+          : `Exported ${count.toLocaleString()} users.`,
+      );
+    } catch {
+      setUserExportNotice("Export failed. Please try again.");
+    } finally {
+      setUserExporting(false);
+    }
   }
 
   async function loadBlockedEmails() {
@@ -1047,13 +1080,17 @@ export default function AdminPortal() {
                 </button>
               )}
             </form>
-            <a
-              href="/api/admin/export/users"
-              className="shrink-0 rounded-lg border px-3 py-2 text-sm hover:bg-accent"
-              download
+            <button
+              type="button"
+              onClick={() => void exportUsers()}
+              disabled={userExporting}
+              className="shrink-0 rounded-lg border px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
             >
-              Export CSV
-            </a>
+              {userExporting ? "Exporting…" : "Export CSV"}
+            </button>
+            {userExportNotice && (
+              <p className="text-xs text-muted-foreground" role="status">{userExportNotice}</p>
+            )}
           </div>
 
           {userLoading ? (
