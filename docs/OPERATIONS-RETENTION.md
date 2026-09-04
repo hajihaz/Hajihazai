@@ -21,6 +21,14 @@ Reviewed: 2026-09-04
 6. **Password-reset tokens:** delete expired/used tokens in bounded batches. Creation-time cleanup is already implemented and `expires_at` is indexed.
 7. **Embeddings/chunks:** retain while their canonical knowledge/memory record is active. Deleting derived data must remain coupled to canonical lifecycle changes.
 
+## Rate-limit provider decision
+
+- Upstash Redis is not enabled in production at the current traffic level.
+- The Postgres/Neon limiter is the active shared limiter and is atomic across Vercel instances.
+- The limiter has bounded expiry cleanup plus per-route/user buckets where required.
+- Reconsider Upstash when request volume, database contention, or latency measurements show that rate-limit writes are materially affecting the application.
+- Do not add Upstash credentials solely to mark the architecture complete; a migration should be justified by measured operational need.
+
 ## Monitoring thresholds
 
 - Alert if `message` or `tool_invocation` growth materially exceeds expected product traffic.
