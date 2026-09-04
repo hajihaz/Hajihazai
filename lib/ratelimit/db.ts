@@ -1,4 +1,5 @@
 import { eq, sql } from "drizzle-orm";
+import type { SQLWrapper } from "drizzle-orm";
 import type { RateLimiter, RateLimitResult } from "./types";
 
 /**
@@ -6,6 +7,23 @@ import type { RateLimiter, RateLimitResult } from "./types";
  * application. The upsert is atomic, so concurrent Vercel instances cannot each
  * admit the same request count independently.
  */
+const CLEANUP_SAMPLE_RATE = 0.02;
+const CLEANUP_BATCH_SIZE = 100;
+
+/** Delete only expired buckets, in small batches, so inactive keys cannot grow the table forever. */
+export async function cleanupExpiredRateLimitBuckets(db: { execute: (query: string | SQLWrapper) => unknown }, now = new Date()) {
+  await db.execute(sql`
+    DELETE FROM "rate_limit_buckets"
+    WHERE "bucket_key" IN (
+      SELECT "bucket_key"
+      FROM "rate_limit_buckets"
+      WHERE "expires_at" <= ${now}
+      ORDER BY "expires_at" ASC
+      LIMIT ${CLEANUP_BATCH_SIZE}
+    )
+  `);
+}
+
 export class DatabaseRateLimiter implements RateLimiter {
   async check(key: string, limit: number, windowMs: number): Promise<RateLimitResult> {
     // Lazy-load DB modules so unit tests can use the in-memory limiter without
@@ -36,6 +54,10 @@ export class DatabaseRateLimiter implements RateLimiter {
         set: { count: sql`${rateLimitBuckets.count} + 1` },
       })
       .returning({ count: rateLimitBuckets.count });
+
+    if (Math.random() < CLEANUP_SAMPLE_RATE) {
+      void cleanupExpiredRateLimitBuckets(db, new Date(now)).catch(() => undefined);
+    }
 
     const count = row?.count ?? limit + 1;
     return count > limit
