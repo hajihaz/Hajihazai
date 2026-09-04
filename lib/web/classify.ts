@@ -80,7 +80,7 @@ const IDENTITY_RE =
 
 // When an internal entity IS present, these push it to hybrid (entity + world).
 const HYBRID_HINT_RE =
-  /\b(latest news|news about|in the news|compare|comparison|versus|\bvs\b|competitor|competitors|market|industry trend|trending|stock|share price|valuation|funding|acquired)\b/i;
+  /\b(latest news|news about|in the news|compare|comparison|versus|\bvs\b|competitor|competitors|market|industry trend|trending|stock|share price|valuation|funding|acquired|online|on the web|on web|internet|external|outside)\b/i;
 
 /** Classify a message into an internal / web / hybrid / website intent. */
 export function classifyQuery(message: string): WebIntent {

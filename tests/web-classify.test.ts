@@ -79,6 +79,11 @@ describe("classifyQuery — hybrid for internal entity + live/external facet", (
     expect(classifyQuery("What is the latest news about Suplaykart?")).toBe("hybrid");
     expect(classifyQuery("Compare AllBee with current web design agencies.")).toBe("hybrid");
   });
+
+  it("treats explicit online research about an internal entity as hybrid", () => {
+    expect(classifyQuery("Research AllBee and tell me what you find online")).toBe("hybrid");
+    expect(classifyQuery("Look up Suplaykart on the web")).toBe("hybrid");
+  });
 });
 
 describe("extractUrl", () => {
