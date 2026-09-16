@@ -84,6 +84,9 @@ export default async function Home({
             <p className="text-xs text-muted-foreground">
               New users will be guided through a quick onboarding process.
             </p>
+            <p className="text-xs text-muted-foreground">
+              By continuing, you acknowledge the <a className="underline" href="/privacy">Privacy Policy</a>. You can delete your account at any time from <a className="underline" href="/delete-account">Delete Account</a>.
+            </p>
           </div>
         </div>
       </main>

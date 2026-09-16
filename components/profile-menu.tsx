@@ -57,6 +57,8 @@ export default function ProfileMenu({
             >
               <Shield className="size-4" /> Admin Portal
             </a>
+            <a href="/privacy" className="block rounded-md px-3 py-2 text-sm hover:bg-accent">Privacy Policy</a>
+            <a href="/delete-account" className="block rounded-md px-3 py-2 text-sm text-red-600 hover:bg-accent">Delete Account</a>
             <div className="my-1 border-t" />
             <div className="px-3 py-2">
               <p className="mb-1.5 text-xs font-medium text-muted-foreground">Appearance</p>
