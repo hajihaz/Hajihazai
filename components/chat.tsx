@@ -3,7 +3,7 @@
 import Image from "next/image";
 
 import { memo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import { Copy, RotateCw, Send, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, RotateCw, Send, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Msg } from "./chat-app";
@@ -273,20 +273,32 @@ const Chat = memo(function Chat({
 
                       {m.meta?.sourceLinks?.length ? (
                         <div className="mt-2 rounded-xl border bg-background/70 p-2.5">
-                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sources</p>
-                          <div className="flex flex-wrap gap-1.5">
-                            {m.meta.sourceLinks.slice(0, 5).map((source) => (
-                              <a
-                                key={source.url}
-                                href={source.url}
-                                target="_blank"
-                                rel="noreferrer noopener"
-                                className="max-w-full truncate rounded-full border bg-background px-2.5 py-1 text-xs transition-colors hover:bg-accent"
-                                title={source.url}
-                              >
-                                {source.title || source.host || source.url}
-                              </a>
-                            ))}
+                          <div className="mb-1.5 flex items-center justify-between gap-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Verified sources</p>
+                            <span className="text-[10px] text-muted-foreground">Live evidence</span>
+                          </div>
+                          <div className="space-y-1.5">
+                            {m.meta.sourceLinks.slice(0, 5).map((source, index) => {
+                              const quality = source.tier === 0 ? "Official" : source.tier === 1 ? "Primary" : source.tier === 2 ? "Established" : source.tier === 3 ? "Reference" : "Verified";
+                              const label = source.title || source.host || source.url;
+                              return (
+                                <a
+                                  key={source.url}
+                                  href={source.url}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="group flex min-w-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-2 transition-colors hover:bg-accent"
+                                  title={source.url}
+                                >
+                                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">{index + 1}</span>
+                                  <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-xs font-medium">{label}</span>
+                                    <span className="block truncate text-[10px] text-muted-foreground">{source.host || source.url} · {quality}</span>
+                                  </span>
+                                  <ExternalLink className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+                                </a>
+                              );
+                            })}
                           </div>
                         </div>
                       ) : null}
