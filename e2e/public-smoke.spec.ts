@@ -4,7 +4,7 @@ test.describe("public production smoke", () => {
   test("sign-in page renders", async ({ page }) => {
     const response = await page.goto("/", { waitUntil: "domcontentloaded" });
     expect(response?.status()).toBe(200);
-    await expect(page.getByRole("heading", { name: /Welcome to HajiHaz AI/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Think deeper\. Build faster\./i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Continue with Google/i })).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /Create an account/i })).toBeVisible();
