@@ -107,6 +107,7 @@ async function retrieveMultiBrain(
 }
 
 export async function POST(req: Request) {
+  const requestStartMs = Date.now();
   const session = await auth();
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
@@ -223,6 +224,7 @@ export async function POST(req: Request) {
   );
   const route = intelligencePlan.route;
   const resolvedBrainSlug = intelligencePlan.brainSlug;
+  const routingCompleteMs = Date.now();
 
   // Adaptive model selection: explicit user choices always win. Otherwise
   // small talk uses the low-cost/fast tier while substantive and research
@@ -639,10 +641,12 @@ export async function POST(req: Request) {
   ];
 
   // Stream the response via SSE.
+  const providerStartMs = Date.now();
   const streamResult = await routeChatStream(chatMessages, {
     preferredModelId,
   });
-  const startMs = Date.now();
+  let firstTokenMs: number | null = null;
+  let finalTokenMs: number | null = null;
 
   const CHUNK_TIMEOUT_MS = 30_000;
 
@@ -663,7 +667,13 @@ export async function POST(req: Request) {
               timedOut: true,
             });
           }
-          if (next.done) break;
+          if (next.done) {
+            finalTokenMs = Date.now();
+            break;
+          }
+          if (typeof next.value === "string" && next.value.length > 0 && firstTokenMs === null) {
+            firstTokenMs = Date.now();
+          }
           fullText += next.value;
           controller.enqueue(sse({ t: "chunk", text: next.value }));
         }
@@ -679,7 +689,16 @@ export async function POST(req: Request) {
               errorReason: (err as { timedOut?: boolean }).timedOut
                 ? "timeout"
                 : "stream_error",
-              latencyMs: Date.now() - startMs,
+              latencyMs: Date.now() - requestStartMs,
+              latency: {
+                requestToRoutingMs: routingCompleteMs - requestStartMs,
+                routingToProviderMs: providerStartMs - routingCompleteMs,
+                routingToFirstTokenMs: firstTokenMs === null ? null : firstTokenMs - routingCompleteMs,
+                requestToFirstTokenMs: firstTokenMs === null ? null : firstTokenMs - requestStartMs,
+                requestToFinalTokenMs: finalTokenMs === null ? null : finalTokenMs - requestStartMs,
+                persistenceMs: null,
+                totalMs: Date.now() - requestStartMs,
+              },
             },
           }).catch(() => {});
         }
@@ -701,7 +720,8 @@ export async function POST(req: Request) {
       // Persist assistant reply + auto-title after streaming completes.
       let assistantMsgId: string | null = null;
       let title = convo.title;
-      const latencyMs = Date.now() - startMs;
+      const persistenceStartMs = Date.now();
+      let persistenceMs: number | null = null;
       if (!debug) {
         // Persistence must never crash the stream — the reply already streamed to
         // the client. On DB failure, log and still send the "done" event below.
@@ -711,7 +731,19 @@ export async function POST(req: Request) {
             role: "assistant",
             content: fullText,
             modelId: streamResult.modelId,
-            metadata: { ...retrievalMeta, latencyMs },
+            metadata: {
+              ...retrievalMeta,
+              latencyMs: Date.now() - requestStartMs,
+              latency: {
+                requestToRoutingMs: routingCompleteMs - requestStartMs,
+                routingToProviderMs: providerStartMs - routingCompleteMs,
+                routingToFirstTokenMs: firstTokenMs === null ? null : firstTokenMs - routingCompleteMs,
+                requestToFirstTokenMs: firstTokenMs === null ? null : firstTokenMs - requestStartMs,
+                requestToFinalTokenMs: finalTokenMs === null ? null : finalTokenMs - requestStartMs,
+                persistenceMs: null,
+                totalMs: Date.now() - requestStartMs,
+              },
+            },
           });
           assistantMsgId = assistantMsg.id;
           if (convo.title === "New chat") {
@@ -721,7 +753,20 @@ export async function POST(req: Request) {
         } catch (err) {
           console.error("[chat] post-stream persistence failed:", err);
         }
+        persistenceMs = Date.now() - persistenceStartMs;
       }
+
+      const totalMs = Date.now() - requestStartMs;
+      const latency = {
+        requestToRoutingMs: routingCompleteMs - requestStartMs,
+        routingToProviderMs: providerStartMs - routingCompleteMs,
+        routingToFirstTokenMs: firstTokenMs === null ? null : firstTokenMs - routingCompleteMs,
+        requestToFirstTokenMs: firstTokenMs === null ? null : firstTokenMs - requestStartMs,
+        requestToFinalTokenMs: finalTokenMs === null ? null : finalTokenMs - requestStartMs,
+        persistenceMs,
+        totalMs,
+      };
+      console.info("[chat.latency]", JSON.stringify(latency));
 
       controller.enqueue(
         sse({
@@ -732,6 +777,7 @@ export async function POST(req: Request) {
           title,
           modelId: streamResult.modelId,
           requestedModelId: preferredModelId ?? null,
+          latency,
           sourceLinks: searchRes?.results.map((r) => ({
             title: r.title,
             url: r.url,
@@ -759,7 +805,8 @@ export async function POST(req: Request) {
                   provider: streamResult.provider,
                   model: streamResult.modelId,
                   requestedModelId: streamResult.requestedModelId,
-                  latencyMs,
+                  latencyMs: totalMs,
+                  latency,
                   brainId: resolvedBrainId,
                   brainSlug: resolvedBrainSlug,
                   brainMode: effectiveBrainMode,

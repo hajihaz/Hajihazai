@@ -1,4 +1,9 @@
+import { config as loadEnv } from "dotenv";
 import { defineConfig, devices } from "@playwright/test";
+
+// Local isolated E2E runs may provide credentials and a test base URL in .env.test.
+// dotenv does not overwrite CI/shell-provided values.
+loadEnv({ path: ".env.test", override: false });
 
 export default defineConfig({
   testDir: "./e2e",

@@ -1,13 +1,12 @@
 import { neon } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
+import postgres from "postgres";
+import { drizzle as drizzlePostgres } from "drizzle-orm/postgres-js";
 import * as schema from "./schema";
 
 /**
- * Drizzle client. We do NOT throw at import time when DATABASE_URL is missing —
- * importing modules that transitively reach the db (e.g. tools) must not crash
- * in CI / pure unit tests. A placeholder connection string keeps a *real*
- * drizzle instance (needed by the Auth.js adapter's dialect detection); any
- * actual query without a real DATABASE_URL fails at runtime, not at import.
+ * Production/preview uses Neon HTTP. Local E2E can opt into native PostgreSQL
+ * with LOCAL_E2E_DB=1, keeping test writes physically isolated from production.
  */
 const connectionString =
   process.env.DATABASE_URL ??
@@ -17,8 +16,15 @@ if (!process.env.DATABASE_URL) {
   console.warn("DATABASE_URL is not set — database queries will fail at runtime.");
 }
 
-const sql = neon(connectionString);
+const neonDb = drizzleNeon(neon(connectionString), { schema });
 
-export const db = drizzle(sql, { schema });
+// The local branch is created only for explicitly opted-in E2E processes. The
+// exported type remains pinned to the production Neon dialect for existing
+// Neon-specific execute() callers while the runtime driver is interchangeable.
+export const db = (
+  process.env.LOCAL_E2E_DB === "1"
+    ? drizzlePostgres(postgres(connectionString), { schema })
+    : neonDb
+) as typeof neonDb;
 
 export * from "./schema";
