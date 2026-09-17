@@ -1,6 +1,6 @@
-const GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image";
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models";
+const PRIMARY_IMAGE_MODEL = "google/gemini-3.1-flash-image";
+const FALLBACK_IMAGE_MODEL = "bytedance-seed/seedream-4.5";
+const OPENROUTER_IMAGE_ENDPOINT = "https://openrouter.ai/api/v1/images";
 
 export const IMAGE_ASPECT_RATIOS = [
   "1:1",
@@ -48,62 +48,59 @@ export async function generateImage(input: {
   imageSize: ImageSize;
   signal?: AbortSignal;
 }) {
-  const key = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  const key = process.env.OPENROUTER_API_KEY;
   if (!key) throw new Error("Image generation is not configured");
 
-  const response = await fetch(
-    `${GEMINI_ENDPOINT}/${GEMINI_IMAGE_MODEL}:generateContent`,
-    {
+  const models = [PRIMARY_IMAGE_MODEL, FALLBACK_IMAGE_MODEL];
+  let lastError = "Image generation failed";
+
+  for (const model of models) {
+    const response = await fetch(OPENROUTER_IMAGE_ENDPOINT, {
       method: "POST",
       headers: {
+        Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        "x-goog-api-key": key,
       },
       body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: buildImagePrompt(input.prompt) }],
-          },
-        ],
-        generationConfig: {
-          responseModalities: ["IMAGE"],
-          responseFormat: {
-            image: {
-              aspectRatio: input.aspectRatio,
-              imageSize: input.imageSize,
-            },
-          },
-        },
+        model,
+        prompt: buildImagePrompt(input.prompt),
+        aspect_ratio: input.aspectRatio,
+        resolution: input.imageSize,
+        quality: "high",
+        output_format: "png",
+        n: 1,
       }),
-      signal: input.signal ?? AbortSignal.timeout(90_000),
-    },
-  );
+      signal: input.signal ?? AbortSignal.timeout(120_000),
+    });
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    console.error(
-      "[image-generation] provider error",
-      response.status,
-      detail.slice(0, 500),
-    );
-    throw new Error("Image generation failed");
+    if (!response.ok) {
+      const detail = await response.text().catch(() => "");
+      console.error(
+        "[image-generation] provider error",
+        model,
+        response.status,
+        detail.slice(0, 500),
+      );
+      lastError = `Image generation failed (${response.status})`;
+      continue;
+    }
+
+    const data = (await response.json()) as {
+      data?: Array<{ b64_json?: string; media_type?: string }>;
+    };
+    const image = data.data?.[0];
+    if (!image?.b64_json) {
+      console.error("[image-generation] provider returned no image", model);
+      lastError = "Image generation returned no image";
+      continue;
+    }
+
+    return {
+      dataUrl: `data:${image.media_type || "image/png"};base64,${image.b64_json}`,
+      mimeType: image.media_type || "image/png",
+      model,
+    };
   }
 
-  const data = (await response.json()) as {
-    candidates?: Array<{
-      content?: {
-        parts?: Array<{ inlineData?: { mimeType?: string; data?: string } }>;
-      };
-    }>;
-  };
-  const parts = data.candidates?.[0]?.content?.parts ?? [];
-  const image = parts.find((part) => part.inlineData?.data)?.inlineData;
-  if (!image?.data) throw new Error("Image generation returned no image");
-
-  return {
-    dataUrl: `data:${image.mimeType || "image/png"};base64,${image.data}`,
-    mimeType: image.mimeType || "image/png",
-    model: GEMINI_IMAGE_MODEL,
-  };
+  throw new Error(lastError);
 }
