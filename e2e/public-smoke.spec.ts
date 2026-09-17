@@ -6,6 +6,7 @@ test.describe("public production smoke", () => {
     expect(response?.status()).toBe(200);
     await expect(page.getByRole("heading", { name: /Think deeper\. Build faster\./i })).toBeVisible();
     await expect(page.getByRole("button", { name: /Continue with Google/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Continue as guest/i })).toBeVisible();
     await expect(page.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /Create an account/i })).toBeVisible();
   });

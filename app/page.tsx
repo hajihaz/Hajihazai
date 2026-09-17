@@ -9,6 +9,7 @@ import { isMaintenanceMode } from "@/lib/system-settings";
 import { signInWithGoogle } from "@/app/actions";
 import ChatApp from "@/components/chat-app";
 import AuthForm from "@/components/auth-form";
+import GuestLoginButton from "@/components/guest-login-button";
 
 function GoogleIcon() {
   return (
@@ -99,6 +100,17 @@ export default async function Home({
             </div>
 
             <AuthForm />
+
+            <div className="flex w-full items-center gap-3 py-1 text-xs text-muted-foreground">
+              <span className="h-px flex-1 bg-border" />
+              or explore first
+              <span className="h-px flex-1 bg-border" />
+            </div>
+
+            <GuestLoginButton />
+            <p className="text-center text-[11px] leading-5 text-muted-foreground">
+              Guest workspaces are temporary and don’t require an account.
+            </p>
 
             <p className="text-xs text-muted-foreground">
               New users will be guided through a quick onboarding process.

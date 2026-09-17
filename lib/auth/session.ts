@@ -36,9 +36,13 @@ export async function getCurrentSessionToken(): Promise<string | null> {
   );
 }
 
-export async function createUserSession(userId: string, secure: boolean): Promise<void> {
+export async function createUserSession(
+  userId: string,
+  secure: boolean,
+  ttlMs = SESSION_TTL_MS,
+): Promise<void> {
   const token = randomBytes(32).toString("hex");
-  const expires = new Date(Date.now() + SESSION_TTL_MS);
+  const expires = new Date(Date.now() + ttlMs);
   await db.insert(sessions).values({ sessionToken: token, userId, expires });
   const store = await cookies();
   store.set(sessionCookieName(secure), token, {
