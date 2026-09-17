@@ -68,7 +68,7 @@ describe("intelligence depth → model level", () => {
 
   it("uses the stronger tier for smart and research turns", () => {
     expect(levelForIntelligenceDepth("smart")).toBe("medium");
-    expect(levelForIntelligenceDepth("research")).toBe("medium");
+    expect(levelForIntelligenceDepth("research")).toBe("high");
   });
 });
 

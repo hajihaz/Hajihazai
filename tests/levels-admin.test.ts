@@ -7,33 +7,34 @@ import {
 } from "@/lib/ai/levels";
 import { isAdmin } from "@/lib/auth/admin";
 
-describe("capability levels (Low/Medium active, High/Max coming soon)", () => {
-  it("returns all four levels with High/Max marked coming soon", () => {
+describe("capability levels", () => {
+  it("returns all four levels with High/Max available", () => {
     const ls = listLevels(() => true);
     expect(ls.map((l) => l.level)).toEqual(["low", "medium", "high", "max"]);
     const high = ls.find((l) => l.level === "high")!;
     const max = ls.find((l) => l.level === "max")!;
-    expect(high.comingSoon).toBe(true);
-    expect(high.available).toBe(false);
-    expect(max.comingSoon).toBe(true);
-    expect(isLevelEnabled("high")).toBe(false);
-    expect(isLevelEnabled("max")).toBe(false);
+    expect(high.comingSoon).toBe(false);
+    expect(high.available).toBe(true);
+    expect(max.comingSoon).toBe(false);
+    expect(max.available).toBe(true);
+    expect(isLevelEnabled("high")).toBe(true);
+    expect(isLevelEnabled("max")).toBe(true);
   });
 
   it("Low and Medium are available when a model is healthy", () => {
-    const healthy = new Set(["groq:compound-mini", "groq:gpt-oss-120b", "groq:qwen3.6-27b", "openrouter:qwen-2.5-7b"]);
-    const ls = listLevels((id) => healthy.has(id));
+    const healthy = new Set(["groq:compound-mini", "groq:gpt-oss-120b", "groq:qwen3.6-27b", "openrouter:qwen-2.5-7b", "gemini:2.0-flash"]);
+    const ls = listLevels((id) => healthy.has(id) || id === "gemini:2.0-flash");
     expect(ls.find((l) => l.level === "low")!.available).toBe(true);
     expect(ls.find((l) => l.level === "medium")!.available).toBe(true);
   });
 
-  it("resolves Low to cheapest, Medium to best; High/Max never resolve", () => {
-    const healthy = new Set(["groq:compound-mini", "groq:gpt-oss-120b", "groq:qwen3.6-27b", "openrouter:qwen-2.5-7b"]);
+  it("resolves each tier to its configured first usable model", () => {
+    const healthy = new Set(["groq:compound-mini", "groq:gpt-oss-120b", "groq:qwen3.6-27b", "openrouter:qwen-2.5-7b", "gemini:2.0-flash"]);
     const usable = (id: string) => healthy.has(id);
     expect(resolveLevel("low", usable)).toBe("groq:qwen3.6-27b");
     expect(resolveLevel("medium", usable)).toBe("groq:compound-mini");
-    expect(resolveLevel("high", usable)).toBeNull();
-    expect(resolveLevel("max", usable)).toBeNull();
+    expect(resolveLevel("high", usable)).toBe("groq:gpt-oss-120b");
+    expect(resolveLevel("max", usable)).toBe("gemini:2.0-flash");
   });
 
   it("default level prefers Medium (it remaps down to any healthy model), null if none", () => {

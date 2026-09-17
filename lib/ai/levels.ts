@@ -7,8 +7,8 @@ import { isModelUsable } from "./health";
  *
  *   LOW    — active, uses the current lowest-cost healthy model
  *   MEDIUM — active, uses the current best healthy model
- *   HIGH   — disabled, "Coming Soon"
- *   MAX    — disabled, "Coming Soon"
+ *   HIGH   — deeper reasoning, prefers GPT OSS 120B
+ *   MAX    — maximum-context tier, prefers Gemini 2.0 Flash
  */
 
 export type Level = "low" | "medium" | "high" | "max";
@@ -37,8 +37,20 @@ export const LEVELS: LevelDef[] = [
     // Best first.
     chain: ["groq:compound-mini", "groq:gpt-oss-120b", "groq:qwen3.6-27b", "gemini:2.0-flash", "openrouter:qwen-2.5-7b"],
   },
-  { level: "high", label: "High", enabled: false, chain: [] },
-  { level: "max", label: "Max", enabled: false, chain: [] },
+  {
+    level: "high",
+    label: "High",
+    enabled: true,
+    // Deeper reasoning first, with strong fallback coverage.
+    chain: ["groq:gpt-oss-120b", "groq:compound-mini", "groq:qwen3.6-27b", "gemini:2.0-flash"],
+  },
+  {
+    level: "max",
+    label: "Max",
+    enabled: true,
+    // Largest-context model first, then the strongest reasoning fallback.
+    chain: ["gemini:2.0-flash", "groq:gpt-oss-120b", "groq:compound-mini"],
+  },
 ];
 
 export interface LevelStatus {
@@ -92,6 +104,7 @@ export function levelForIntelligenceDepth(
   depth: "quick" | "smart" | "research",
 ): Level {
   if (depth === "quick") return "low";
+  if (depth === "research") return "high";
   return "medium";
 }
 
