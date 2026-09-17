@@ -5,6 +5,9 @@ export const metadata: Metadata = {
   title: "HajiHaz AI",
   description:
     "Next-generation AI assistant platform powered by memory, retrieval, and multi-model intelligence.",
+  applicationName: "HajiHaz AI",
+  openGraph: { title: "HajiHaz AI", description: "Personal intelligence with memory, live evidence, and specialized AI brains.", type: "website", images: [{ url: "/branding/hajihaz-logo.png", alt: "HajiHaz AI" }] },
+  twitter: { card: "summary_large_image", title: "HajiHaz AI", description: "Personal intelligence with memory, live evidence, and specialized AI brains.", images: ["/branding/hajihaz-logo.png"] },
   icons: {
     icon: "/branding/hajihaz-mark.png",
     shortcut: "/branding/hajihaz-mark.png",
