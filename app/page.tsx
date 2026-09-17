@@ -149,8 +149,8 @@ export default async function Home({
     updatedAt: c.updatedAt?.toISOString() ?? null,
   }));
 
-  // Capability levels (Low/Medium active, High/Max "Coming Soon"). The client
-  // refines availability via GET /api/models using configured capability metadata.
+  // Capability levels are configured centrally; the client refines availability
+  // via GET /api/models using the current model-health metadata.
   const levels = listLevels();
   const admin = adminUser || isAdmin(profile?.email);
   const { c: openConversationId } = await searchParams;
