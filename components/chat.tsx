@@ -2,14 +2,39 @@
 
 import Image from "next/image";
 
-import { memo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
-import { Copy, ExternalLink, RotateCw, Send, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
+import {
+  memo,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useCallback,
+  useState,
+} from "react";
+import {
+  Copy,
+  ImagePlus,
+  ExternalLink,
+  RotateCw,
+  Send,
+  Square,
+  ThumbsDown,
+  ThumbsUp,
+  Trash2,
+} from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Msg } from "./chat-app";
-import BrainSelector, { type BrainOption, type BrainMode } from "./brain-selector";
-import { ProfileCard, isProfileCardQuery, DEFAULT_PROFILE } from "./profile-card";
+import BrainSelector, {
+  type BrainOption,
+  type BrainMode,
+} from "./brain-selector";
+import {
+  ProfileCard,
+  isProfileCardQuery,
+  DEFAULT_PROFILE,
+} from "./profile-card";
 import VoiceInput from "./voice-input";
+import ImageGenerator from "./image-generator";
 
 const NEAR_BOTTOM_PX = 80; // px from bottom to trigger auto-scroll
 
@@ -63,6 +88,7 @@ const Chat = memo(function Chat({
   const bottomRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
   // True while WE are programmatically scrolling, so the scroll handler doesn't
   // mistake our own auto-scroll for the user scrolling away from the bottom.
   const suppressScrollRef = useRef(false);
@@ -139,22 +165,55 @@ const Chat = memo(function Chat({
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center py-12 text-center sm:py-16">
               <div className="relative mb-5 flex size-16 items-center justify-center overflow-hidden rounded-2xl border bg-black shadow-sm">
-                <Image src="/branding/hajihaz-mark.png" alt="HajiHaz AI mark" width={512} height={512} priority className="size-14 object-contain" />
+                <Image
+                  src="/branding/hajihaz-mark.png"
+                  alt="HajiHaz AI mark"
+                  width={512}
+                  height={512}
+                  priority
+                  className="size-14 object-contain"
+                />
               </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">HajiHaz AI</p>
-              <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">What are we building today?</h2>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                HajiHaz AI
+              </p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                What are we building today?
+              </h2>
               <p className="mt-3 max-w-lg text-balance text-sm leading-6 text-muted-foreground sm:text-base">
-                Ask a question, bring a problem, or start with one of your workspaces. HajiHaz can use memory, knowledge and live evidence when the task calls for it.
+                Ask a question, bring a problem, or start with one of your
+                workspaces. HajiHaz can use memory, knowledge and live evidence
+                when the task calls for it.
               </p>
               <div className="mt-7 grid w-full max-w-2xl gap-3 text-left sm:grid-cols-2">
                 {[
-                  { area: "Personal", prompts: ["Who is Haji?", "What are Haji's goals?"] },
-                  { area: "AllBee", prompts: ["Who founded AllBee?", "What services does AllBee provide?"] },
-                  { area: "Legal", prompts: ["Explain Article 21.", "What is negligence?"] },
-                  { area: "Suplaykart", prompts: ["What is Suplaykart?", "Who founded Suplaykart?"] },
+                  {
+                    area: "Personal",
+                    prompts: ["Who is Haji?", "What are Haji's goals?"],
+                  },
+                  {
+                    area: "AllBee",
+                    prompts: [
+                      "Who founded AllBee?",
+                      "What services does AllBee provide?",
+                    ],
+                  },
+                  {
+                    area: "Legal",
+                    prompts: ["Explain Article 21.", "What is negligence?"],
+                  },
+                  {
+                    area: "Suplaykart",
+                    prompts: ["What is Suplaykart?", "Who founded Suplaykart?"],
+                  },
                 ].map(({ area, prompts }) => (
-                  <div key={area} className="rounded-2xl border bg-background/60 p-3 shadow-sm transition-colors hover:border-foreground/20">
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{area}</p>
+                  <div
+                    key={area}
+                    className="rounded-2xl border bg-background/60 p-3 shadow-sm transition-colors hover:border-foreground/20"
+                  >
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      {area}
+                    </p>
                     <div className="flex flex-col gap-2">
                       {prompts.map((p) => (
                         <button
@@ -201,7 +260,9 @@ const Chat = memo(function Chat({
                         }`}
                       >
                         {isUser ? (
-                          <span className="whitespace-pre-wrap">{m.content}</span>
+                          <span className="whitespace-pre-wrap">
+                            {m.content}
+                          </span>
                         ) : (
                           <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:rounded-lg prose-pre:border prose-pre:bg-background/60 prose-code:rounded prose-code:bg-background/60 prose-code:px-1 prose-code:text-[0.8em]">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -215,19 +276,28 @@ const Chat = memo(function Chat({
                       </div>
 
                       {/* Clarification quick actions (Phase 7) — pick an area to disambiguate. */}
-                      {!isUser && !m.streaming && m.clarify && m.clarify.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {m.clarify.map((opt) => (
-                            <button
-                              key={opt}
-                              onClick={() => onSendPrompt(prevMsg?.role === "user" ? `${prevMsg.content} ${opt}` : opt)}
-                              className="rounded-full border bg-background px-3 py-1 text-xs font-medium transition-colors hover:bg-accent"
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                      {!isUser &&
+                        !m.streaming &&
+                        m.clarify &&
+                        m.clarify.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {m.clarify.map((opt) => (
+                              <button
+                                key={opt}
+                                onClick={() =>
+                                  onSendPrompt(
+                                    prevMsg?.role === "user"
+                                      ? `${prevMsg.content} ${opt}`
+                                      : opt,
+                                  )
+                                }
+                                className="rounded-full border bg-background px-3 py-1 text-xs font-medium transition-colors hover:bg-accent"
+                              >
+                                {opt}
+                              </button>
+                            ))}
+                          </div>
+                        )}
 
                       {/* Action bar — hover on desktop, always shown on mobile. */}
                       {!m.streaming && (
@@ -236,7 +306,10 @@ const Chat = memo(function Chat({
                             isUser ? "justify-end" : "justify-start"
                           }`}
                         >
-                          <ActionButton label="Copy" onClick={() => onCopy(m.content)}>
+                          <ActionButton
+                            label="Copy"
+                            onClick={() => onCopy(m.content)}
+                          >
                             <Copy className="size-3.5" />
                           </ActionButton>
 
@@ -252,16 +325,28 @@ const Chat = memo(function Chat({
                           {/* Feedback (Phase 5) — assistant replies only. */}
                           {m.role === "assistant" && !m.error ? (
                             <>
-                              <ActionButton label="Helpful" active={m.feedback === "helpful"} onClick={() => onFeedback(m, "helpful")}>
+                              <ActionButton
+                                label="Helpful"
+                                active={m.feedback === "helpful"}
+                                onClick={() => onFeedback(m, "helpful")}
+                              >
                                 <ThumbsUp className="size-3.5" />
                               </ActionButton>
-                              <ActionButton label="Not helpful" active={m.feedback === "not_helpful"} onClick={() => onFeedback(m, "not_helpful")}>
+                              <ActionButton
+                                label="Not helpful"
+                                active={m.feedback === "not_helpful"}
+                                onClick={() => onFeedback(m, "not_helpful")}
+                              >
                                 <ThumbsDown className="size-3.5" />
                               </ActionButton>
                             </>
                           ) : null}
 
-                          <ActionButton label="Delete" onClick={() => onDelete(m)} danger>
+                          <ActionButton
+                            label="Delete"
+                            onClick={() => onDelete(m)}
+                            danger
+                          >
                             <Trash2 className="size-3.5" />
                           </ActionButton>
                         </div>
@@ -274,37 +359,65 @@ const Chat = memo(function Chat({
                       {m.meta?.sourceLinks?.length ? (
                         <div className="mt-2 rounded-xl border bg-background/70 p-2.5">
                           <div className="mb-1.5 flex items-center justify-between gap-2">
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Verified sources</p>
-                            <span className="text-[10px] text-muted-foreground">Live evidence</span>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                              Verified sources
+                            </p>
+                            <span className="text-[10px] text-muted-foreground">
+                              Live evidence
+                            </span>
                           </div>
                           <div className="space-y-1.5">
-                            {m.meta.sourceLinks.slice(0, 5).map((source, index) => {
-                              const quality = source.tier === 0 ? "Official" : source.tier === 1 ? "Primary" : source.tier === 2 ? "Established" : source.tier === 3 ? "Reference" : "Verified";
-                              const kind = source.kind === "website" ? "Website" : "Web search";
-                              const label = source.title || source.host || source.url;
-                              return (
-                                <a
-                                  key={source.url}
-                                  href={source.url}
-                                  target="_blank"
-                                  rel="noreferrer noopener"
-                                  className="group flex min-w-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-2 transition-colors hover:bg-accent"
-                                  title={source.url}
-                                >
-                                  <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">{index + 1}</span>
-                                  <span className="min-w-0 flex-1">
-                                    <span className="block truncate text-xs font-medium">{label}</span>
-                                    <span className="block truncate text-[10px] text-muted-foreground">{source.host || source.url} · {kind} · {quality}</span>
-                                  </span>
-                                  <ExternalLink className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
-                                </a>
-                              );
-                            })}
+                            {m.meta.sourceLinks
+                              .slice(0, 5)
+                              .map((source, index) => {
+                                const quality =
+                                  source.tier === 0
+                                    ? "Official"
+                                    : source.tier === 1
+                                      ? "Primary"
+                                      : source.tier === 2
+                                        ? "Established"
+                                        : source.tier === 3
+                                          ? "Reference"
+                                          : "Verified";
+                                const kind =
+                                  source.kind === "website"
+                                    ? "Website"
+                                    : "Web search";
+                                const label =
+                                  source.title || source.host || source.url;
+                                return (
+                                  <a
+                                    key={source.url}
+                                    href={source.url}
+                                    target="_blank"
+                                    rel="noreferrer noopener"
+                                    className="group flex min-w-0 items-center gap-2 rounded-lg border bg-background px-2.5 py-2 transition-colors hover:bg-accent"
+                                    title={source.url}
+                                  >
+                                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+                                      {index + 1}
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate text-xs font-medium">
+                                        {label}
+                                      </span>
+                                      <span className="block truncate text-[10px] text-muted-foreground">
+                                        {source.host || source.url} · {kind} ·{" "}
+                                        {quality}
+                                      </span>
+                                    </span>
+                                    <ExternalLink className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
+                                  </a>
+                                );
+                              })}
                           </div>
                         </div>
                       ) : null}
 
-                      {showProfileCard && <ProfileCard data={DEFAULT_PROFILE} />}
+                      {showProfileCard && (
+                        <ProfileCard data={DEFAULT_PROFILE} />
+                      )}
                     </div>
                   </div>
                 );
@@ -362,6 +475,15 @@ const Chat = memo(function Chat({
               onChange={setInput}
               disabled={isGenerating || sending}
             />
+            <button
+              type="button"
+              onClick={() => setImageGeneratorOpen(true)}
+              aria-label="Create image"
+              title="Create image"
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <ImagePlus className="size-4" />
+            </button>
             {isGenerating ? (
               <button
                 type="button"
@@ -385,6 +507,10 @@ const Chat = memo(function Chat({
           </div>
         </div>
       </div>
+      <ImageGenerator
+        open={imageGeneratorOpen}
+        onClose={() => setImageGeneratorOpen(false)}
+      />
     </div>
   );
 });
@@ -424,28 +550,36 @@ function DebugPanel({ meta }: { meta: NonNullable<Msg["meta"]> }) {
   const u = meta.usage;
   return (
     <div className="mt-1.5 rounded-md border bg-muted/40 px-2.5 py-1.5 font-mono text-[11px] leading-relaxed text-muted-foreground">
-      <div>provider: {meta.provider ?? "—"} · model: {meta.model ?? "—"}</div>
       <div>
-        latency: {meta.latencyMs ?? "—"}ms · tokens{u?.approx ? "≈" : ":"} {u?.totalTokens ?? "—"} (p
+        provider: {meta.provider ?? "—"} · model: {meta.model ?? "—"}
+      </div>
+      <div>
+        latency: {meta.latencyMs ?? "—"}ms · tokens{u?.approx ? "≈" : ":"}{" "}
+        {u?.totalTokens ?? "—"} (p
         {u?.promptTokens ?? "—"}/c{u?.completionTokens ?? "—"})
       </div>
       {meta.fallbackFrom ? (
         <div className="text-amber-600">
-          fallback: {meta.fallbackFrom} → {meta.model} (attempts {meta.attempts ?? "—"})
+          fallback: {meta.fallbackFrom} → {meta.model} (attempts{" "}
+          {meta.attempts ?? "—"})
         </div>
       ) : null}
       {meta.brainMode || meta.brainSlug || meta.brainId ? (
         <div className="mt-1 border-t border-border/40 pt-1 text-violet-500">
           <div>
-            brain: {meta.brainSlug ?? "none"} · mode: {meta.brainMode ?? "manual"}
-            {typeof meta.brainConfidence === "number" ? ` · confidence: ${meta.brainConfidence}%` : ""}
+            brain: {meta.brainSlug ?? "none"} · mode:{" "}
+            {meta.brainMode ?? "manual"}
+            {typeof meta.brainConfidence === "number"
+              ? ` · confidence: ${meta.brainConfidence}%`
+              : ""}
           </div>
           {meta.brainMatched && meta.brainMatched.length ? (
             <div>matched: {meta.brainMatched.join(", ")}</div>
           ) : null}
           {meta.brainReason ? <div>reason: {meta.brainReason}</div> : null}
           <div>
-            retrieved → docs: {meta.knowledgeCount ?? 0} · memories: {meta.memoryCount ?? 0}
+            retrieved → docs: {meta.knowledgeCount ?? 0} · memories:{" "}
+            {meta.memoryCount ?? 0}
             {meta.retrievalMethod ? ` · method: ${meta.retrievalMethod}` : ""}
           </div>
           {meta.sources && meta.sources.length ? (
