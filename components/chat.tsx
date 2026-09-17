@@ -280,6 +280,7 @@ const Chat = memo(function Chat({
                           <div className="space-y-1.5">
                             {m.meta.sourceLinks.slice(0, 5).map((source, index) => {
                               const quality = source.tier === 0 ? "Official" : source.tier === 1 ? "Primary" : source.tier === 2 ? "Established" : source.tier === 3 ? "Reference" : "Verified";
+                              const kind = source.kind === "website" ? "Website" : "Web search";
                               const label = source.title || source.host || source.url;
                               return (
                                 <a
@@ -293,7 +294,7 @@ const Chat = memo(function Chat({
                                   <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">{index + 1}</span>
                                   <span className="min-w-0 flex-1">
                                     <span className="block truncate text-xs font-medium">{label}</span>
-                                    <span className="block truncate text-[10px] text-muted-foreground">{source.host || source.url} · {quality}</span>
+                                    <span className="block truncate text-[10px] text-muted-foreground">{source.host || source.url} · {kind} · {quality}</span>
                                   </span>
                                   <ExternalLink className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" />
                                 </a>

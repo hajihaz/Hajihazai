@@ -783,11 +783,13 @@ export async function POST(req: Request) {
             url: r.url,
             host: r.host ?? null,
             tier: r.tier ?? null,
+            kind: "search" as const,
           })) ?? (websiteRes?.ok ? [{
             title: websiteRes.title || websiteRes.finalUrl,
             url: websiteRes.finalUrl,
             host: (() => { try { return new URL(websiteRes.finalUrl).hostname.replace(/^www\./, ""); } catch { return null; } })(),
             tier: null,
+            kind: "website" as const,
           }] : []),
           // Phase 7 — clarification quick-action options (non-admin safe). Business
           // roles ("CEO", "ownership") apply only to the companies; "founder" and

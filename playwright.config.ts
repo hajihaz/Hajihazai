@@ -3,7 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Local isolated E2E runs may provide credentials and a test base URL in .env.test.
 // dotenv does not overwrite CI/shell-provided values.
-if (process.env.E2E_BASE_URL === "http://127.0.0.1:3000") {
+if (/^https?:\/\/(127\.0\.0\.1|localhost)(?::\d+)?$/i.test(process.env.E2E_BASE_URL ?? "")) {
   loadEnv({ path: ".env.test", override: false });
 }
 

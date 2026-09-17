@@ -41,7 +41,7 @@ export type MsgMeta = {
   memoryCount?: number | null;
   retrievalMethod?: string | null;
   sources?: string[] | null;
-  sourceLinks?: Array<{ title: string; url: string; host?: string | null; tier?: number | null }> | null;
+  sourceLinks?: Array<{ title: string; url: string; host?: string | null; tier?: number | null; kind?: "search" | "website" }> | null;
   referenceEntity?: string | null;
   referenceReason?: string | null;
 };

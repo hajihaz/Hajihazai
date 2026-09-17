@@ -28,6 +28,28 @@ test.describe("authenticated production smoke", () => {
     await expect(page.getByText("New Chat", { exact: true }).first()).toBeVisible();
   });
 
+  test("browser composer creates and restores a conversation", async ({ page }) => {
+    test.skip(!ALLOW_WRITE, "Set E2E_ALLOW_WRITE=true only for an isolated write-capable test environment.");
+    test.setTimeout(120_000);
+    const login = await page.request.post("/api/auth/login", {
+      data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
+    });
+    expect(login.status()).toBe(200);
+
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.getByPlaceholder("Message HajiHaz AI…")).toBeVisible();
+    await page.getByRole("button", { name: "New Chat", exact: true }).click();
+    const composer = page.getByPlaceholder("Message HajiHaz AI…");
+    await composer.click();
+    await composer.pressSequentially("Respond with the exact token E2E_UI_OK and nothing else.");
+    await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByText("E2E_UI_OK", { exact: false }).last()).toBeVisible({ timeout: 90_000 });
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByText("E2E_UI_OK", { exact: false }).last()).toBeVisible({ timeout: 30_000 });
+  });
+
   test("authenticated read APIs remain available and scoped", async ({ page }) => {
     const login = await page.request.post("/api/auth/login", {
       data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
