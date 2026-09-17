@@ -7,6 +7,7 @@ import Chat from "./chat";
 import Modal from "./modal";
 import ProfileMenu from "./profile-menu";
 import type { BrainOption, BrainMode } from "./brain-selector";
+import ImageGenerator from "./image-generator";
 
 type Conv = { id: string; title: string; updatedAt?: string | null };
 type Proj = { id: string; name: string; isSystem?: boolean };
@@ -41,7 +42,13 @@ export type MsgMeta = {
   memoryCount?: number | null;
   retrievalMethod?: string | null;
   sources?: string[] | null;
-  sourceLinks?: Array<{ title: string; url: string; host?: string | null; tier?: number | null; kind?: "search" | "website" }> | null;
+  sourceLinks?: Array<{
+    title: string;
+    url: string;
+    host?: string | null;
+    tier?: number | null;
+    kind?: "search" | "website";
+  }> | null;
   referenceEntity?: string | null;
   referenceReason?: string | null;
 };
@@ -60,7 +67,11 @@ export type Msg = {
   /** Phase 5 — feedback the user gave on this assistant message. */
   feedback?: "helpful" | "not_helpful" | null;
 };
-type User = { name?: string | null; email?: string | null; image?: string | null };
+type User = {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+};
 
 const CHAT_TIMEOUT_MS = 60_000;
 const uuid = () => crypto.randomUUID();
@@ -91,10 +102,11 @@ export default function ChatApp({
   isAdmin: boolean;
   openConversationId?: string;
 }) {
-  const [conversations, setConversations] = useState<Conv[]>(initialConversations);
+  const [conversations, setConversations] =
+    useState<Conv[]>(initialConversations);
   const [activeId, setActiveId] = useState<string | null>(
     (openConversationId &&
-      initialConversations.some((c) => c.id === openConversationId)
+    initialConversations.some((c) => c.id === openConversationId)
       ? openConversationId
       : initialConversations[0]?.id) ?? null,
   );
@@ -111,6 +123,7 @@ export default function ChatApp({
   );
   const [debug, setDebug] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   // Synchronous concurrency guard — React state lags a frame, so a ref is what
   // actually blocks a second send while a response is still generating.
@@ -142,7 +155,11 @@ export default function ChatApp({
 
   function changeLevel(newLevel: string) {
     setLevel(newLevel);
-    try { localStorage.setItem("hh-level", newLevel); } catch { /**/ }
+    try {
+      localStorage.setItem("hh-level", newLevel);
+    } catch {
+      /**/
+    }
   }
 
   const stopGeneration = useCallback(() => {
@@ -160,9 +177,11 @@ export default function ChatApp({
         e.preventDefault();
         setSidebarOpen(true);
         // rAF x2 to wait for sidebar slide-in before focusing
-        requestAnimationFrame(() => requestAnimationFrame(() => {
-          sidebarSearchRef.current?.focus();
-        }));
+        requestAnimationFrame(() =>
+          requestAnimationFrame(() => {
+            sidebarSearchRef.current?.focus();
+          }),
+        );
       } else if (e.key === "n") {
         const tag = (e.target as HTMLElement).tagName;
         if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -182,10 +201,15 @@ export default function ChatApp({
   useEffect(() => {
     try {
       const savedLevel = localStorage.getItem("hh-level");
-      if (savedLevel && initialLevels.some((l) => l.level === savedLevel && l.available)) {
+      if (
+        savedLevel &&
+        initialLevels.some((l) => l.level === savedLevel && l.available)
+      ) {
         setLevel(savedLevel);
       }
-    } catch { /**/ }
+    } catch {
+      /**/
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -194,7 +218,9 @@ export default function ChatApp({
     try {
       const saved = localStorage.getItem("hh-brain-mode");
       if (saved === "smart" || saved === "manual") setBrainMode(saved);
-    } catch { /**/ }
+    } catch {
+      /**/
+    }
   }, []);
 
   useEffect(() => {
@@ -211,19 +237,36 @@ export default function ChatApp({
       if (!res.ok) return;
       const data = await res.json();
       const loaded: BrainOption[] = (data.brains ?? []).map(
-        (b: { id: string; name: string; slug: string; icon: string; color: string }) => ({
-          id: b.id, name: b.name, slug: b.slug, icon: b.icon, color: b.color,
+        (b: {
+          id: string;
+          name: string;
+          slug: string;
+          icon: string;
+          color: string;
+        }) => ({
+          id: b.id,
+          name: b.name,
+          slug: b.slug,
+          icon: b.icon,
+          color: b.color,
         }),
       );
       setBrains(loaded);
       try {
         const savedBrainId = localStorage.getItem("hh-brain-id");
         const match = savedBrainId && loaded.find((b) => b.id === savedBrainId);
-        if (match) { setSelectedBrainId(match.id); return; }
-      } catch { /**/ }
+        if (match) {
+          setSelectedBrainId(match.id);
+          return;
+        }
+      } catch {
+        /**/
+      }
       const hajiCore = loaded.find((b) => b.slug === "haji-core");
       if (hajiCore) setSelectedBrainId(hajiCore.id);
-    } catch { /**/ }
+    } catch {
+      /**/
+    }
   }
 
   async function loadProjects() {
@@ -232,11 +275,17 @@ export default function ChatApp({
       if (!res.ok) return;
       const data = await res.json();
       setProjects(
-        (data.projects ?? []).map((p: { id: string; name: string; isSystem?: boolean }) => ({
-          id: p.id, name: p.name, isSystem: p.isSystem ?? false,
-        })),
+        (data.projects ?? []).map(
+          (p: { id: string; name: string; isSystem?: boolean }) => ({
+            id: p.id,
+            name: p.name,
+            isSystem: p.isSystem ?? false,
+          }),
+        ),
       );
-    } catch { /**/ }
+    } catch {
+      /**/
+    }
   }
 
   const newProject = useCallback(async () => {
@@ -250,7 +299,10 @@ export default function ChatApp({
     if (!res.ok) return;
     const data = await res.json();
     if (data.project) {
-      setProjects((p) => [{ id: data.project.id, name: data.project.name }, ...p]);
+      setProjects((p) => [
+        { id: data.project.id, name: data.project.name },
+        ...p,
+      ]);
     }
   }, []);
 
@@ -262,12 +314,20 @@ export default function ChatApp({
       if (Array.isArray(data.levels) && data.levels.length > 0) {
         setLevels(data.levels);
         setLevel((cur) => {
-          const stillOk = data.levels.find((l: LevelOption) => l.level === cur && l.available);
+          const stillOk = data.levels.find(
+            (l: LevelOption) => l.level === cur && l.available,
+          );
           if (stillOk) return cur;
-          return data.default ?? data.levels.find((l: LevelOption) => l.available)?.level ?? cur;
+          return (
+            data.default ??
+            data.levels.find((l: LevelOption) => l.available)?.level ??
+            cur
+          );
         });
       }
-    } catch { /**/ }
+    } catch {
+      /**/
+    }
   }
 
   const openConversation = useCallback(async (id: string) => {
@@ -279,7 +339,10 @@ export default function ChatApp({
       const data = await res.json();
       const loaded: Msg[] = (data.messages ?? []).map(
         (m: { id: string; role: Msg["role"]; content: string }) => ({
-          id: m.id, dbId: m.id, role: m.role, content: m.content,
+          id: m.id,
+          dbId: m.id,
+          role: m.role,
+          content: m.content,
           // isNew intentionally omitted → no animation on loaded messages
         }),
       );
@@ -317,57 +380,80 @@ export default function ChatApp({
         return;
       }
       setConversations((p) => p.filter((c) => c.id !== id));
-      if (activeId === id) { setActiveId(null); setMessages([]); }
+      if (activeId === id) {
+        setActiveId(null);
+        setMessages([]);
+      }
     } catch {
       notify("Couldn't delete the chat");
     }
   }
 
-  const handleRename = useCallback(async (id: string, title: string) => {
-    const nextTitle = title.trim();
-    if (!nextTitle) return;
-    const previous = conversations.find((c) => c.id === id)?.title;
-    setConversations((p) => p.map((c) => (c.id === id ? { ...c, title: nextTitle } : c)));
-    try {
-      const res = await fetch(`/api/conversations/${id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: nextTitle }),
-      });
-      if (!res.ok) {
+  const handleRename = useCallback(
+    async (id: string, title: string) => {
+      const nextTitle = title.trim();
+      if (!nextTitle) return;
+      const previous = conversations.find((c) => c.id === id)?.title;
+      setConversations((p) =>
+        p.map((c) => (c.id === id ? { ...c, title: nextTitle } : c)),
+      );
+      try {
+        const res = await fetch(`/api/conversations/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: nextTitle }),
+        });
+        if (!res.ok) {
+          if (previous !== undefined) {
+            setConversations((p) =>
+              p.map((c) => (c.id === id ? { ...c, title: previous } : c)),
+            );
+          }
+          notify("Couldn't rename the chat");
+        }
+      } catch {
         if (previous !== undefined) {
-          setConversations((p) => p.map((c) => (c.id === id ? { ...c, title: previous } : c)));
+          setConversations((p) =>
+            p.map((c) => (c.id === id ? { ...c, title: previous } : c)),
+          );
         }
         notify("Couldn't rename the chat");
       }
-    } catch {
-      if (previous !== undefined) {
-        setConversations((p) => p.map((c) => (c.id === id ? { ...c, title: previous } : c)));
-      }
-      notify("Couldn't rename the chat");
-    }
-  }, [conversations, notify]);
+    },
+    [conversations, notify],
+  );
 
   function exportConversation(format: "md" | "txt" | "pdf") {
     if (!activeId || messages.length === 0) return;
     setIsExportOpen(false);
-    const title = conversations.find((c) => c.id === activeId)?.title ?? "Conversation";
-    const slug = title.replace(/[^a-z0-9]+/gi, "-").toLowerCase().slice(0, 60);
+    const title =
+      conversations.find((c) => c.id === activeId)?.title ?? "Conversation";
+    const slug = title
+      .replace(/[^a-z0-9]+/gi, "-")
+      .toLowerCase()
+      .slice(0, 60);
 
     if (format === "md") {
       const lines = [`# ${title}\n`];
       for (const m of messages) {
         if (m.role === "user") lines.push(`**You:** ${m.content}\n`);
-        else if (m.role === "assistant") lines.push(`**HajiHaz:** ${m.content}\n`);
+        else if (m.role === "assistant")
+          lines.push(`**HajiHaz:** ${m.content}\n`);
       }
-      downloadBlob(new Blob([lines.join("\n")], { type: "text/markdown" }), `${slug}.md`);
+      downloadBlob(
+        new Blob([lines.join("\n")], { type: "text/markdown" }),
+        `${slug}.md`,
+      );
     } else if (format === "txt") {
       const lines = [`${title}\n${"=".repeat(title.length)}\n`];
       for (const m of messages) {
         if (m.role === "user") lines.push(`You: ${m.content}\n`);
         else if (m.role === "assistant") lines.push(`HajiHaz: ${m.content}\n`);
       }
-      downloadBlob(new Blob([lines.join("\n")], { type: "text/plain" }), `${slug}.txt`);
+      downloadBlob(
+        new Blob([lines.join("\n")], { type: "text/plain" }),
+        `${slug}.txt`,
+      );
     } else if (format === "pdf") {
       const body = messages
         .filter((m) => m.role === "user" || m.role === "assistant")
@@ -385,33 +471,49 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
 .msg p{margin:0;white-space:pre-wrap}.user{background:#eff6ff}.ai{background:#f9fafb}
 </style></head><body><h1>${escHtml(title)}</h1>${body}</body></html>`;
       const win = window.open("", "_blank");
-      if (win) { win.document.write(html); win.document.close(); setTimeout(() => win.print(), 250); }
+      if (win) {
+        win.document.write(html);
+        win.document.close();
+        setTimeout(() => win.print(), 250);
+      }
     }
   }
 
   /* ── message actions ── */
 
-  const copyMessage = useCallback(async (text: string) => {
-    try { await navigator.clipboard.writeText(text); notify("Copied to clipboard"); }
-    catch { notify("Copy failed"); }
-  }, [notify]);
+  const copyMessage = useCallback(
+    async (text: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        notify("Copied to clipboard");
+      } catch {
+        notify("Copy failed");
+      }
+    },
+    [notify],
+  );
 
-  const deleteMessage = useCallback(async (msg: Msg) => {
-    if (!msg.dbId) {
-      setMessages((p) => p.filter((m) => m.id !== msg.id));
-      return;
-    }
-    try {
-      const res = await fetch(`/api/messages/${msg.dbId}`, { method: "DELETE" });
-      if (!res.ok) {
-        notify("Couldn't delete the message");
+  const deleteMessage = useCallback(
+    async (msg: Msg) => {
+      if (!msg.dbId) {
+        setMessages((p) => p.filter((m) => m.id !== msg.id));
         return;
       }
-      setMessages((p) => p.filter((m) => m.id !== msg.id));
-    } catch {
-      notify("Couldn't delete the message");
-    }
-  }, [notify]);
+      try {
+        const res = await fetch(`/api/messages/${msg.dbId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          notify("Couldn't delete the message");
+          return;
+        }
+        setMessages((p) => p.filter((m) => m.id !== msg.id));
+      } catch {
+        notify("Couldn't delete the message");
+      }
+    },
+    [notify],
+  );
 
   function retryMessage(msg: Msg) {
     if (msg.error) {
@@ -423,13 +525,24 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     if (idx < 0) return;
     let priorText = "";
     for (let i = idx - 1; i >= 0; i--) {
-      if (messages[i].role === "user") { priorText = messages[i].content; break; }
+      if (messages[i].role === "user") {
+        priorText = messages[i].content;
+        break;
+      }
     }
     if (!priorText) return;
-    if (msg.dbId) void fetch(`/api/messages/${msg.dbId}`, { method: "DELETE" }).catch(() => {});
+    if (msg.dbId)
+      void fetch(`/api/messages/${msg.dbId}`, { method: "DELETE" }).catch(
+        () => {},
+      );
     setMessages((p) => p.filter((m) => m.id !== msg.id));
-    const priorUser = [...messages.slice(0, idx)].reverse().find((m) => m.role === "user");
-    void runChat(priorText, { regenerate: true, regenerateUserMessageId: priorUser?.dbId ?? undefined });
+    const priorUser = [...messages.slice(0, idx)]
+      .reverse()
+      .find((m) => m.role === "user");
+    void runChat(priorText, {
+      regenerate: true,
+      regenerateUserMessageId: priorUser?.dbId ?? undefined,
+    });
   }
 
   function send() {
@@ -437,7 +550,10 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     if (!text || generatingRef.current) return; // block duplicate/concurrent sends
     setInput("");
     const localId = uuid();
-    setMessages((p) => [...p, { id: localId, role: "user", content: text, isNew: true }]);
+    setMessages((p) => [
+      ...p,
+      { id: localId, role: "user", content: text, isNew: true },
+    ]);
     void runChat(text, { userLocalId: localId });
   }
 
@@ -446,7 +562,10 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     const t = text.trim();
     if (!t || generatingRef.current) return;
     const localId = uuid();
-    setMessages((p) => [...p, { id: localId, role: "user", content: t, isNew: true }]);
+    setMessages((p) => [
+      ...p,
+      { id: localId, role: "user", content: t, isNew: true },
+    ]);
     void runChat(t, { userLocalId: localId });
   }
 
@@ -454,7 +573,9 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
   async function sendFeedback(msg: Msg, value: "helpful" | "not_helpful") {
     if (!msg.dbId) return;
     const previous = msg.feedback;
-    setMessages((p) => p.map((m) => (m.id === msg.id ? { ...m, feedback: value } : m)));
+    setMessages((p) =>
+      p.map((m) => (m.id === msg.id ? { ...m, feedback: value } : m)),
+    );
     try {
       const res = await fetch("/api/chat/feedback", {
         method: "POST",
@@ -462,20 +583,27 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
         body: JSON.stringify({ messageId: msg.dbId, value }),
       });
       if (!res.ok) {
-        setMessages((p) => p.map((m) => (m.id === msg.id ? { ...m, feedback: previous } : m)));
+        setMessages((p) =>
+          p.map((m) => (m.id === msg.id ? { ...m, feedback: previous } : m)),
+        );
         notify("Couldn't save feedback");
       }
     } catch {
-      setMessages((p) => p.map((m) => (m.id === msg.id ? { ...m, feedback: previous } : m)));
+      setMessages((p) =>
+        p.map((m) => (m.id === msg.id ? { ...m, feedback: previous } : m)),
+      );
       notify("Couldn't save feedback");
     }
   }
 
-  async function runChat(text: string, opts: {
-    userLocalId?: string;
-    regenerate?: boolean;
-    regenerateUserMessageId?: string;
-  }) {
+  async function runChat(
+    text: string,
+    opts: {
+      userLocalId?: string;
+      regenerate?: boolean;
+      regenerateUserMessageId?: string;
+    },
+  ) {
     if (generatingRef.current) return; // never run two generations at once
     generatingRef.current = true;
     setSending(true);
@@ -543,33 +671,63 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
                 const chunk = typeof event.text === "string" ? event.text : "";
                 setMessages((p) => [
                   ...p,
-                  { id: streamMsgId, role: "assistant" as const, content: chunk, streaming: true, isNew: true },
+                  {
+                    id: streamMsgId,
+                    role: "assistant" as const,
+                    content: chunk,
+                    streaming: true,
+                    isNew: true,
+                  },
                 ]);
                 addedStreamMsg = true;
                 assistantShown = true;
               } else {
                 setMessages((p) =>
                   p.map((m) =>
-                    m.id === streamMsgId ? { ...m, content: m.content + event.text } : m,
+                    m.id === streamMsgId
+                      ? { ...m, content: m.content + event.text }
+                      : m,
                   ),
                 );
               }
             } else if (event.t === "done") {
               if (opts.userLocalId && event.userMessageId) {
                 setMessages((p) =>
-                  p.map((m) => m.id === opts.userLocalId ? { ...m, dbId: event.userMessageId } : m),
+                  p.map((m) =>
+                    m.id === opts.userLocalId
+                      ? { ...m, dbId: event.userMessageId }
+                      : m,
+                  ),
                 );
               }
               setMessages((p) =>
                 p.map((m) =>
                   m.id === streamMsgId
-                    ? { ...m, dbId: event.assistantMessageId ?? null, meta: event.meta ? { ...event.meta, sourceLinks: event.sourceLinks ?? event.meta.sourceLinks ?? null } : (event.sourceLinks?.length ? { sourceLinks: event.sourceLinks } : null), streaming: false, clarify: event.clarify?.options ?? null }
+                    ? {
+                        ...m,
+                        dbId: event.assistantMessageId ?? null,
+                        meta: event.meta
+                          ? {
+                              ...event.meta,
+                              sourceLinks:
+                                event.sourceLinks ??
+                                event.meta.sourceLinks ??
+                                null,
+                            }
+                          : event.sourceLinks?.length
+                            ? { sourceLinks: event.sourceLinks }
+                            : null,
+                        streaming: false,
+                        clarify: event.clarify?.options ?? null,
+                      }
                     : m,
                 ),
               );
               if (event.title && convId) {
                 setConversations((p) =>
-                  p.map((c) => (c.id === convId ? { ...c, title: event.title } : c)),
+                  p.map((c) =>
+                    c.id === convId ? { ...c, title: event.title } : c,
+                  ),
                 );
               }
             } else if (event.t === "error") {
@@ -577,10 +735,19 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
               assistantShown = true;
               setMessages((p) => [
                 ...p,
-                { id: uuid(), role: "assistant" as const, content: "⚠️ Something went wrong. Please try again.", error: true, retryText: text, isNew: true },
+                {
+                  id: uuid(),
+                  role: "assistant" as const,
+                  content: "⚠️ Something went wrong. Please try again.",
+                  error: true,
+                  retryText: text,
+                  isNew: true,
+                },
               ]);
             }
-          } catch { /**/ }
+          } catch {
+            /**/
+          }
         }
       }
     } catch (err) {
@@ -589,11 +756,14 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
       setMessages((p) => [
         ...p,
         {
-          id: uuid(), role: "assistant",
+          id: uuid(),
+          role: "assistant",
           content: aborted
             ? "⏱️ The request timed out. Please try again."
             : "⚠️ Couldn't reach HajiHaz. Check your connection and try again.",
-          error: true, retryText: text, isNew: true,
+          error: true,
+          retryText: text,
+          isNew: true,
         },
       ]);
     } finally {
@@ -603,13 +773,24 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
       abortRef.current = null;
       if (addedStreamMsg) {
         setMessages((p) =>
-          p.map((m) => (m.id === streamMsgId && m.streaming ? { ...m, streaming: false } : m)),
+          p.map((m) =>
+            m.id === streamMsgId && m.streaming
+              ? { ...m, streaming: false }
+              : m,
+          ),
         );
       } else if (!assistantShown) {
         // Stream ended with no content and no error → guarantee exactly one reply.
         setMessages((p) => [
           ...p,
-          { id: uuid(), role: "assistant", content: "⚠️ No response received. Please try again.", error: true, retryText: text, isNew: true },
+          {
+            id: uuid(),
+            role: "assistant",
+            content: "⚠️ No response received. Please try again.",
+            error: true,
+            retryText: text,
+            isNew: true,
+          },
         ]);
       }
     }
@@ -617,12 +798,21 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
 
   const handleSelectBrain = useCallback((id: string | null) => {
     setSelectedBrainId(id);
-    try { if (id) localStorage.setItem("hh-brain-id", id); else localStorage.removeItem("hh-brain-id"); } catch { /**/ }
+    try {
+      if (id) localStorage.setItem("hh-brain-id", id);
+      else localStorage.removeItem("hh-brain-id");
+    } catch {
+      /**/
+    }
   }, []);
 
   const handleSetBrainMode = useCallback((mode: BrainMode) => {
     setBrainMode(mode);
-    try { localStorage.setItem("hh-brain-mode", mode); } catch { /**/ }
+    try {
+      localStorage.setItem("hh-brain-mode", mode);
+    } catch {
+      /**/
+    }
   }, []);
 
   const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
@@ -637,7 +827,9 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
         onSelect={openConversation}
         onNew={newChat}
         onNewProject={newProject}
-        onDelete={(id) => setPendingDelete(conversations.find((c) => c.id === id) ?? null)}
+        onDelete={(id) =>
+          setPendingDelete(conversations.find((c) => c.id === id) ?? null)
+        }
         onRename={handleRename}
         onToast={notify}
         open={sidebarOpen}
@@ -667,11 +859,19 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           <div className="hidden min-w-0 items-center gap-2 sm:flex">
             {user.image ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={user.image} alt="" className="size-7 shrink-0 rounded-full" />
+              <img
+                src={user.image}
+                alt=""
+                className="size-7 shrink-0 rounded-full"
+              />
             ) : null}
             <div className="min-w-0 text-sm">
-              <div className="truncate font-medium leading-tight">{user.name}</div>
-              <div className="truncate text-xs leading-tight text-muted-foreground">{user.email}</div>
+              <div className="truncate font-medium leading-tight">
+                {user.name}
+              </div>
+              <div className="truncate text-xs leading-tight text-muted-foreground">
+                {user.email}
+              </div>
             </div>
           </div>
 
@@ -728,7 +928,9 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
               </div>
             ) : null}
 
-            <label className="sr-only" htmlFor="level-select">Response quality level</label>
+            <label className="sr-only" htmlFor="level-select">
+              Response quality level
+            </label>
             <select
               id="level-select"
               value={level}
@@ -737,7 +939,8 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
             >
               {levels.map((l) => (
                 <option key={l.level} value={l.level} disabled={!l.available}>
-                  {l.label}{l.comingSoon ? " (Coming Soon)" : ""}
+                  {l.label}
+                  {l.comingSoon ? " (Coming Soon)" : ""}
                 </option>
               ))}
             </select>
@@ -768,6 +971,14 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           brainMode={brainMode}
           onSelectBrain={handleSelectBrain}
           onSetBrainMode={handleSetBrainMode}
+          onOpenImageGenerator={() => {
+            console.log("IMAGE_OPEN_CLICK");
+            setImageGeneratorOpen(true);
+          }}
+        />
+        <ImageGenerator
+          open={imageGeneratorOpen}
+          onClose={() => setImageGeneratorOpen(false)}
         />
       </div>
 
@@ -778,7 +989,8 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
         title="Delete conversation?"
       >
         <p className="mb-4 text-sm text-muted-foreground">
-          "{pendingDelete?.title}" and all its messages will be permanently removed. This cannot be undone.
+          "{pendingDelete?.title}" and all its messages will be permanently
+          removed. This cannot be undone.
         </p>
         <div className="flex justify-end gap-2">
           <button

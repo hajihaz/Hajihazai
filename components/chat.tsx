@@ -2,14 +2,7 @@
 
 import Image from "next/image";
 
-import {
-  memo,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useCallback,
-  useState,
-} from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import {
   Copy,
   ImagePlus,
@@ -34,7 +27,6 @@ import {
   DEFAULT_PROFILE,
 } from "./profile-card";
 import VoiceInput from "./voice-input";
-import ImageGenerator from "./image-generator";
 
 const NEAR_BOTTOM_PX = 80; // px from bottom to trigger auto-scroll
 
@@ -61,6 +53,7 @@ const Chat = memo(function Chat({
   brainMode,
   onSelectBrain,
   onSetBrainMode,
+  onOpenImageGenerator,
 }: {
   messages: Msg[];
   conversationId: string | null;
@@ -83,12 +76,12 @@ const Chat = memo(function Chat({
   brainMode: BrainMode;
   onSelectBrain: (id: string | null) => void;
   onSetBrainMode: (mode: BrainMode) => void;
+  onOpenImageGenerator: () => void;
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
   // True while WE are programmatically scrolling, so the scroll handler doesn't
   // mistake our own auto-scroll for the user scrolling away from the bottom.
   const suppressScrollRef = useRef(false);
@@ -477,7 +470,7 @@ const Chat = memo(function Chat({
             />
             <button
               type="button"
-              onClick={() => setImageGeneratorOpen(true)}
+              onClick={onOpenImageGenerator}
               aria-label="Create image"
               title="Create image"
               className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
@@ -507,10 +500,6 @@ const Chat = memo(function Chat({
           </div>
         </div>
       </div>
-      <ImageGenerator
-        open={imageGeneratorOpen}
-        onClose={() => setImageGeneratorOpen(false)}
-      />
     </div>
   );
 });
