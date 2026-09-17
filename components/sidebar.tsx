@@ -338,17 +338,28 @@ const Sidebar = memo(function Sidebar({
         }`}
       >
         {/* Header */}
-        <div className="flex items-center gap-2 p-3">
+        <div className="p-3 pb-2">
+          <div className="mb-2 flex items-center gap-2 px-1">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-foreground text-background">
+              <span className="text-sm">✦</span>
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">HajiHaz AI</p>
+              <p className="text-[10px] text-muted-foreground">Personal intelligence</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
           <button
             onClick={onNew}
-            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90"
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90"
           >
             <Plus className="size-4" /> New Chat
           </button>
+          </div>
           <button
             onClick={onClose}
             aria-label="Close conversations"
-            className="flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-accent md:hidden"
+            className="absolute right-3 top-3 flex size-11 shrink-0 items-center justify-center rounded-lg hover:bg-accent md:hidden"
           >
             <X className="size-5" />
           </button>

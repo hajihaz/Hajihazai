@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { Brain, Globe2, LockKeyhole, Sparkles } from "lucide-react";
 import { auth } from "@/auth";
 import { listConversations } from "@/lib/db/queries";
 import { getProfile, isProfileComplete } from "@/lib/db/profile-queries";
@@ -44,26 +44,45 @@ export default async function Home({
   if (!session?.user?.id) {
     return (
       <main className="flex min-h-dvh flex-col items-center justify-center px-6 py-10">
-        <div className="flex w-full max-w-sm flex-col items-center gap-6 text-center">
+        <div className="relative flex w-full max-w-2xl flex-col items-center gap-8 text-center">
+          <div className="pointer-events-none absolute -top-32 size-72 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
           {/* Brand */}
-          <div className="flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm text-muted-foreground">
-            <Sparkles className="size-4" /> HajiHaz AI
+          <div className="relative flex items-center gap-2 rounded-full border bg-background/80 px-4 py-1.5 text-sm font-medium shadow-sm backdrop-blur">
+            <span className="flex size-6 items-center justify-center rounded-full bg-foreground text-background">
+              <Sparkles className="size-3.5" />
+            </span>
+            HajiHaz AI
           </div>
 
           {/* Headline + sub-copy: make it clear this is sign-in AND sign-up */}
-          <div className="space-y-2">
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Welcome to HajiHaz AI
+          <div className="relative max-w-xl space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">Your personal intelligence layer</p>
+            <h1 className="text-4xl font-semibold tracking-tight sm:text-6xl">
+              Think deeper. Build faster.
             </h1>
-            <p className="text-balance text-sm text-muted-foreground sm:text-base">
-              Sign in or create your account with Google.
+            <p className="mx-auto max-w-lg text-balance text-sm leading-6 text-muted-foreground sm:text-base">
+              HajiHaz AI combines your private knowledge, memory, live web evidence, and specialized brains in one workspace.
             </p>
           </div>
 
+          <div className="grid w-full max-w-2xl grid-cols-3 gap-2 sm:gap-3">
+            {[
+              { icon: Brain, label: "Memory", text: "Your context" },
+              { icon: Globe2, label: "Live Web", text: "Current evidence" },
+              { icon: LockKeyhole, label: "Private", text: "Your workspace" },
+            ].map(({ icon: Icon, label, text }) => (
+              <div key={label} className="rounded-2xl border bg-background/70 p-3 text-left shadow-sm backdrop-blur sm:p-4">
+                <Icon className="size-4 text-muted-foreground" />
+                <p className="mt-2 text-xs font-semibold sm:text-sm">{label}</p>
+                <p className="mt-0.5 text-[11px] text-muted-foreground sm:text-xs">{text}</p>
+              </div>
+            ))}
+          </div>
+
           {/* Auth card: badge → button → helper */}
-          <div className="flex w-full flex-col items-center gap-3">
+          <div className="flex w-full max-w-sm flex-col items-center gap-3">
             <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-              Login &amp; Registration
+              Sign in or create your account
             </span>
 
             <form action={signInWithGoogle} className="w-full">

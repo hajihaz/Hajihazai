@@ -135,26 +135,31 @@ const Chat = memo(function Chat({
           {loading ? (
             <MessagesSkeleton />
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center py-16 text-center sm:py-20">
-              <h2 className="text-2xl font-semibold">HajiHaz AI</h2>
-              <p className="mt-2 max-w-md text-sm text-muted-foreground sm:text-base">
-                Ask anything — your conversations are saved automatically. Try one of these:
+            <div className="flex flex-col items-center py-12 text-center sm:py-16">
+              <div className="relative mb-5 flex size-14 items-center justify-center rounded-2xl border bg-background shadow-sm">
+                <div className="absolute inset-1 rounded-xl bg-primary/5" />
+                <span className="relative text-xl">✦</span>
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">HajiHaz AI</p>
+              <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">What are we building today?</h2>
+              <p className="mt-3 max-w-lg text-balance text-sm leading-6 text-muted-foreground sm:text-base">
+                Ask a question, bring a problem, or start with one of your workspaces. HajiHaz can use memory, knowledge and live evidence when the task calls for it.
               </p>
-              <div className="mt-6 grid w-full max-w-2xl gap-4 text-left sm:grid-cols-2">
+              <div className="mt-7 grid w-full max-w-2xl gap-3 text-left sm:grid-cols-2">
                 {[
                   { area: "Personal", prompts: ["Who is Haji?", "What are Haji's goals?"] },
                   { area: "AllBee", prompts: ["Who founded AllBee?", "What services does AllBee provide?"] },
                   { area: "Legal", prompts: ["Explain Article 21.", "What is negligence?"] },
                   { area: "Suplaykart", prompts: ["What is Suplaykart?", "Who founded Suplaykart?"] },
                 ].map(({ area, prompts }) => (
-                  <div key={area} className="rounded-xl border p-3">
+                  <div key={area} className="rounded-2xl border bg-background/60 p-3 shadow-sm transition-colors hover:border-foreground/20">
                     <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{area}</p>
                     <div className="flex flex-col gap-2">
                       {prompts.map((p) => (
                         <button
                           key={p}
                           onClick={() => onSendPrompt(p)}
-                          className="rounded-lg border bg-background px-3 py-2 text-left text-sm transition-colors hover:bg-accent"
+                          className="rounded-xl border bg-background px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent"
                         >
                           {p}
                         </button>
