@@ -1,5 +1,6 @@
 const GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image";
-const GEMINI_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models";
+const GEMINI_ENDPOINT =
+  "https://generativelanguage.googleapis.com/v1beta/models";
 
 export const IMAGE_ASPECT_RATIOS = [
   "1:1",
