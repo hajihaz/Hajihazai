@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { memo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { Copy, RotateCw, Send, Square, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -136,9 +138,8 @@ const Chat = memo(function Chat({
             <MessagesSkeleton />
           ) : messages.length === 0 ? (
             <div className="flex flex-col items-center py-12 text-center sm:py-16">
-              <div className="relative mb-5 flex size-14 items-center justify-center rounded-2xl border bg-background shadow-sm">
-                <div className="absolute inset-1 rounded-xl bg-primary/5" />
-                <span className="relative text-xl">✦</span>
+              <div className="relative mb-5 flex size-16 items-center justify-center overflow-hidden rounded-2xl border bg-black shadow-sm">
+                <Image src="/branding/hajihaz-mark.png" alt="HajiHaz AI mark" width={512} height={512} priority className="size-14 object-contain" />
               </div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">HajiHaz AI</p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">What are we building today?</h2>

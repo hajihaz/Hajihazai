@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { Brain, Globe2, LockKeyhole, Sparkles } from "lucide-react";
+import { Brain, Globe2, LockKeyhole } from "lucide-react";
+import Image from "next/image"
 import { auth } from "@/auth";
 import { listConversations } from "@/lib/db/queries";
 import { getProfile, isProfileComplete } from "@/lib/db/profile-queries";
@@ -48,11 +49,15 @@ export default async function Home({
         <div className="relative flex w-full max-w-2xl flex-col items-center gap-8 text-center">
           <div className="pointer-events-none absolute -top-32 size-72 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
           {/* Brand */}
-          <div className="relative flex items-center gap-2 rounded-full border bg-background/80 px-4 py-1.5 text-sm font-medium shadow-sm backdrop-blur">
-            <span className="flex size-6 items-center justify-center rounded-full bg-foreground text-background">
-              <Sparkles className="size-3.5" />
-            </span>
-            HajiHaz AI
+          <div className="relative overflow-hidden rounded-2xl border bg-black shadow-sm">
+            <Image
+              src="/branding/hajihaz-logo.png"
+              alt="HajiHaz AI"
+              width={607}
+              height={481}
+              priority
+              className="h-auto w-52 sm:w-64"
+            />
           </div>
 
           {/* Headline + sub-copy: make it clear this is sign-in AND sign-up */}

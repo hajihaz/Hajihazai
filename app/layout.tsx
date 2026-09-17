@@ -5,6 +5,11 @@ export const metadata: Metadata = {
   title: "HajiHaz AI",
   description:
     "Next-generation AI assistant platform powered by memory, retrieval, and multi-model intelligence.",
+  icons: {
+    icon: "/branding/hajihaz-mark.png",
+    shortcut: "/branding/hajihaz-mark.png",
+    apple: "/branding/hajihaz-mark.png",
+  },
 };
 
 export const viewport: Viewport = {

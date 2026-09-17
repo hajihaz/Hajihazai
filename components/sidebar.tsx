@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Brain,
@@ -340,8 +342,8 @@ const Sidebar = memo(function Sidebar({
         {/* Header */}
         <div className="p-3 pb-2">
           <div className="mb-2 flex items-center gap-2 px-1">
-            <div className="flex size-7 items-center justify-center rounded-lg bg-foreground text-background">
-              <span className="text-sm">✦</span>
+            <div className="flex size-8 items-center justify-center overflow-hidden rounded-lg bg-black">
+              <Image src="/branding/hajihaz-mark.png" alt="HajiHaz AI" width={512} height={512} className="size-7 object-contain" />
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold">HajiHaz AI</p>
