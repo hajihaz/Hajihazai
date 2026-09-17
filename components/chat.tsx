@@ -270,6 +270,26 @@ const Chat = memo(function Chat({
                         <DebugPanel meta={m.meta} />
                       ) : null}
 
+                      {m.meta?.sourceLinks?.length ? (
+                        <div className="mt-2 rounded-xl border bg-background/70 p-2.5">
+                          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Sources</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {m.meta.sourceLinks.slice(0, 5).map((source) => (
+                              <a
+                                key={source.url}
+                                href={source.url}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                                className="max-w-full truncate rounded-full border bg-background px-2.5 py-1 text-xs transition-colors hover:bg-accent"
+                                title={source.url}
+                              >
+                                {source.title || source.host || source.url}
+                              </a>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+
                       {showProfileCard && <ProfileCard data={DEFAULT_PROFILE} />}
                     </div>
                   </div>

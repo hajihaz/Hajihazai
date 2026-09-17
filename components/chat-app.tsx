@@ -41,6 +41,7 @@ export type MsgMeta = {
   memoryCount?: number | null;
   retrievalMethod?: string | null;
   sources?: string[] | null;
+  sourceLinks?: Array<{ title: string; url: string; host?: string | null; tier?: number | null }> | null;
   referenceEntity?: string | null;
   referenceReason?: string | null;
 };
@@ -562,7 +563,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
               setMessages((p) =>
                 p.map((m) =>
                   m.id === streamMsgId
-                    ? { ...m, dbId: event.assistantMessageId ?? null, meta: event.meta ?? null, streaming: false, clarify: event.clarify?.options ?? null }
+                    ? { ...m, dbId: event.assistantMessageId ?? null, meta: event.meta ? { ...event.meta, sourceLinks: event.sourceLinks ?? event.meta.sourceLinks ?? null } : (event.sourceLinks?.length ? { sourceLinks: event.sourceLinks } : null), streaming: false, clarify: event.clarify?.options ?? null }
                     : m,
                 ),
               );

@@ -732,6 +732,17 @@ export async function POST(req: Request) {
           title,
           modelId: streamResult.modelId,
           requestedModelId: preferredModelId ?? null,
+          sourceLinks: searchRes?.results.map((r) => ({
+            title: r.title,
+            url: r.url,
+            host: r.host ?? null,
+            tier: r.tier ?? null,
+          })) ?? (websiteRes?.ok ? [{
+            title: websiteRes.title || websiteRes.finalUrl,
+            url: websiteRes.finalUrl,
+            host: (() => { try { return new URL(websiteRes.finalUrl).hostname.replace(/^www\./, ""); } catch { return null; } })(),
+            tier: null,
+          }] : []),
           // Phase 7 — clarification quick-action options (non-admin safe). Business
           // roles ("CEO", "ownership") apply only to the companies; "founder" and
           // generic prompts also include Haji.
