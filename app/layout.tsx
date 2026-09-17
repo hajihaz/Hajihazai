@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://hajihazai.vercel.app"),
   title: "HajiHaz AI",
   description:
     "Next-generation AI assistant platform powered by memory, retrieval, and multi-model intelligence.",
