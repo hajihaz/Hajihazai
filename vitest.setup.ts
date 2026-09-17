@@ -14,12 +14,18 @@ import { config } from "dotenv";
  *   3. Refuse to run if the resolved DATABASE_URL is the production database,
  *      failing loudly instead of mutating prod.
  */
-config({ path: ".env.test" });
-config({ path: ".env.local" });
+// Keep the default unit-test command DB-free. DB-backed suites are opt-in via
+// RUN_DB_TESTS=1 so a developer's .env.local can never accidentally expose a
+// production database to `npm test`. Isolated Playwright loads .env.test itself.
+const runDbTests = process.env.RUN_DB_TESTS === "1";
+if (runDbTests) {
+  config({ path: ".env.test" });
+  config({ path: ".env.local" });
 
-// An explicit test DB URL always wins (e.g. set by CI).
-if (process.env.TEST_DATABASE_URL) {
-  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+  // An explicit test DB URL always wins (e.g. CI).
+  if (process.env.TEST_DATABASE_URL) {
+    process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+  }
 }
 
 // Known production Neon host fragments — tests must never run against these.

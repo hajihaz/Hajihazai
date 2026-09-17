@@ -14,3 +14,5 @@ Write-capable Playwright runs are blocked unless **both** conditions are true:
 The Playwright configuration fails before test execution if `E2E_ALLOW_WRITE=true` is combined with a non-local target or without the local DB adapter. The Vitest setup has an independent production-database guard for DB-backed tests.
 
 The local `.env.test` file is gitignored. Keep production database credentials out of `.env.test`.
+
+The default `npm test` command is intentionally DB-free. To run DB-backed Vitest suites, use `RUN_DB_TESTS=1` with a dedicated test database; the independent production-host guard still applies. Isolated Playwright runs use the local PostgreSQL adapter and do not require this flag.
