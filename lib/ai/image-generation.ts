@@ -1,7 +1,7 @@
 const PRIMARY_GOOGLE_MODEL = "gemini-3.1-flash-image";
 const PRO_GOOGLE_MODEL = "gemini-3-pro-image";
 const OPENROUTER_IMAGE_MODELS = ["google/gemini-3.1-flash-image", "bytedance-seed/seedream-4.5"] as const;
-const GOOGLE_ENDPOINT = "https://generativelanguage.googleapis.com/v1/models";
+const GOOGLE_INTERACTIONS_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
 const OPENROUTER_IMAGE_ENDPOINT = "https://openrouter.ai/api/v1/images";
 
 export const IMAGE_ASPECT_RATIOS = ["1:1", "4:3", "3:4", "16:9", "9:16", "3:2", "2:3", "21:9"] as const;
@@ -37,15 +37,17 @@ async function generateWithGoogle(input: { prompt: string; aspectRatio: ImageAsp
   const models = input.imageSize === "4K" ? [PRO_GOOGLE_MODEL, PRIMARY_GOOGLE_MODEL] : [PRIMARY_GOOGLE_MODEL];
 
   for (const model of models) {
-    const response = await fetch(`${GOOGLE_ENDPOINT}/${model}:generateContent`, {
+    const response = await fetch(GOOGLE_INTERACTIONS_ENDPOINT, {
       method: "POST",
       headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: buildImagePrompt(input.prompt) }] }],
-        generationConfig: {
-          responseModalities: ["IMAGE"],
-          responseFormat: { image: { aspectRatio: input.aspectRatio, imageSize: input.imageSize } },
-          thinkingConfig: { thinkingLevel: "high", includeThoughts: false },
+        model,
+        input: [{ type: "text", text: buildImagePrompt(input.prompt) }],
+        response_format: {
+          type: "image",
+          mime_type: "image/png",
+          aspect_ratio: input.aspectRatio,
+          image_size: input.imageSize,
         },
       }),
       signal: input.signal ?? AbortSignal.timeout(120_000),
@@ -55,17 +57,15 @@ async function generateWithGoogle(input: { prompt: string; aspectRatio: ImageAsp
       console.error("[image-generation] Google provider error", model, response.status, detail.slice(0, 500));
       continue;
     }
-    const data = (await response.json()) as { candidates?: Array<{ content?: { parts?: Array<{ inlineData?: { data?: string; mimeType?: string } }> } }> };
-    const parts = data.candidates?.[0]?.content?.parts ?? [];
-    const imagePart = parts.find((part) => part.inlineData?.data);
-    const base64 = imagePart?.inlineData?.data;
+    const data = (await response.json()) as { output_image?: { data?: string; mime_type?: string } };
+    const base64 = data.output_image?.data;
     if (!base64) {
       console.error("[image-generation] Google returned no image", model);
       continue;
     }
     return {
-      dataUrl: `data:${imagePart.inlineData?.mimeType || "image/png"};base64,${base64}`,
-      mimeType: imagePart.inlineData?.mimeType || "image/png",
+      dataUrl: `data:${data.output_image?.mime_type || "image/png"};base64,${base64}`,
+      mimeType: data.output_image?.mime_type || "image/png",
       model,
     };
   }
