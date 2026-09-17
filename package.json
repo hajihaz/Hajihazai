@@ -18,7 +18,8 @@
     "predeploy-check": "bash scripts/predeploy.sh",
     "quality:report": "tsx scripts/quality-report.mts",
     "quality:report:monthly": "tsx scripts/quality-report.mts --monthly",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:isolated": "E2E_BASE_URL=http://127.0.0.1:3000 LOCAL_E2E_DB=1 playwright test"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
