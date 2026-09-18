@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bug, Download, Menu, PlusCircle, Share2 } from "lucide-react";
+import { Bug, Download, GitFork, Menu, PlusCircle, Share2 } from "lucide-react";
 import Sidebar from "./sidebar";
 import Chat from "./chat";
 import Modal from "./modal";
@@ -422,6 +422,18 @@ export default function ChatApp({
     },
     [conversations, notify],
   );
+
+  const branchConversation = useCallback(async () => {
+    if (!activeId) return;
+    try {
+      const res = await fetch(`/api/conversations/${activeId}/branch`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.id) { notify(data?.error ?? "Couldn't branch the conversation"); return; }
+      setConversations((p) => [{ id: data.id, title: data.title, projectId: data.projectId }, ...p]);
+      await openConversation(data.id);
+      notify("Conversation branched");
+    } catch { notify("Couldn't branch the conversation"); }
+  }, [activeId, notify, openConversation]);
 
   const shareConversation = useCallback(async () => {
     if (!activeId) return;
@@ -998,6 +1010,12 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
             {activeId && messages.length > 0 ? (
               <button type="button" onClick={() => void shareConversation()} aria-label="Share conversation" title="Share conversation" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
                 <Share2 className="size-4" />
+              </button>
+            ) : null}
+
+            {activeId && messages.length > 0 ? (
+              <button type="button" onClick={() => void branchConversation()} aria-label="Branch conversation" title="Branch conversation" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
+                <GitFork className="size-4" />
               </button>
             ) : null}
 
