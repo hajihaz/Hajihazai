@@ -30,20 +30,29 @@ export async function extractText(
   }
 
   if (ext === "pdf") {
-    let parser: import("pdf-parse").PDFParse | null = null;
     try {
-      // pdf-parse/pdfjs-dist can evaluate browser canvas globals (DOMMatrix) at
-      // module load under some server bundlers. Keep it out of the module graph
-      // for routes that only need TXT/MD/DOCX, and execute it only for PDFs.
-      const { PDFParse } = await import("pdf-parse");
-      parser = new PDFParse({ data: buf });
-      const result = await parser.getText();
-      return acceptExtractedText(result.text);
+      // Load PDF.js only for PDF requests. The legacy build avoids browser-only
+      // globals under the Next.js Node runtime and works for normal text PDFs.
+      const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buf) });
+      const doc = await loadingTask.promise;
+      let text = "";
+      for (let pageNo = 1; pageNo <= doc.numPages; pageNo += 1) {
+        const page = await doc.getPage(pageNo);
+        const content = await page.getTextContent();
+        const pageText = content.items
+          .map((item) => ("str" in item ? item.str : ""))
+          .join(" ")
+          .trim();
+        if (pageText) text += `${pageText}\n\n`;
+      }
+      await doc.destroy();
+      return acceptExtractedText(text.trim());
     } catch (error) {
       console.warn("[knowledge] PDF extraction failed:", error);
       return { ok: false, error: "Could not read the PDF. Please check that it is a valid, text-readable PDF." };
     } finally {
-      await parser?.destroy().catch(() => undefined);
+
     }
   }
 

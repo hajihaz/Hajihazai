@@ -8,7 +8,6 @@ import Modal from "./modal";
 import ProfileMenu from "./profile-menu";
 import type { BrainOption, BrainMode } from "./brain-selector";
 import ImageGenerator from "./image-generator";
-import PdfStudio from "./pdf-studio";
 
 type Conv = { id: string; title: string; updatedAt?: string | null };
 type Proj = { id: string; name: string; isSystem?: boolean };
@@ -125,7 +124,6 @@ export default function ChatApp({
   const [debug, setDebug] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
-  const [pdfStudioOpen, setPdfStudioOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   // Synchronous concurrency guard — React state lags a frame, so a ref is what
   // actually blocks a second send while a response is still generating.
@@ -547,16 +545,55 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     });
   }
 
-  function send() {
+  async function send(files: File[] = []) {
     const text = input.trim();
     if (!text || generatingRef.current) return; // block duplicate/concurrent sends
     setInput("");
+    if (files.length > 0) {
+      await sendPdf(files, text);
+      return;
+    }
     const localId = uuid();
     setMessages((p) => [
       ...p,
       { id: localId, role: "user", content: text, isNew: true },
     ]);
     void runChat(text, { userLocalId: localId });
+  }
+
+  async function sendPdf(files: File[], prompt: string) {
+    if (files.length > 2) files = files.slice(0, 2);
+    setSending(true);
+    setIsGenerating(true);
+    const localId = uuid();
+    const attachmentLabel = files.length === 1 ? `\n\n📎 ${files[0].name}` : `\n\n📎 ${files[0].name}\n📎 ${files[1].name}`;
+    setMessages((p) => [...p, { id: localId, role: "user", content: prompt + attachmentLabel, isNew: true }]);
+    try {
+      const form = new FormData();
+      form.append("source", files[0]);
+      if (files[1]) form.append("reference", files[1]);
+      form.append("prompt", prompt);
+      const res = await fetch("/api/pdf/edit", { method: "POST", body: form });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || `PDF generation failed (HTTP ${res.status})`);
+      }
+      const blob = await res.blob();
+      if (!blob.size) throw new Error("Generated PDF was empty");
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = files[0].name.replace(/\.pdf$/i, "") + "-hajihaz-edited.pdf";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      setMessages((p) => [...p, { id: uuid(), role: "assistant", content: `📄 **PDF ready.** I applied your instruction to **${files[0].name}** and downloaded the generated PDF.`, isNew: true }]);
+    } catch (error) {
+      setMessages((p) => [...p, { id: uuid(), role: "assistant", content: `⚠️ ${error instanceof Error ? error.message : "PDF generation failed. Please try again."}`, error: true, isNew: true }]);
+    } finally {
+      setSending(false);
+      setIsGenerating(false);
+      generatingRef.current = false;
+    }
   }
 
   // Send an explicit prompt (empty-state example prompts + clarification chips).
@@ -973,13 +1010,11 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           brainMode={brainMode}
           onSelectBrain={handleSelectBrain}
           onSetBrainMode={handleSetBrainMode}
-          onOpenPdfStudio={() => setPdfStudioOpen(true)}
           onOpenImageGenerator={() => {
             console.log("IMAGE_OPEN_CLICK");
             setImageGeneratorOpen(true);
           }}
         />
-        <PdfStudio open={pdfStudioOpen} onClose={() => setPdfStudioOpen(false)} />
         <ImageGenerator
           open={imageGeneratorOpen}
           onClose={() => setImageGeneratorOpen(false)}

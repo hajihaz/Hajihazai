@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 
-import { memo, useEffect, useLayoutEffect, useRef, useCallback } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useCallback, useState } from "react";
 import {
   Copy,
   ImagePlus,
   ExternalLink,
-  FilePenLine,
+  Paperclip,
+  X,
   RotateCw,
   Send,
   Square,
@@ -55,13 +56,12 @@ const Chat = memo(function Chat({
   onSelectBrain,
   onSetBrainMode,
   onOpenImageGenerator,
-  onOpenPdfStudio,
 }: {
   messages: Msg[];
   conversationId: string | null;
   input: string;
   setInput: (v: string) => void;
-  onSend: () => void;
+  onSend: (files?: File[]) => void;
   onSendPrompt: (text: string) => void;
   onFeedback: (msg: Msg, value: "helpful" | "not_helpful") => void;
   onCopy: (text: string) => void;
@@ -79,12 +79,13 @@ const Chat = memo(function Chat({
   onSelectBrain: (id: string | null) => void;
   onSetBrainMode: (mode: BrainMode) => void;
   onOpenImageGenerator: () => void;
-  onOpenPdfStudio: () => void;
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
+  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
   // True while WE are programmatically scrolling, so the scroll handler doesn't
   // mistake our own auto-scroll for the user scrolling away from the bottom.
   const suppressScrollRef = useRef(false);
@@ -450,7 +451,28 @@ const Chat = memo(function Chat({
         )}
 
         <div className="p-3 pb-safe sm:p-4">
-          <div className="mx-auto flex max-w-3xl items-end gap-2">
+          <div className="mx-auto max-w-3xl">
+            {pdfFiles.length > 0 ? (
+              <div className="mb-2 flex flex-wrap gap-2" aria-label="Attached PDFs">
+                {pdfFiles.map((file, index) => (
+                  <div key={`${file.name}-${index}`} className="flex max-w-full items-center gap-2 rounded-xl border bg-muted/50 px-2.5 py-1.5 text-xs">
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-background font-semibold">PDF</span>
+                    <span className="max-w-56 truncate">{file.name}</span>
+                    {index === 1 ? <span className="hidden rounded-md bg-background px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground sm:inline">Reference</span> : null}
+                    <button type="button" onClick={() => setPdfFiles((files) => files.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`} title={`Remove ${file.name}`} className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"><X className="size-3.5" /></button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => {
+              const picked = Array.from(e.target.files ?? []);
+              const valid = picked.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+              const tooLarge = valid.find((f) => f.size > 12 * 1024 * 1024);
+              if (tooLarge) window.alert(`${tooLarge.name} is larger than 12MB.`);
+              setPdfFiles((current) => [...current, ...valid.filter((f) => f.size <= 12 * 1024 * 1024)].slice(0, 2));
+              e.currentTarget.value = "";
+            }} />
+            <div className="flex items-end gap-2">
             <textarea
               ref={textareaRef}
               value={input}
@@ -458,7 +480,9 @@ const Chat = memo(function Chat({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  onSend();
+                  const files = pdfFiles;
+                  setPdfFiles([]);
+                  onSend(files);
                 }
               }}
               rows={1}
@@ -473,12 +497,12 @@ const Chat = memo(function Chat({
             />
             <button
               type="button"
-              onClick={onOpenPdfStudio}
-              aria-label="Edit or create PDF"
-              title="Edit or create PDF"
+              onClick={() => pdfInputRef.current?.click()}
+              aria-label="Attach PDF"
+              title="Attach PDF"
               className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
             >
-              <FilePenLine className="size-4" />
+              <Paperclip className="size-4" />
             </button>
             <button
               type="button"
@@ -501,7 +525,7 @@ const Chat = memo(function Chat({
               </button>
             ) : (
               <button
-                onClick={onSend}
+                onClick={() => { const files = pdfFiles; setPdfFiles([]); onSend(files); }}
                 disabled={!input.trim()}
                 aria-label="Send message"
                 className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40"
@@ -509,6 +533,7 @@ const Chat = memo(function Chat({
                 <Send className="size-4" />
               </button>
             )}
+            </div>
           </div>
         </div>
       </div>
