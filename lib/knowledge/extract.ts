@@ -32,10 +32,12 @@ export async function extractText(
 
   if (ext === "pdf") {
     try {
-      const globals = globalThis as typeof globalThis & { DOMMatrix?: unknown };
+      const globals = globalThis as typeof globalThis & { DOMMatrix?: unknown; pdfjsWorker?: unknown };
       if (!globals.DOMMatrix) globals.DOMMatrix = CSSMatrix as unknown as typeof globalThis.DOMMatrix;
+      const worker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+      if (!globals.pdfjsWorker) globals.pdfjsWorker = worker;
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buf), useWorkerFetch: false, isEvalSupported: false, disableWorker: true } as never);
+      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buf), useWorkerFetch: false, isEvalSupported: false });
       const doc = await loadingTask.promise;
       let text = "";
       for (let pageNo = 1; pageNo <= doc.numPages; pageNo += 1) {
