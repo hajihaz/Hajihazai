@@ -51,6 +51,20 @@ export type MsgMeta = {
   }> | null;
   referenceEntity?: string | null;
   referenceReason?: string | null;
+  research?: {
+    depth?: "quick" | "smart" | "research";
+    queries?: string[];
+    reason?: string | null;
+    evidenceCount?: number;
+    provider?: string | null;
+    sources?: Array<{
+      title: string;
+      url: string;
+      host?: string | null;
+      tier?: number | null;
+      snippet?: string;
+    }>;
+  } | null;
 };
 export type Msg = {
   id: string;
@@ -338,11 +352,12 @@ export default function ChatApp({
       const res = await fetch(`/api/conversations/${id}/messages`);
       const data = await res.json();
       const loaded: Msg[] = (data.messages ?? []).map(
-        (m: { id: string; role: Msg["role"]; content: string }) => ({
+        (m: { id: string; role: Msg["role"]; content: string; metadata?: MsgMeta | null }) => ({
           id: m.id,
           dbId: m.id,
           role: m.role,
           content: m.content,
+          meta: m.metadata ?? null,
           // isNew intentionally omitted → no animation on loaded messages
         }),
       );
@@ -828,9 +843,16 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
                                 event.sourceLinks ??
                                 event.meta.sourceLinks ??
                                 null,
+                              research:
+                                event.research ??
+                                event.meta.research ??
+                                null,
                             }
-                          : event.sourceLinks?.length
-                            ? { sourceLinks: event.sourceLinks }
+                          : (event.sourceLinks?.length || event.research)
+                            ? {
+                                sourceLinks: event.sourceLinks ?? null,
+                                research: event.research ?? null,
+                              }
                             : null,
                         streaming: false,
                         clarify: event.clarify?.options ?? null,

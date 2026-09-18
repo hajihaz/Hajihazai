@@ -433,6 +433,20 @@ export async function POST(req: Request) {
     sources: [...new Set(knowledge.chunks.map((c) => c.title))],
     query: sanitizeQueryForLog(message),
     webIntent,
+    research: {
+      depth: intelligencePlan.depth,
+      queries: intelligencePlan.researchQueries.map((q) => sanitizeQueryForLog(q)).slice(0, 3),
+      reason: intelligencePlan.researchReason,
+      evidenceCount: searchRes?.results.length ?? 0,
+      provider: searchRes?.provider ?? null,
+      sources: (searchRes?.results ?? []).slice(0, 5).map((r) => ({
+        title: r.title,
+        url: r.url,
+        host: r.host ?? null,
+        tier: r.tier ?? null,
+        snippet: r.snippet.slice(0, 700),
+      })),
+    },
   };
 
   // ── Hard verification gate (Rule #4) ──────────────────────────────────────
@@ -778,6 +792,7 @@ export async function POST(req: Request) {
           modelId: streamResult.modelId,
           requestedModelId: preferredModelId ?? null,
           latency,
+          research: retrievalMeta.research,
           sourceLinks: searchRes?.results.map((r) => ({
             title: r.title,
             url: r.url,

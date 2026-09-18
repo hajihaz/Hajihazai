@@ -28,6 +28,15 @@ export async function GET(
       role: m.role,
       content: m.content,
       modelId: m.modelId,
+      metadata:
+        m.role === "assistant"
+          ? {
+              sourceLinks:
+                (m.metadata as { sourceLinks?: unknown } | null | undefined)?.sourceLinks ?? null,
+              research:
+                (m.metadata as { research?: unknown } | null | undefined)?.research ?? null,
+            }
+          : null,
     })),
   }, {
     headers: { "Cache-Control": "private, no-store" },

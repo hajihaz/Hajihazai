@@ -244,6 +244,11 @@ const Chat = memo(function Chat({
                   !isUser &&
                   prevMsg?.role === "user" &&
                   isProfileCardQuery(prevMsg.content);
+                const research = !isUser ? m.meta?.research ?? null : null;
+                const researchSources =
+                  m.meta?.sourceLinks?.length
+                    ? m.meta.sourceLinks
+                    : research?.sources ?? [];
 
                 return (
                   <div
@@ -359,11 +364,57 @@ const Chat = memo(function Chat({
                         </div>
                       )}
 
+                      {research?.depth === "research" && !m.streaming ? (
+                        <details className="mt-2 rounded-xl border bg-background/70 p-2.5" open={false}>
+                          <summary className="cursor-pointer list-none text-xs font-semibold">
+                            <span className="inline-flex items-center gap-2">
+                              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-primary">Research</span>
+                              <span>{research.evidenceCount ?? research.sources?.length ?? 0} evidence sources</span>
+                            </span>
+                          </summary>
+                          <div className="mt-3 space-y-3">
+                            {research.queries?.length ? (
+                              <div>
+                                <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Research plan</p>
+                                <ol className="space-y-1 text-xs text-muted-foreground">
+                                  {research.queries.map((query, queryIndex) => (
+                                    <li key={`${query}-${queryIndex}`} className="flex gap-2">
+                                      <span className="font-semibold text-foreground">{queryIndex + 1}.</span>
+                                      <span>{query}</span>
+                                    </li>
+                                  ))}
+                                </ol>
+                              </div>
+                            ) : null}
+                            {research.reason ? (
+                              <p className="text-[10px] text-muted-foreground">{research.reason}</p>
+                            ) : null}
+                            {researchSources.length ? (
+                              <div className="space-y-2">
+                                <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Evidence collected</p>
+                                {researchSources.slice(0, 5).map((source, sourceIndex) => (
+                                  <a key={source.url} href={source.url} target="_blank" rel="noreferrer noopener" className="block rounded-lg border bg-background p-2.5 hover:bg-accent">
+                                    <div className="flex items-start gap-2">
+                                      <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold">{sourceIndex + 1}</span>
+                                      <div className="min-w-0">
+                                        <p className="truncate text-xs font-medium">{source.title}</p>
+                                        <p className="mt-0.5 truncate text-[10px] text-muted-foreground">{source.host || source.url}</p>
+                                        {"snippet" in source && source.snippet ? <p className="mt-1 line-clamp-3 text-[11px] leading-relaxed text-muted-foreground">{source.snippet}</p> : null}
+                                      </div>
+                                    </div>
+                                  </a>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </details>
+                      ) : null}
+
                       {isAdmin && debug && m.role === "assistant" && m.meta ? (
                         <DebugPanel meta={m.meta} />
                       ) : null}
 
-                      {m.meta?.sourceLinks?.length ? (
+                      {researchSources.length ? (
                         <div className="mt-2 rounded-xl border bg-background/70 p-2.5">
                           <div className="mb-1.5 flex items-center justify-between gap-2">
                             <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -374,7 +425,7 @@ const Chat = memo(function Chat({
                             </span>
                           </div>
                           <div className="space-y-1.5">
-                            {m.meta.sourceLinks
+                            {researchSources
                               .slice(0, 5)
                               .map((source, index) => {
                                 const quality =
@@ -388,7 +439,7 @@ const Chat = memo(function Chat({
                                           ? "Reference"
                                           : "Verified";
                                 const kind =
-                                  source.kind === "website"
+                                  "kind" in source && source.kind === "website"
                                     ? "Website"
                                     : "Web search";
                                 const label =
