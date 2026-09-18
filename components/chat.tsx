@@ -87,8 +87,8 @@ const Chat = memo(function Chat({
   const bottomRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const pdfInputRef = useRef<HTMLInputElement>(null);
-  const [pdfFiles, setPdfFiles] = useState<File[]>([]);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   // True while WE are programmatically scrolling, so the scroll handler doesn't
   // mistake our own auto-scroll for the user scrolling away from the bottom.
   const suppressScrollRef = useRef(false);
@@ -461,24 +461,24 @@ const Chat = memo(function Chat({
 
         <div className="p-3 pb-safe sm:p-4">
           <div className="mx-auto max-w-3xl">
-            {pdfFiles.length > 0 ? (
-              <div className="mb-2 flex flex-wrap gap-2" aria-label="Attached PDFs">
-                {pdfFiles.map((file, index) => (
+            {attachmentFiles.length > 0 ? (
+              <div className="mb-2 flex flex-wrap gap-2" aria-label="Attached files">
+                {attachmentFiles.map((file, index) => (
                   <div key={`${file.name}-${index}`} className="flex max-w-full items-center gap-2 rounded-xl border bg-muted/50 px-2.5 py-1.5 text-xs">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-background font-semibold">PDF</span>
+                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-background font-semibold">{file.name.toLowerCase().endsWith(".pdf") ? "PDF" : file.name.split(".").pop()?.toUpperCase()}</span>
                     <span className="max-w-56 truncate">{file.name}</span>
                     {index === 1 ? <span className="hidden rounded-md bg-background px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground sm:inline">Reference</span> : null}
-                    <button type="button" onClick={() => setPdfFiles((files) => files.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`} title={`Remove ${file.name}`} className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"><X className="size-3.5" /></button>
+                    <button type="button" onClick={() => setAttachmentFiles((files) => files.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`} title={`Remove ${file.name}`} className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"><X className="size-3.5" /></button>
                   </div>
                 ))}
               </div>
             ) : null}
-            <input ref={pdfInputRef} type="file" accept="application/pdf,.pdf" multiple className="hidden" onChange={(e) => {
+            <input ref={attachmentInputRef} type="file" accept="application/pdf,.pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={(e) => {
               const picked = Array.from(e.target.files ?? []);
-              const valid = picked.filter((f) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf"));
+              const valid = picked.filter((f) => /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i.test(f.name));
               const tooLarge = valid.find((f) => f.size > 12 * 1024 * 1024);
               if (tooLarge) window.alert(`${tooLarge.name} is larger than 12MB.`);
-              setPdfFiles((current) => [...current, ...valid.filter((f) => f.size <= 12 * 1024 * 1024)].slice(0, 2));
+              setAttachmentFiles((current) => [...current, ...valid.filter((f) => f.size <= 12 * 1024 * 1024)].slice(0, 5));
               e.currentTarget.value = "";
             }} />
             <div className="flex items-end gap-2">
@@ -489,8 +489,8 @@ const Chat = memo(function Chat({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  const files = pdfFiles;
-                  setPdfFiles([]);
+                  const files = attachmentFiles;
+                  setAttachmentFiles([]);
                   onSend(files);
                 }
               }}
@@ -506,9 +506,9 @@ const Chat = memo(function Chat({
             />
             <button
               type="button"
-              onClick={() => pdfInputRef.current?.click()}
-              aria-label="Attach PDF"
-              title="Attach PDF"
+              onClick={() => attachmentInputRef.current?.click()}
+              aria-label="Attach files"
+              title="Attach files"
               className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
             >
               <Paperclip className="size-4" />
@@ -534,7 +534,7 @@ const Chat = memo(function Chat({
               </button>
             ) : (
               <button
-                onClick={() => { const files = pdfFiles; setPdfFiles([]); onSend(files); }}
+                onClick={() => { const files = attachmentFiles; setAttachmentFiles([]); onSend(files); }}
                 disabled={!input.trim()}
                 aria-label="Send message"
                 className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40"

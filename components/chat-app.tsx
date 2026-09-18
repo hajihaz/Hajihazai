@@ -583,52 +583,75 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
 
   async function send(files: File[] = []) {
     const text = input.trim();
-    if (!text || generatingRef.current) return; // block duplicate/concurrent sends
+    if ((!text && files.length === 0) || generatingRef.current) return;
     setInput("");
     if (files.length > 0) {
-      await sendPdf(files, text);
+      await sendAttachments(files, text);
       return;
     }
     const localId = uuid();
-    setMessages((p) => [
-      ...p,
-      { id: localId, role: "user", content: text, isNew: true },
-    ]);
+    setMessages((p) => [...p, { id: localId, role: "user", content: text, isNew: true }]);
     void runChat(text, { userLocalId: localId });
   }
 
-  async function sendPdf(files: File[], prompt: string) {
-    if (files.length > 2) files = files.slice(0, 2);
+  async function sendAttachments(files: File[], prompt: string) {
+    files = files.slice(0, 5);
+    const pdfs = files.filter((f) => /\.pdf$/i.test(f.name));
+    const pdfEditIntent = pdfs.length > 0 && /\b(edit|change|replace|remove|delete|add|modify|rewrite|reformat|redesign|create|make|generate|convert|fix|update)\b/i.test(prompt) && /\bpdf|document|page|pages|format|layout|name|topic|title\b/i.test(prompt);
     setSending(true);
     setIsGenerating(true);
     const localId = uuid();
-    const attachmentLabel = files.length === 1 ? `\n\n📎 ${files[0].name}` : `\n\n📎 ${files[0].name}\n📎 ${files[1].name}`;
-    setMessages((p) => [...p, { id: localId, role: "user", content: prompt + attachmentLabel, isNew: true }]);
+    const labels = files.map((f) => `📎 ${f.name}`).join("\n");
+    setMessages((p) => [...p, { id: localId, role: "user", content: `${prompt || "Please analyze the attached files."}\n\n${labels}`, isNew: true }]);
     try {
-      const form = new FormData();
-      form.append("source", files[0]);
-      if (files[1]) form.append("reference", files[1]);
-      form.append("prompt", prompt);
-      const res = await fetch("/api/pdf/edit", { method: "POST", body: form });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        throw new Error(data?.error || `PDF generation failed (HTTP ${res.status})`);
+      if (pdfEditIntent && pdfs.length <= 2 && files.length === pdfs.length) {
+        const form = new FormData();
+        form.append("source", pdfs[0]);
+        if (pdfs[1]) form.append("reference", pdfs[1]);
+        form.append("prompt", prompt);
+        const res = await fetch("/api/pdf/edit", { method: "POST", body: form });
+        if (!res.ok) { const data = await res.json().catch(() => null); throw new Error(data?.error || `PDF generation failed (HTTP ${res.status})`); }
+        const blob = await res.blob();
+        if (!blob.size) throw new Error("Generated PDF was empty");
+        const url = URL.createObjectURL(blob); const a = document.createElement("a");
+        a.href = url; a.download = pdfs[0].name.replace(/\.pdf$/i, "") + "-hajihaz-edited.pdf"; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        setMessages((p) => [...p, { id: uuid(), role: "assistant", content: `📄 **PDF ready.** I applied your instruction to **${pdfs[0].name}** and downloaded the generated PDF.`, isNew: true }]);
+        return;
       }
-      const blob = await res.blob();
-      if (!blob.size) throw new Error("Generated PDF was empty");
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = files[0].name.replace(/\.pdf$/i, "") + "-hajihaz-edited.pdf";
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setMessages((p) => [...p, { id: uuid(), role: "assistant", content: `📄 **PDF ready.** I applied your instruction to **${files[0].name}** and downloaded the generated PDF.`, isNew: true }]);
+
+      // Normal ChatGPT-style file analysis: ingest the files into the user's private knowledge scope,
+      // then immediately ask HajiHaz to use those newly indexed documents.
+      const images = files.filter((f) => /^image\/(jpeg|png|webp|gif)$/i.test(f.type) || /\.(jpe?g|png|webp|gif)$/i.test(f.name));
+      const docs = files.filter((f) => !images.includes(f));
+      if (images.length) {
+        const form = new FormData();
+        for (const image of images.slice(0, 4)) form.append("image", image);
+        form.append("prompt", prompt || "Analyze these images carefully and describe everything relevant.");
+        const res = await fetch("/api/chat/image", { method: "POST", body: form });
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(data?.error || `Image analysis failed (HTTP ${res.status})`);
+        setMessages((p) => [...p, { id: uuid(), role: "assistant", content: data.text, isNew: true }]);
+      }
+      if (docs.length) {
+        const uploaded: string[] = [];
+        for (const file of docs) {
+          const form = new FormData();
+          form.append("file", file);
+          form.append("title", file.name);
+          const res = await fetch("/api/knowledge/upload", { method: "POST", body: form });
+          if (!res.ok) { const data = await res.json().catch(() => null); throw new Error(data?.error || `Couldn't upload ${file.name} (HTTP ${res.status})`); }
+          uploaded.push(file.name);
+        }
+        const attachmentPrompt = `${prompt || "Analyze the attached files and summarize the most important information."}\n\nUse these newly attached files as the primary source for this response: ${uploaded.join(", ")}. If the request asks for facts from the files, distinguish file content from general knowledge.`;
+        const localUser = uuid();
+        setMessages((p) => [...p, { id: localUser, role: "user", content: attachmentPrompt, isNew: true }]);
+        await runChat(attachmentPrompt, { userLocalId: localUser });
+      }
     } catch (error) {
-      setMessages((p) => [...p, { id: uuid(), role: "assistant", content: `⚠️ ${error instanceof Error ? error.message : "PDF generation failed. Please try again."}`, error: true, isNew: true }]);
+      setMessages((p) => [...p, { id: uuid(), role: "assistant", content: `⚠️ ${error instanceof Error ? error.message : "File processing failed. Please try again."}`, error: true, isNew: true }]);
     } finally {
-      setSending(false);
-      setIsGenerating(false);
-      generatingRef.current = false;
+      setSending(false); setIsGenerating(false); generatingRef.current = false;
     }
   }
 
