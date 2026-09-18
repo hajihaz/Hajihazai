@@ -7,6 +7,7 @@ import {
   Copy,
   ImagePlus,
   ExternalLink,
+  FilePenLine,
   RotateCw,
   Send,
   Square,
@@ -54,6 +55,7 @@ const Chat = memo(function Chat({
   onSelectBrain,
   onSetBrainMode,
   onOpenImageGenerator,
+  onOpenPdfStudio,
 }: {
   messages: Msg[];
   conversationId: string | null;
@@ -77,6 +79,7 @@ const Chat = memo(function Chat({
   onSelectBrain: (id: string | null) => void;
   onSetBrainMode: (mode: BrainMode) => void;
   onOpenImageGenerator: () => void;
+  onOpenPdfStudio: () => void;
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -468,6 +471,15 @@ const Chat = memo(function Chat({
               onChange={setInput}
               disabled={isGenerating || sending}
             />
+            <button
+              type="button"
+              onClick={onOpenPdfStudio}
+              aria-label="Edit or create PDF"
+              title="Edit or create PDF"
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <FilePenLine className="size-4" />
+            </button>
             <button
               type="button"
               onClick={onOpenImageGenerator}

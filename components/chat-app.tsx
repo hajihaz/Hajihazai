@@ -8,6 +8,7 @@ import Modal from "./modal";
 import ProfileMenu from "./profile-menu";
 import type { BrainOption, BrainMode } from "./brain-selector";
 import ImageGenerator from "./image-generator";
+import PdfStudio from "./pdf-studio";
 
 type Conv = { id: string; title: string; updatedAt?: string | null };
 type Proj = { id: string; name: string; isSystem?: boolean };
@@ -124,6 +125,7 @@ export default function ChatApp({
   const [debug, setDebug] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
+  const [pdfStudioOpen, setPdfStudioOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   // Synchronous concurrency guard — React state lags a frame, so a ref is what
   // actually blocks a second send while a response is still generating.
@@ -971,11 +973,13 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           brainMode={brainMode}
           onSelectBrain={handleSelectBrain}
           onSetBrainMode={handleSetBrainMode}
+          onOpenPdfStudio={() => setPdfStudioOpen(true)}
           onOpenImageGenerator={() => {
             console.log("IMAGE_OPEN_CLICK");
             setImageGeneratorOpen(true);
           }}
         />
+        <PdfStudio open={pdfStudioOpen} onClose={() => setPdfStudioOpen(false)} />
         <ImageGenerator
           open={imageGeneratorOpen}
           onClose={() => setImageGeneratorOpen(false)}
