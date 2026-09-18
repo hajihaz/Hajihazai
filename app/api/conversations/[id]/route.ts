@@ -1,9 +1,14 @@
 import { auth } from "@/auth";
-import { deleteConversation, renameConversation } from "@/lib/db/queries";
+import { deleteConversation, renameConversation, getConversation } from "@/lib/db/queries";
+import { db } from "@/lib/db";
+import { conversations } from "@/lib/db/schema";
+import { and, eq } from "drizzle-orm";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
 
 const TITLE_MAX = 120;
+
+export const dynamic = "force-dynamic";
 
 /** Rename a conversation: { title }. Ownership-enforced. */
 export async function PATCH(
@@ -22,6 +27,12 @@ export async function PATCH(
   if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
+  if (typeof body?.archived === "boolean") {
+    const current = await getConversation(session.user.id, id);
+    if (!current) return new Response("Not found", { status: 404 });
+    const [updated] = await db.update(conversations).set({ archived: body.archived, updatedAt: new Date() }).where(and(eq(conversations.id, id), eq(conversations.userId, session.user.id))).returning({ id: conversations.id, archived: conversations.archived });
+    return Response.json(updated);
+  }
   const raw = typeof body?.title === "string" ? body.title.trim() : "";
   if (!raw) return new Response("title is required", { status: 400 });
   const title = raw.slice(0, TITLE_MAX);

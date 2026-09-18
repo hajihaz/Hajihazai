@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bug, Download, Menu, PlusCircle } from "lucide-react";
+import { Bug, Download, Menu, PlusCircle, Share2 } from "lucide-react";
 import Sidebar from "./sidebar";
 import Chat from "./chat";
 import Modal from "./modal";
@@ -9,7 +9,7 @@ import ProfileMenu from "./profile-menu";
 import type { BrainOption, BrainMode } from "./brain-selector";
 import ImageGenerator from "./image-generator";
 
-type Conv = { id: string; title: string; updatedAt?: string | null };
+type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean };
 type Proj = { id: string; name: string; isSystem?: boolean };
 type LevelOption = {
   level: string;
@@ -423,6 +423,18 @@ export default function ChatApp({
     [conversations, notify],
   );
 
+  const shareConversation = useCallback(async () => {
+    if (!activeId) return;
+    try {
+      const res = await fetch(`/api/conversations/${activeId}/share`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.url) { notify(data?.error ?? "Couldn't create share link"); return; }
+      const url = new URL(data.url, window.location.origin).toString();
+      await navigator.clipboard.writeText(url);
+      notify("Share link copied");
+    } catch { notify("Couldn't create share link"); }
+  }, [activeId, notify]);
+
   function exportConversation(format: "md" | "txt" | "pdf") {
     if (!activeId || messages.length === 0) return;
     setIsExportOpen(false);
@@ -481,6 +493,16 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
 
   /* ── message actions ── */
 
+  const archiveConversation = useCallback(async (id: string, archived: boolean) => {
+    try {
+      const res = await fetch(`/api/conversations/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ archived }) });
+      if (!res.ok) { notify("Couldn't update the chat"); return; }
+      setConversations((p) => p.map((c) => c.id === id ? { ...c, archived } : c).filter((c) => !c.archived));
+      if (archived && activeId === id) { setActiveId(null); setMessages([]); }
+      notify(archived ? "Chat archived" : "Chat restored");
+    } catch { notify("Couldn't update the chat"); }
+  }, [activeId, notify]);
+
   const copyMessage = useCallback(
     async (text: string) => {
       try {
@@ -514,6 +536,20 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     },
     [notify],
   );
+
+  const editMessage = useCallback(async (msg: Msg) => {
+    if (msg.role !== "user" || !msg.dbId || generatingRef.current) return;
+    const next = window.prompt("Edit your message", msg.content);
+    if (next === null || !next.trim() || next.trim() === msg.content.trim()) return;
+    try {
+      const res = await fetch(`/api/messages/${msg.dbId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ content: next.trim() }) });
+      if (!res.ok) { notify("Couldn't edit the message"); return; }
+      const idx = messages.findIndex((m) => m.id === msg.id);
+      if (idx < 0) return;
+      setMessages((p) => [...p.slice(0, idx), { ...msg, content: next.trim() }]);
+      void runChat(next.trim(), { regenerate: true, regenerateUserMessageId: msg.dbId });
+    } catch { notify("Couldn't edit the message"); }
+  }, [messages, notify]);
 
   function retryMessage(msg: Msg) {
     if (msg.error) {
@@ -870,6 +906,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           setPendingDelete(conversations.find((c) => c.id === id) ?? null)
         }
         onRename={handleRename}
+        onArchive={archiveConversation}
         onToast={notify}
         open={sidebarOpen}
         onClose={handleSidebarClose}
@@ -927,6 +964,12 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
                 }`}
               >
                 <Bug className="size-4" />
+              </button>
+            ) : null}
+
+            {activeId && messages.length > 0 ? (
+              <button type="button" onClick={() => void shareConversation()} aria-label="Share conversation" title="Share conversation" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
+                <Share2 className="size-4" />
               </button>
             ) : null}
 
@@ -999,6 +1042,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           onCopy={copyMessage}
           onDelete={deleteMessage}
           onRetry={retryMessage}
+          onEdit={editMessage}
           onStop={stopGeneration}
           sending={sending}
           isGenerating={isGenerating}

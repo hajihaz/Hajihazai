@@ -200,6 +200,27 @@ export async function setMessageFeedback(
  * Delete a single message the user owns (message → conversation → user).
  * Returns false if the message doesn't exist or belongs to another user.
  */
+export async function updateOwnedMessage(userId: string, messageId: string, content: string) {
+  const owned = await getMessage(userId, messageId);
+  if (!owned || owned.role !== "user") return null;
+  const [row] = await db.update(messages).set({ content }).where(eq(messages.id, messageId)).returning();
+  return row ?? null;
+}
+
+export async function deleteMessagesAfter(userId: string, messageId: string) {
+  const target = await getMessage(userId, messageId);
+  if (!target) return false;
+  const rows = await db.select({ id: messages.id, createdAt: messages.createdAt }).from(messages)
+    .where(eq(messages.conversationId, target.conversationId)).orderBy(asc(messages.createdAt));
+  const idx = rows.findIndex((r) => r.id === messageId);
+  if (idx < 0) return false;
+  const ids = rows.slice(idx + 1).map((r) => r.id);
+  if (ids.length) {
+    for (const id of ids) await db.delete(messages).where(eq(messages.id, id));
+  }
+  return true;
+}
+
 export async function deleteMessage(userId: string, messageId: string) {
   const [owned] = await db
     .select({ id: messages.id })

@@ -4,6 +4,8 @@ import Image from "next/image";
 
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Archive,
+  ArchiveRestore,
   Brain,
   ChevronRight,
   Folder,
@@ -18,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 
-type Conv = { id: string; title: string; updatedAt?: string | null };
+type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean };
 type Proj = { id: string; name: string; isSystem?: boolean };
 type BrainEntry = { id: string; name: string; slug: string; icon: string; color: string };
 
@@ -85,6 +87,7 @@ function ConvRow({
   onCancelRename,
   onStartRename,
   onTogglePin,
+  onArchive,
   onSelect,
   onDelete,
 }: {
@@ -99,6 +102,7 @@ function ConvRow({
   onCancelRename: () => void;
   onStartRename: () => void;
   onTogglePin: () => void;
+  onArchive: () => void;
   onSelect: () => void;
   onDelete: () => void;
 }) {
@@ -140,6 +144,9 @@ function ConvRow({
           >
             {isPinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
           </button>
+          <button onClick={(e) => { e.stopPropagation(); onArchive(); }} aria-label={c.archived ? "Unarchive conversation" : "Archive conversation"} title={c.archived ? "Unarchive" : "Archive"} className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground md:opacity-0 md:transition md:group-hover:opacity-100">
+            {c.archived ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
+          </button>
           <button
             onClick={(e) => { e.stopPropagation(); onStartRename(); }}
             aria-label="Rename conversation"
@@ -172,6 +179,7 @@ const Sidebar = memo(function Sidebar({
   onNewProject,
   onDelete,
   onRename,
+  onArchive,
   onToast,
   open,
   onClose,
@@ -186,6 +194,7 @@ const Sidebar = memo(function Sidebar({
   onNewProject: () => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
+  onArchive: (id: string, archived: boolean) => void;
   onToast: (msg: string) => void;
   open: boolean;
   onClose: () => void;
@@ -537,6 +546,7 @@ const Sidebar = memo(function Sidebar({
                           onCancelRename={cancelRename}
                           onStartRename={() => startRename(c)}
                           onTogglePin={() => togglePin(c.id)}
+                          onArchive={() => onArchive(c.id, !c.archived)}
                           onSelect={() => onSelect(c.id)}
                           onDelete={() => onDelete(c.id)}
                         />
@@ -567,6 +577,7 @@ const Sidebar = memo(function Sidebar({
                         onCancelRename={cancelRename}
                         onStartRename={() => startRename(c)}
                         onTogglePin={() => togglePin(c.id)}
+                        onArchive={() => onArchive(c.id, !c.archived)}
                         onSelect={() => onSelect(c.id)}
                         onDelete={() => onDelete(c.id)}
                       />
@@ -595,6 +606,7 @@ const Sidebar = memo(function Sidebar({
                             onCancelRename={cancelRename}
                             onStartRename={() => startRename(c)}
                             onTogglePin={() => togglePin(c.id)}
+                            onArchive={() => onArchive(c.id, !c.archived)}
                             onSelect={() => onSelect(c.id)}
                             onDelete={() => onDelete(c.id)}
                           />

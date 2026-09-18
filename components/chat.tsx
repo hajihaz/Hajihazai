@@ -10,6 +10,7 @@ import {
   Paperclip,
   X,
   RotateCw,
+  Pencil,
   Send,
   Square,
   ThumbsDown,
@@ -44,6 +45,7 @@ const Chat = memo(function Chat({
   onCopy,
   onDelete,
   onRetry,
+  onEdit,
   onStop,
   sending,
   isGenerating,
@@ -67,6 +69,7 @@ const Chat = memo(function Chat({
   onCopy: (text: string) => void;
   onDelete: (msg: Msg) => void;
   onRetry: (msg: Msg) => void;
+  onEdit: (msg: Msg) => void;
   onStop: () => void;
   sending: boolean;
   isGenerating: boolean;
@@ -309,6 +312,12 @@ const Chat = memo(function Chat({
                           >
                             <Copy className="size-3.5" />
                           </ActionButton>
+
+                          {m.role === "user" ? (
+                            <ActionButton label="Edit" onClick={() => onEdit(m)}>
+                              <Pencil className="size-3.5" />
+                            </ActionButton>
+                          ) : null}
 
                           {m.role === "assistant" ? (
                             <ActionButton

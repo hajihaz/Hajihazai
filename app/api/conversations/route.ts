@@ -18,6 +18,7 @@ export async function GET() {
       id: c.id,
       title: c.title,
       projectId: c.projectId,
+      archived: c.archived,
       updatedAt: c.updatedAt?.toISOString() ?? null,
     })),
   });
