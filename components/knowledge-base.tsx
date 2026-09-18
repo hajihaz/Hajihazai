@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { BookOpen, FileText, Plus, Trash2, X } from "lucide-react";
 
-type SourceType = "pdf" | "text" | "website" | "note";
+type SourceType = "pdf" | "text" | "website" | "note" | "image";
 type DocStatus = "processing" | "active" | "failed";
 type Doc = {
   id: string;
