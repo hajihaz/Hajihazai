@@ -8,6 +8,7 @@ import Modal from "./modal";
 import ProfileMenu from "./profile-menu";
 import type { BrainOption, BrainMode } from "./brain-selector";
 import ImageGenerator from "./image-generator";
+import CanvasWorkspace from "./canvas-workspace";
 
 type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean };
 type Proj = { id: string; name: string; isSystem?: boolean };
@@ -138,6 +139,7 @@ export default function ChatApp({
   const [debug, setDebug] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
+  const [canvasOpen, setCanvasOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   // Synchronous concurrency guard — React state lags a frame, so a ref is what
   // actually blocks a second send while a response is still generating.
@@ -1041,6 +1043,12 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
               </button>
             ) : null}
 
+            {messages.length > 0 ? (
+              <button type="button" onClick={() => setCanvasOpen(true)} aria-label="Open canvas" title="Open canvas" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
+                <span className="text-xs font-semibold">C</span>
+              </button>
+            ) : null}
+
             {/* Export button — only when there's a conversation with messages */}
             {activeId && messages.length > 0 ? (
               <div className="relative">
@@ -1130,6 +1138,12 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
         <ImageGenerator
           open={imageGeneratorOpen}
           onClose={() => setImageGeneratorOpen(false)}
+        />
+        <CanvasWorkspace
+          open={canvasOpen}
+          conversationId={activeId}
+          messages={messages}
+          onClose={() => setCanvasOpen(false)}
         />
       </div>
 
