@@ -5,7 +5,6 @@ import Image from "next/image";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
-  ArchiveRestore,
   Brain,
   ChevronRight,
   Folder,
@@ -144,8 +143,8 @@ function ConvRow({
           >
             {isPinned ? <PinOff className="size-3.5" /> : <Pin className="size-3.5" />}
           </button>
-          <button onClick={(e) => { e.stopPropagation(); onArchive(); }} aria-label={c.archived ? "Unarchive conversation" : "Archive conversation"} title={c.archived ? "Unarchive" : "Archive"} className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground md:opacity-0 md:transition md:group-hover:opacity-100">
-            {c.archived ? <ArchiveRestore className="size-3.5" /> : <Archive className="size-3.5" />}
+          <button onClick={(e) => { e.stopPropagation(); onArchive(); }} aria-label="Archive conversation" title="Archive" className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:text-foreground md:opacity-0 md:transition md:group-hover:opacity-100">
+            <Archive className="size-3.5" />
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onStartRename(); }}

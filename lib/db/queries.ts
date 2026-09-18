@@ -10,7 +10,7 @@ export async function listConversations(userId: string) {
   return db
     .select()
     .from(conversations)
-    .where(eq(conversations.userId, userId))
+    .where(and(eq(conversations.userId, userId), eq(conversations.archived, false)))
     .orderBy(desc(conversations.updatedAt))
     .limit(200);
 }
@@ -39,6 +39,7 @@ export async function listProjectConversations(
       and(
         eq(conversations.userId, userId),
         eq(conversations.projectId, projectId),
+        eq(conversations.archived, false),
       ),
     )
     .orderBy(desc(conversations.updatedAt))
