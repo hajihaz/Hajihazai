@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/automations",
-      "schedule": "* * * * *"
+      "schedule": "17 3 * * *"
     },
     {
       "path": "/api/cron/db-maintenance",
