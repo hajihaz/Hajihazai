@@ -449,6 +449,18 @@ export default function ChatApp({
     [conversations, notify],
   );
 
+  const branchMessage = useCallback(async (msg: Msg) => {
+    if (!activeId) return;
+    try {
+      const res = await fetch(`/api/conversations/${activeId}/branch`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messageId: msg.id }) });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.id) { notify(data?.error ?? "Couldn't branch from this message"); return; }
+      setConversations((p) => [{ id: data.id, title: data.title, projectId: data.projectId }, ...p]);
+      await openConversation(data.id);
+      notify("Message branch created");
+    } catch { notify("Couldn't branch from this message"); }
+  }, [activeId, notify, openConversation]);
+
   const branchConversation = useCallback(async () => {
     if (!activeId) return;
     try {
@@ -1147,6 +1159,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           onDelete={deleteMessage}
           onRetry={retryMessage}
           onEdit={editMessage}
+          onBranchMessage={branchMessage}
           onStop={stopGeneration}
           sending={sending}
           isGenerating={isGenerating}

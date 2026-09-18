@@ -14,10 +14,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const oversized = rejectOversizedBody(req, 16_384);
   if (oversized) return oversized;
   const { id } = await params;
+  const body = await req.json().catch(() => null);
+  const requestedMessageId = typeof body?.messageId === "string" ? body.messageId : null;
   const source = await getConversation(session.user.id, id);
   if (!source) return new Response("Not found", { status: 404 });
-  const sourceMessages = (await listMessages(id)).slice(0, MAX_MESSAGES);
-  const branchTitle = `Branch: ${source.title}`.slice(0, 120);
+  const allMessages = await listMessages(id);
+  const sourceMessages = requestedMessageId
+    ? (() => { const index = allMessages.findIndex((m) => m.id === requestedMessageId); return index >= 0 ? allMessages.slice(0, index + 1) : null; })()
+    : allMessages.slice(0, MAX_MESSAGES);
+  if (!sourceMessages) return new Response("Message not found", { status: 404 });
+  const branchTitle = `${requestedMessageId ? "Branch from message" : "Branch"}: ${source.title}`.slice(0, 120);
   const branch = await createConversation(session.user.id, branchTitle, source.projectId);
   for (const message of sourceMessages) {
     if (!message.content || message.content.length > MAX_CONTENT) continue;

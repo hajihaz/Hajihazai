@@ -11,6 +11,7 @@ import {
   X,
   RotateCw,
   Pencil,
+  GitFork,
   Send,
   Square,
   ThumbsDown,
@@ -47,6 +48,7 @@ const Chat = memo(function Chat({
   onDelete,
   onRetry,
   onEdit,
+  onBranchMessage,
   onStop,
   sending,
   isGenerating,
@@ -72,6 +74,7 @@ const Chat = memo(function Chat({
   onDelete: (msg: Msg) => void;
   onRetry: (msg: Msg) => void;
   onEdit: (msg: Msg) => void;
+  onBranchMessage: (msg: Msg) => void;
   onStop: () => void;
   sending: boolean;
   isGenerating: boolean;
@@ -325,6 +328,12 @@ const Chat = memo(function Chat({
                           {m.role === "user" ? (
                             <ActionButton label="Edit" onClick={() => onEdit(m)}>
                               <Pencil className="size-3.5" />
+                            </ActionButton>
+                          ) : null}
+
+                          {m.role === "assistant" && !m.error ? (
+                            <ActionButton label="Branch from here" onClick={() => onBranchMessage(m)}>
+                              <GitFork className="size-3.5" />
                             </ActionButton>
                           ) : null}
 
