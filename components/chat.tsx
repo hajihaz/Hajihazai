@@ -89,6 +89,7 @@ const Chat = memo(function Chat({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [isDragOver, setIsDragOver] = useState(false);
   // True while WE are programmatically scrolling, so the scroll handler doesn't
   // mistake our own auto-scroll for the user scrolling away from the bottom.
   const suppressScrollRef = useRef(false);
@@ -460,7 +461,17 @@ const Chat = memo(function Chat({
         )}
 
         <div className="p-3 pb-safe sm:p-4">
-          <div className="mx-auto max-w-3xl">
+          <div
+            className={`mx-auto max-w-3xl rounded-2xl transition ${isDragOver ? "ring-2 ring-primary/50" : ""}`}
+            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault(); setIsDragOver(false);
+              const dropped = Array.from(e.dataTransfer.files ?? []).filter((f) => /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i.test(f.name));
+              setAttachmentFiles((current) => [...current, ...dropped].slice(0, 5));
+            }}
+          >
+            {isDragOver ? <div className="mb-2 rounded-xl border border-dashed bg-accent/60 px-3 py-2 text-center text-xs font-medium text-muted-foreground">Drop files to attach</div> : null}
             {attachmentFiles.length > 0 ? (
               <div className="mb-2 flex flex-wrap gap-2" aria-label="Attached files">
                 {attachmentFiles.map((file, index) => (
@@ -486,6 +497,10 @@ const Chat = memo(function Chat({
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
+              onPaste={(e) => {
+                const images = Array.from(e.clipboardData.files ?? []).filter((f) => /^image\/(jpeg|png|webp|gif)$/i.test(f.type));
+                if (images.length) setAttachmentFiles((current) => [...current, ...images].slice(0, 5));
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
