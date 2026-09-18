@@ -497,8 +497,13 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     try {
       const res = await fetch(`/api/conversations/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ archived }) });
       if (!res.ok) { notify("Couldn't update the chat"); return; }
-      setConversations((p) => archived ? p.filter((c) => c.id !== id) : p);
-      if (archived && activeId === id) { setActiveId(null); setMessages([]); }
+      if (archived) {
+        setConversations((p) => p.filter((c) => c.id !== id));
+        if (activeId === id) { setActiveId(null); setMessages([]); }
+      } else {
+        const list = await fetch("/api/conversations").then((r) => r.ok ? r.json() : null).catch(() => null);
+        if (Array.isArray(list?.conversations)) setConversations(list.conversations);
+      }
       notify(archived ? "Chat archived" : "Chat restored");
     } catch { notify("Couldn't update the chat"); }
   }, [activeId, notify]);

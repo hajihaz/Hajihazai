@@ -5,6 +5,7 @@ import Image from "next/image";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
+  ArchiveRestore,
   Brain,
   ChevronRight,
   Folder,
@@ -201,6 +202,9 @@ const Sidebar = memo(function Sidebar({
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [projectChats, setProjectChats] = useState<Record<string, Conv[]>>({});
+  const [showArchived, setShowArchived] = useState(false);
+  const [archivedChats, setArchivedChats] = useState<Conv[]>([]);
+  const [loadingArchived, setLoadingArchived] = useState(false);
   const [loadingProj, setLoadingProj] = useState<string | null>(null);
   const { collapsed, toggle: toggleSection } = useSectionCollapse();
 
@@ -262,6 +266,27 @@ const Sidebar = memo(function Sidebar({
         setLoadingProj(null);
       }
     }
+  }
+
+  async function toggleArchivedView() {
+    const next = !showArchived;
+    setShowArchived(next);
+    if (!next || archivedChats.length) return;
+    setLoadingArchived(true);
+    try {
+      const res = await fetch("/api/conversations?archived=true");
+      if (!res.ok) throw new Error("load failed");
+      const data = await res.json();
+      setArchivedChats(Array.isArray(data.conversations) ? data.conversations : []);
+    } catch {
+      onToast("Couldn't load archived chats");
+    } finally { setLoadingArchived(false); }
+  }
+
+  function handleArchive(id: string, archived: boolean) {
+    onArchive(id, archived);
+    if (archived) setArchivedChats((prev) => prev.filter((c) => c.id !== id));
+    else setArchivedChats((prev) => prev.filter((c) => c.id !== id));
   }
 
   function togglePin(id: string) {
@@ -503,6 +528,44 @@ const Sidebar = memo(function Sidebar({
             </>
           )}
 
+          {/* Archived Chats */}
+          <div className="mb-2 px-1">
+            <button
+              onClick={toggleArchivedView}
+              className={`flex min-h-9 w-full items-center gap-2 rounded-lg px-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground ${showArchived ? "bg-accent/60 text-foreground" : ""}`}
+              aria-expanded={showArchived}
+              aria-label="Archived chats"
+            >
+              {showArchived ? <ArchiveRestore className="size-4" /> : <Archive className="size-4" />}
+              <span>Archived</span>
+              {loadingArchived ? <span className="ml-auto text-[11px]">Loading…</span> : archivedChats.length > 0 ? <span className="ml-auto text-[11px] tabular-nums text-muted-foreground">{archivedChats.length}</span> : null}
+            </button>
+            {showArchived ? (
+              <div className="mt-1 space-y-1">
+                {archivedChats.length === 0 && !loadingArchived ? <p className="px-3 py-3 text-xs text-muted-foreground">No archived chats.</p> : null}
+                {archivedChats.map((c) => (
+                  <ConvRow
+                    key={c.id}
+                    c={c}
+                    isPinned={false}
+                    isActive={activeId === c.id}
+                    isRenaming={false}
+                    renameValue=""
+                    renameInputRef={renameInputRef}
+                    onRenameChange={() => {}}
+                    onCommitRename={() => {}}
+                    onCancelRename={() => {}}
+                    onStartRename={() => {}}
+                    onTogglePin={() => {}}
+                    onArchive={() => handleArchive(c.id, false)}
+                    onSelect={() => { onSelect(c.id); onClose(); }}
+                    onDelete={() => { onDelete(c.id); setArchivedChats((prev) => prev.filter((x) => x.id !== c.id)); }}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </div>
+
           {/* Recent Chats */}
           <div className="mb-1 flex items-center px-2 pt-1">
             <button
@@ -545,7 +608,7 @@ const Sidebar = memo(function Sidebar({
                           onCancelRename={cancelRename}
                           onStartRename={() => startRename(c)}
                           onTogglePin={() => togglePin(c.id)}
-                          onArchive={() => onArchive(c.id, !c.archived)}
+                          onArchive={() => handleArchive(c.id, !c.archived)}
                           onSelect={() => onSelect(c.id)}
                           onDelete={() => onDelete(c.id)}
                         />
@@ -576,7 +639,7 @@ const Sidebar = memo(function Sidebar({
                         onCancelRename={cancelRename}
                         onStartRename={() => startRename(c)}
                         onTogglePin={() => togglePin(c.id)}
-                        onArchive={() => onArchive(c.id, !c.archived)}
+                        onArchive={() => handleArchive(c.id, !c.archived)}
                         onSelect={() => onSelect(c.id)}
                         onDelete={() => onDelete(c.id)}
                       />
@@ -605,7 +668,7 @@ const Sidebar = memo(function Sidebar({
                             onCancelRename={cancelRename}
                             onStartRename={() => startRename(c)}
                             onTogglePin={() => togglePin(c.id)}
-                            onArchive={() => onArchive(c.id, !c.archived)}
+                            onArchive={() => handleArchive(c.id, !c.archived)}
                             onSelect={() => onSelect(c.id)}
                             onDelete={() => onDelete(c.id)}
                           />

@@ -4,7 +4,7 @@ import { getProject } from "@/lib/db/project-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
@@ -12,7 +12,8 @@ export async function GET() {
   const readLimited = await rateLimitResponse(`conversations-read:${session.user.id}`, 120, 60_000);
   if (readLimited) return readLimited;
 
-  const rows = await listConversations(session.user.id);
+  const archivedOnly = new URL(req.url).searchParams.get("archived") === "true";
+  const rows = await listConversations(session.user.id, archivedOnly);
   return Response.json({
     conversations: rows.map((c) => ({
       id: c.id,

@@ -6,11 +6,11 @@ const PROJECT_LIST_LIMIT = 200;
 
 /* ----------------------------- Conversations ----------------------------- */
 
-export async function listConversations(userId: string) {
+export async function listConversations(userId: string, archivedOnly = false) {
   return db
     .select()
     .from(conversations)
-    .where(and(eq(conversations.userId, userId), eq(conversations.archived, false)))
+    .where(and(eq(conversations.userId, userId), eq(conversations.archived, archivedOnly)))
     .orderBy(desc(conversations.updatedAt))
     .limit(200);
 }
