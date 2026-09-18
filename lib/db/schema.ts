@@ -102,6 +102,8 @@ export const conversations = pgTable(
     // Personality foundation: which persona is active (default = Haji).
     personaId: text("personaId").notNull().default("haji"),
     archived: boolean("archived").notNull().default(false),
+    pinned: boolean("pinned").notNull().default(false),
+    intelligenceLevel: text("intelligence_level").notNull().default("medium"),
     createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
   },
@@ -233,6 +235,7 @@ export const knowledgeSourceType = pgEnum("knowledge_source_type", [
   "text",
   "website",
   "note",
+  "image",
 ]);
 
 export const knowledgeStatus = pgEnum("knowledge_status", [
@@ -268,6 +271,12 @@ export const knowledgeDocument = pgTable(
     visibility: knowledgeVisibility("visibility").notNull().default("private"),
     createdAt: timestamp("createdAt", { mode: "date" }).notNull().defaultNow(),
     updatedAt: timestamp("updatedAt", { mode: "date" }).notNull().defaultNow(),
+    // Stable file identity/metadata for the persistent File Library.
+    originalName: text("original_name"),
+    mimeType: text("mime_type"),
+    byteSize: integer("byte_size"),
+    // Image bytes are stored only when an image needs stable browser preview.
+    fileData: text("file_data"),
   },
   (t) => [
     index("knowledge_document_user_idx").on(t.userId),
@@ -362,6 +371,61 @@ export const knowledgeChunkRelations = relations(knowledgeChunk, ({ one }) => ({
 
 export type KnowledgeChunk = typeof knowledgeChunk.$inferSelect;
 export type NewKnowledgeChunk = typeof knowledgeChunk.$inferInsert;
+
+
+/* ------------------------------------------------------------------ */
+/* Platform — conversation resources and persistent artifacts          */
+/* ------------------------------------------------------------------ */
+
+export const conversationAttachments = pgTable(
+  "conversation_attachment",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    conversationId: text("conversation_id").notNull().references(() => conversations.id, { onDelete: "cascade" }),
+    documentId: text("document_id").notNull().references(() => knowledgeDocument.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("conversation_attachment_unique_idx").on(t.conversationId, t.documentId),
+    index("conversation_attachment_conversation_idx").on(t.conversationId),
+    index("conversation_attachment_user_idx").on(t.userId),
+  ],
+);
+
+export type ConversationAttachment = typeof conversationAttachments.$inferSelect;
+export type NewConversationAttachment = typeof conversationAttachments.$inferInsert;
+
+export const artifacts = pgTable(
+  "artifact",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    conversationId: text("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    title: text("title").notNull().default("Untitled artifact"),
+    content: text("content").notNull().default(""),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("artifact_user_idx").on(t.userId), index("artifact_conversation_idx").on(t.conversationId)],
+);
+
+export const artifactVersions = pgTable(
+  "artifact_version",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    artifactId: text("artifact_id").notNull().references(() => artifacts.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [index("artifact_version_artifact_idx").on(t.artifactId, t.createdAt)],
+);
+
+export type Artifact = typeof artifacts.$inferSelect;
+export type NewArtifact = typeof artifacts.$inferInsert;
+export type ArtifactVersion = typeof artifactVersions.$inferSelect;
 
 /* ------------------------------------------------------------------ */
 /* Phase 8.3 — Tool invocation audit                                   */

@@ -1,8 +1,8 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ilike } from "drizzle-orm";
 import { db } from "./index";
 import { knowledgeDocument } from "./schema";
 
-type SourceType = "pdf" | "text" | "website" | "note";
+type SourceType = "pdf" | "text" | "website" | "note" | "image";
 type DocStatus = "processing" | "active" | "failed";
 type DocVisibility = "private" | "global";
 
@@ -99,5 +99,19 @@ export async function deleteDocument(userId: string, id: string) {
       and(eq(knowledgeDocument.id, id), eq(knowledgeDocument.userId, userId)),
     )
     .returning();
+  return row ?? null;
+}
+
+
+export async function searchDocuments(userId: string, query: string) {
+  const term = `%${query.trim()}%`;
+  return db.select().from(knowledgeDocument)
+    .where(and(eq(knowledgeDocument.userId, userId), ilike(knowledgeDocument.title, term)))
+    .orderBy(desc(knowledgeDocument.updatedAt)).limit(DOCUMENT_LIST_LIMIT);
+}
+
+export async function updateDocumentFileMetadata(userId: string, id: string, input: { originalName: string; mimeType: string; byteSize: number; fileData?: string | null }) {
+  const [row] = await db.update(knowledgeDocument).set({ ...input, updatedAt: new Date() })
+    .where(and(eq(knowledgeDocument.id, id), eq(knowledgeDocument.userId, userId))).returning();
   return row ?? null;
 }

@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { deleteDocument, getDocument } from "@/lib/db/knowledge-queries";
+import { getContent } from "@/lib/db/knowledge-content-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { rateLimitResponse } from "@/lib/ratelimit";
 
@@ -21,7 +22,8 @@ export async function GET(
   if (!document) {
     return new Response("Not found", { status: 404 });
   }
-  return Response.json({ document }, { headers: PRIVATE_NO_STORE });
+  const content = await getContent(session.user.id, id);
+  return Response.json({ document, preview: { content: content?.content ?? null, dataUrl: document.fileData ? `data:${document.mimeType ?? "application/octet-stream"};base64,${document.fileData}` : null } }, { headers: PRIVATE_NO_STORE });
 }
 
 export async function DELETE(

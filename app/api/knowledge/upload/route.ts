@@ -24,9 +24,10 @@ export async function POST(req: Request) {
   if (file.size > MAX_UPLOAD_BYTES) {
     return Response.json({ error: "File exceeds the 5MB limit" }, { status: 413 });
   }
-  if (!isSupportedExt(extFromName(file.name))) {
+  const imageUpload = /\.(jpe?g|png|webp|gif)$/i.test(file.name) || /^image\/(jpeg|png|webp|gif)$/i.test(file.type);
+  if (!imageUpload && !isSupportedExt(extFromName(file.name))) {
     return Response.json(
-      { error: "Unsupported file type. Allowed: PDF, DOCX, TXT, and MD" },
+      { error: "Unsupported file type. Allowed: PDF, DOCX, TXT, MD, JPEG, PNG, WebP, GIF" },
       { status: 400 },
     );
   }
@@ -44,6 +45,7 @@ export async function POST(req: Request) {
     buffer,
     projectId,
     title,
+    mimeType: file.type,
   });
   if (!result.ok) return Response.json({ error: result.error }, { status: 400 });
 

@@ -58,6 +58,7 @@ const Chat = memo(function Chat({
   onSelectBrain,
   onSetBrainMode,
   onOpenImageGenerator,
+  onOpenFileLibrary,
 }: {
   messages: Msg[];
   conversationId: string | null;
@@ -82,6 +83,7 @@ const Chat = memo(function Chat({
   onSelectBrain: (id: string | null) => void;
   onSetBrainMode: (mode: BrainMode) => void;
   onOpenImageGenerator: () => void;
+  onOpenFileLibrary: () => void;
 }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -570,6 +572,15 @@ const Chat = memo(function Chat({
               onChange={setInput}
               disabled={isGenerating || sending}
             />
+            <button
+              type="button"
+              onClick={onOpenFileLibrary}
+              aria-label="Attach from file library"
+              title="Attach from file library"
+              className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <Paperclip className="size-4" />
+            </button>
             <button
               type="button"
               onClick={() => attachmentInputRef.current?.click()}

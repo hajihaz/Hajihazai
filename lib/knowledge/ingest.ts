@@ -1,4 +1,4 @@
-import { createDocument, deleteDocument, updateDocumentStatus } from "@/lib/db/knowledge-queries";
+import { createDocument, deleteDocument, updateDocumentStatus, updateDocumentFileMetadata } from "@/lib/db/knowledge-queries";
 import { createContent } from "@/lib/db/knowledge-content-queries";
 import { createChunks } from "@/lib/db/knowledge-chunk-queries";
 import { chunkDocument } from "./chunk";
@@ -22,6 +22,7 @@ export async function ingestDocument(
     brainId?: string | null;
     title?: string;
     visibility?: "private" | "global";
+    mimeType?: string;
   },
 ): Promise<
   | { ok: true; documentId: string; chunks: number }
@@ -33,7 +34,8 @@ export async function ingestDocument(
   }
 
   const ext = extFromName(input.filename);
-  const extracted = await extractText(ext, input.buffer);
+  const isImage = /^(jpe?g|png|webp|gif)$/i.test(ext);
+  const extracted = isImage ? { ok: true as const, text: `[Image attachment: ${input.filename}]` } : await extractText(ext, input.buffer);
   if (!extracted.ok) return { ok: false, error: extracted.error };
 
   const text = extracted.text.trim();
@@ -41,7 +43,7 @@ export async function ingestDocument(
 
   const doc = await createDocument(userId, {
     title: input.title?.trim() || input.filename,
-    sourceType: ext === "pdf" ? "pdf" : "text",
+    sourceType: ext === "pdf" ? "pdf" : isImage ? "image" : "text",
     projectId: input.projectId ?? null,
     brainId: input.brainId ?? null,
     visibility: input.visibility ?? "private",
@@ -49,6 +51,11 @@ export async function ingestDocument(
   });
 
   try {
+    if (isImage) {
+      await updateDocumentFileMetadata(userId, doc.id, { originalName: input.filename, mimeType: input.mimeType ?? "application/octet-stream", byteSize: input.buffer.length, fileData: input.buffer.toString("base64") });
+    } else {
+      await updateDocumentFileMetadata(userId, doc.id, { originalName: input.filename, mimeType: input.mimeType ?? "application/octet-stream", byteSize: input.buffer.length });
+    }
     const content = await createContent(userId, doc.id, text);
     if (!content) throw new Error("failed to store document content");
     const chunks = chunkDocument(text);

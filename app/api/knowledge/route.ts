@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { createDocument, listDocuments } from "@/lib/db/knowledge-queries";
+import { createDocument, listDocuments, searchDocuments } from "@/lib/db/knowledge-queries";
 import { assertKnowledgeWritePermission } from "@/lib/knowledge/permissions";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
@@ -8,14 +8,15 @@ import { logKnowledgeAction } from "@/lib/knowledge/safety";
 const PRIVATE_NO_STORE = { "Cache-Control": "private, no-store" } as const;
 const SOURCE_TYPES = ["pdf", "text", "website", "note"] as const;
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
   }
   const limited = await rateLimitResponse(`knowledge-list:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
-  const documents = await listDocuments(session.user.id);
+  const query = new URL(req.url).searchParams.get("q")?.trim() ?? "";
+  const documents = query ? await searchDocuments(session.user.id, query) : await listDocuments(session.user.id);
   return Response.json({ documents }, { headers: PRIVATE_NO_STORE });
 }
 

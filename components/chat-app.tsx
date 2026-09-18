@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bug, Download, GitFork, Menu, PlusCircle, Share2 } from "lucide-react";
+import { Bug, Download, GitFork, Menu, PlusCircle, Share2, Paperclip } from "lucide-react";
 import Sidebar from "./sidebar";
 import Chat from "./chat";
 import Modal from "./modal";
@@ -9,6 +9,7 @@ import ProfileMenu from "./profile-menu";
 import type { BrainOption, BrainMode } from "./brain-selector";
 import ImageGenerator from "./image-generator";
 import CanvasWorkspace from "./canvas-workspace";
+import FileLibrary from "./file-library";
 
 type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean };
 type Proj = { id: string; name: string; isSystem?: boolean };
@@ -140,6 +141,8 @@ export default function ChatApp({
   const [isGenerating, setIsGenerating] = useState(false);
   const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
   const [canvasOpen, setCanvasOpen] = useState(false);
+  const [fileLibraryOpen, setFileLibraryOpen] = useState(false);
+  const [attachments, setAttachments] = useState<Array<{id:string;documentId:string;title:string;originalName?:string|null;mimeType?:string|null;byteSize?:number|null}>>([]);
   const abortRef = useRef<AbortController | null>(null);
   // Synchronous concurrency guard — React state lags a frame, so a ref is what
   // actually blocks a second send while a response is still generating.
@@ -364,6 +367,8 @@ export default function ChatApp({
         }),
       );
       setMessages(loaded);
+      const ar = await fetch(`/api/conversations/${id}/attachments`);
+      if (ar.ok) setAttachments((await ar.json()).attachments ?? []);
     } finally {
       setLoading(false);
     }
@@ -380,6 +385,7 @@ export default function ChatApp({
       setConversations((p) => [convo, ...p]);
       setActiveId(convo.id);
       setMessages([]);
+      setAttachments([]);
       setSidebarOpen(false);
     } catch {
       notify("Couldn't create a new chat");
@@ -659,6 +665,13 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
       const images = files.filter((f) => /^image\/(jpeg|png|webp|gif)$/i.test(f.type) || /\.(jpe?g|png|webp|gif)$/i.test(f.name));
       const docs = files.filter((f) => !images.includes(f));
       if (images.length) {
+        for (const image of images.slice(0, 4)) {
+          const store = new FormData(); store.append("file", image); store.append("title", image.name);
+          const stored = await fetch("/api/knowledge/upload", { method: "POST", body: store });
+          if (!stored.ok) { const data = await stored.json().catch(() => null); throw new Error(data?.error || `Couldn't save ${image.name}`); }
+          const storedData = await stored.json();
+          if (activeId && storedData.documentId) { await fetch(`/api/conversations/${activeId}/attachments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: storedData.documentId }) }); }
+        }
         const form = new FormData();
         for (const image of images.slice(0, 4)) form.append("image", image);
         form.append("prompt", prompt || "Analyze these images carefully and describe everything relevant.");
@@ -676,6 +689,8 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           const res = await fetch("/api/knowledge/upload", { method: "POST", body: form });
           if (!res.ok) { const data = await res.json().catch(() => null); throw new Error(data?.error || `Couldn't upload ${file.name} (HTTP ${res.status})`); }
           uploaded.push(file.name);
+          const uploadedData = await res.clone().json().catch(() => null);
+          if (activeId && uploadedData?.documentId) await fetch(`/api/conversations/${activeId}/attachments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: uploadedData.documentId }) });
         }
         const attachmentPrompt = `${prompt || "Analyze the attached files and summarize the most important information."}\n\nUse these newly attached files as the primary source for this response: ${uploaded.join(", ")}. If the request asks for facts from the files, distinguish file content from general knowledge.`;
         const localUser = uuid();
@@ -1043,6 +1058,10 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
               </button>
             ) : null}
 
+            <button type="button" onClick={() => setFileLibraryOpen(true)} aria-label="Open file library" title="File library" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
+              <Paperclip className="size-4" />
+            </button>
+
             {messages.length > 0 ? (
               <button type="button" onClick={() => setCanvasOpen(true)} aria-label="Open canvas" title="Open canvas" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
                 <span className="text-xs font-semibold">C</span>
@@ -1107,6 +1126,12 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           </div>
         </header>
 
+        {attachments.length > 0 ? (
+          <div className="flex shrink-0 gap-2 overflow-x-auto border-b px-3 py-2 text-xs">
+            {attachments.map((a) => <span key={a.id} className="inline-flex shrink-0 items-center gap-1 rounded-full border bg-muted/40 px-2.5 py-1"><Paperclip className="size-3" />{a.originalName ?? a.title}</span>)}
+          </div>
+        ) : null}
+
         <Chat
           messages={messages}
           conversationId={activeId}
@@ -1131,9 +1156,9 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           onSelectBrain={handleSelectBrain}
           onSetBrainMode={handleSetBrainMode}
           onOpenImageGenerator={() => {
-            console.log("IMAGE_OPEN_CLICK");
             setImageGeneratorOpen(true);
           }}
+          onOpenFileLibrary={() => setFileLibraryOpen(true)}
         />
         <ImageGenerator
           open={imageGeneratorOpen}
@@ -1144,6 +1169,16 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           conversationId={activeId}
           messages={messages}
           onClose={() => setCanvasOpen(false)}
+        />
+        <FileLibrary
+          open={fileLibraryOpen}
+          conversationId={activeId}
+          onClose={() => setFileLibraryOpen(false)}
+          onAttached={(doc) => {
+            setAttachments((p) => p.some(a => a.documentId === doc.id) ? p : [...p, { id: crypto.randomUUID(), documentId: doc.id, title: doc.title, originalName: doc.originalName, mimeType: doc.mimeType, byteSize: doc.byteSize }]);
+            setFileLibraryOpen(false);
+            notify(`Attached “${doc.title}”`);
+          }}
         />
       </div>
 
