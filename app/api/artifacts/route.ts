@@ -1,0 +1,5 @@
+import { auth } from "@/auth";
+import { createArtifact, listArtifacts } from "@/lib/db/artifact-queries";
+import { rateLimitResponse } from "@/lib/ratelimit";
+export async function GET(req:Request){const s=await auth();if(!s?.user?.id)return new Response("Unauthorized",{status:401});const q=new URL(req.url).searchParams.get("conversationId")??undefined;return Response.json({artifacts:await listArtifacts(s.user.id,q)},{headers:{"Cache-Control":"private, no-store"}});}
+export async function POST(req:Request){const s=await auth();if(!s?.user?.id)return new Response("Unauthorized",{status:401});const l=await rateLimitResponse(`artifacts:${s.user.id}`,30,60000);if(l)return l;const b=await req.json().catch(()=>null);const title=typeof b?.title==="string"?b.title.trim().slice(0,200):"Untitled artifact";const content=typeof b?.content==="string"?b.content.slice(0,500000):"";const row=await createArtifact(s.user.id,{conversationId:typeof b?.conversationId==="string"?b.conversationId:null,title,content});return Response.json({artifact:row},{status:201});}

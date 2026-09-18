@@ -5,18 +5,24 @@ import { ArrowLeft, FileText, MessageSquarePlus, Upload } from "lucide-react";
 
 type Chat = { id: string; title: string };
 type Doc = { id: string; title: string; status: string };
+type Artifact = { id: string; title: string; conversationId: string | null; updatedAt: string };
 
 export default function ProjectWorkspace({
   project,
   initialChats,
   initialDocs,
+  initialArtifacts,
 }: {
   project: { id: string; name: string; description: string | null; instructions: string | null };
   initialChats: Chat[];
   initialDocs: Doc[];
+  initialArtifacts: Artifact[];
 }) {
   const [chats] = useState<Chat[]>(initialChats);
   const [docs, setDocs] = useState<Doc[]>(initialDocs);
+  const [artifacts] = useState<Artifact[]>(initialArtifacts);
+  const [projectSearch, setProjectSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<{title:string;kind:string;id:string}[]>([]);
   const [instructions, setInstructions] = useState(project.instructions ?? "");
   const [instrMsg, setInstrMsg] = useState<string | null>(null);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
@@ -137,6 +143,14 @@ export default function ProjectWorkspace({
             ))
           )}
         </div>
+      </section>
+
+      {/* Project Artifacts & Search */}
+      <section className="mt-8 space-y-3">
+        <div className="flex items-center justify-between"><h2 className="text-sm font-semibold">Project Artifacts</h2><span className="text-xs text-muted-foreground">{artifacts.length}</span></div>
+        <div className="overflow-hidden rounded-lg border">{artifacts.length===0?<p className="px-3 py-4 text-sm text-muted-foreground">Artifacts created in project chats appear here.</p>:artifacts.map(a=><a key={a.id} href={a.conversationId ? `/?c=${a.conversationId}` : "/"} className="block border-b px-3 py-2 text-sm last:border-0 hover:bg-accent"><span className="font-medium">{a.title}</span><span className="ml-2 text-xs text-muted-foreground">{new Date(a.updatedAt).toLocaleString()}</span></a>)}</div>
+        <form onSubmit={async e=>{e.preventDefault();const q=projectSearch.trim();if(!q){setSearchResults([]);return;}const r=await fetch(`/api/projects/${project.id}/search?q=${encodeURIComponent(q)}`);if(r.ok)setSearchResults((await r.json()).results??[]);}} className="flex gap-2"><input value={projectSearch} onChange={e=>setProjectSearch(e.target.value)} placeholder="Search this project…" className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm"/><button className="rounded-lg border px-3 text-sm hover:bg-accent">Search</button></form>
+        {searchResults.length>0?<div className="rounded-lg border p-2">{searchResults.map(r=><div key={`${r.kind}-${r.id}`} className="px-2 py-1.5 text-xs"><span className="mr-2 rounded bg-muted px-1.5 py-0.5">{r.kind}</span>{r.title}</div>)}</div>:null}
       </section>
 
       {/* Project Instructions */}

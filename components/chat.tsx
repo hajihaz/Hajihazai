@@ -16,6 +16,7 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
+  Volume2,
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -324,6 +325,12 @@ const Chat = memo(function Chat({
                           {m.role === "user" ? (
                             <ActionButton label="Edit" onClick={() => onEdit(m)}>
                               <Pencil className="size-3.5" />
+                            </ActionButton>
+                          ) : null}
+
+                          {m.role === "assistant" && !m.error ? (
+                            <ActionButton label="Read aloud" onClick={() => { if (typeof window !== "undefined" && "speechSynthesis" in window) { window.speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(m.content.replace(/[#*_`]/g, "")); u.lang = "en-US"; window.speechSynthesis.speak(u); } }}>
+                              <Volume2 className="size-3.5" />
                             </ActionButton>
                           ) : null}
 

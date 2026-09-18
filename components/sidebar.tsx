@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 
-type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean };
+type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean; pinned?: boolean };
 type Proj = { id: string; name: string; isSystem?: boolean };
 type BrainEntry = { id: string; name: string; slug: string; icon: string; color: string };
 
@@ -212,14 +212,9 @@ const Sidebar = memo(function Sidebar({
   const [searchQuery, setSearchQuery] = useState("");
 
   // Pin
-  const [pinned, setPinned] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem("hh-pinned");
-      return saved ? new Set<string>(JSON.parse(saved)) : new Set<string>();
-    } catch {
-      return new Set<string>();
-    }
-  });
+  const [pinned, setPinned] = useState<Set<string>>(() => new Set());
+  useEffect(() => { setPinned(new Set(conversations.filter(c => c.pinned).map(c => c.id))); }, [conversations]);
+
 
   // Inline rename
   const [inlineRenameId, setInlineRenameId] = useState<string | null>(null);
@@ -294,7 +289,7 @@ const Sidebar = memo(function Sidebar({
       if (prev.has(id)) {
         const next = new Set(prev);
         next.delete(id);
-        try { localStorage.setItem("hh-pinned", JSON.stringify([...next])); } catch {}
+        void fetch(`/api/conversations/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pinned: false }) });
         return next;
       }
       if (prev.size >= MAX_PINNED) {
@@ -303,7 +298,7 @@ const Sidebar = memo(function Sidebar({
       }
       const next = new Set(prev);
       next.add(id);
-      try { localStorage.setItem("hh-pinned", JSON.stringify([...next])); } catch {}
+      void fetch(`/api/conversations/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pinned: true }) });
       return next;
     });
   }

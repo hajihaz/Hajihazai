@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getProject } from "@/lib/db/project-queries";
 import { listProjectConversations } from "@/lib/db/queries";
 import { listProjectDocuments } from "@/lib/db/knowledge-queries";
+import { listProjectArtifacts } from "@/lib/db/artifact-queries";
 import ProjectWorkspace from "@/components/project-workspace";
 
 export default async function ProjectPage({
@@ -17,9 +18,10 @@ export default async function ProjectPage({
   const project = await getProject(session.user.id, id);
   if (!project) notFound();
 
-  const [chats, documents] = await Promise.all([
+  const [chats, documents, artifacts] = await Promise.all([
     listProjectConversations(session.user.id, id),
     listProjectDocuments(session.user.id, id),
+    listProjectArtifacts(session.user.id, id),
   ]);
 
   return (
@@ -31,11 +33,8 @@ export default async function ProjectPage({
         instructions: project.instructions,
       }}
       initialChats={chats.map((c) => ({ id: c.id, title: c.title }))}
-      initialDocs={documents.map((d) => ({
-        id: d.id,
-        title: d.title,
-        status: d.status,
-      }))}
+      initialDocs={documents.map((d) => ({ id: d.id, title: d.title, status: d.status }))}
+      initialArtifacts={artifacts.map((a) => ({ id: a.id, title: a.title, conversationId: a.conversationId, updatedAt: a.updatedAt.toISOString() }))}
     />
   );
 }

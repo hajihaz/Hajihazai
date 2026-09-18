@@ -27,6 +27,14 @@ export async function PATCH(
   if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
+  if (typeof body?.pinned === "boolean" || typeof body?.intelligenceLevel === "string") {
+    const current = await getConversation(session.user.id, id);
+    if (!current) return new Response("Not found", { status: 404 });
+    const level = typeof body?.intelligenceLevel === "string" ? body.intelligenceLevel : undefined;
+    if (level && !["low","medium","high","max"].includes(level)) return new Response("invalid intelligenceLevel", { status: 400 });
+    const [updated] = await db.update(conversations).set({ ...(typeof body?.pinned === "boolean" ? { pinned: body.pinned } : {}), ...(level ? { intelligenceLevel: level } : {}), updatedAt: new Date() }).where(and(eq(conversations.id, id), eq(conversations.userId, session.user.id))).returning({ id: conversations.id, pinned: conversations.pinned, intelligenceLevel: conversations.intelligenceLevel });
+    return Response.json(updated);
+  }
   if (typeof body?.archived === "boolean") {
     const current = await getConversation(session.user.id, id);
     if (!current) return new Response("Not found", { status: 404 });

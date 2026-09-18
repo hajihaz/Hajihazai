@@ -20,6 +20,8 @@ export async function GET(req: Request) {
       title: c.title,
       projectId: c.projectId,
       archived: c.archived,
+      pinned: c.pinned,
+      intelligenceLevel: c.intelligenceLevel,
       updatedAt: c.updatedAt?.toISOString() ?? null,
     })),
   });

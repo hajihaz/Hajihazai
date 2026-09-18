@@ -11,7 +11,7 @@ import ImageGenerator from "./image-generator";
 import CanvasWorkspace from "./canvas-workspace";
 import FileLibrary from "./file-library";
 
-type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean };
+type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean; pinned?: boolean; intelligenceLevel?: string };
 type Proj = { id: string; name: string; isSystem?: boolean };
 type LevelOption = {
   level: string;
@@ -174,6 +174,7 @@ export default function ChatApp({
 
   function changeLevel(newLevel: string) {
     setLevel(newLevel);
+    if (activeId) void fetch(`/api/conversations/${activeId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ intelligenceLevel: newLevel }) });
     try {
       localStorage.setItem("hh-level", newLevel);
     } catch {
@@ -367,6 +368,8 @@ export default function ChatApp({
         }),
       );
       setMessages(loaded);
+      const current = conversations.find(c => c.id === id);
+      if (current?.intelligenceLevel && initialLevels.some(l => l.level === current.intelligenceLevel && l.available)) setLevel(current.intelligenceLevel);
       const ar = await fetch(`/api/conversations/${id}/attachments`);
       if (ar.ok) setAttachments((await ar.json()).attachments ?? []);
     } finally {
