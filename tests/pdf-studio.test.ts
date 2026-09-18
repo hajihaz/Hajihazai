@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildPdfFromSpec } from "@/lib/pdf/studio";
+import { PDFDocument, StandardFonts } from "pdf-lib";
+import { extractText } from "@/lib/knowledge/extract";
 
 describe("PDF Studio renderer", () => {
   it("builds a valid multi-section PDF with tables and page breaks", async () => {
@@ -21,5 +23,18 @@ describe("PDF Studio renderer", () => {
     });
     expect(bytes.byteLength).toBeGreaterThan(1000);
     expect(Buffer.from(bytes).subarray(0, 5).toString()).toBe("%PDF-");
+  });
+});
+
+describe("PDF text extraction", () => {
+  it("extracts text from a normal text PDF in the server runtime", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([400, 300]);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    page.drawText("HajiHaz PDF attachment test", { x: 40, y: 240, font, size: 16 });
+    const bytes = await pdf.save();
+    const result = await extractText("pdf", Buffer.from(bytes));
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.text).toContain("HajiHaz PDF attachment test");
   });
 });
