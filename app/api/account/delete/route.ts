@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { rateLimitResponse } from "@/lib/ratelimit";
 import { db, knowledgeAuditLog, users } from "@/lib/db";
 import { eq, or } from "drizzle-orm";
 
@@ -7,6 +8,8 @@ export async function DELETE() {
   const userId = session?.user?.id;
   const email = session?.user?.email?.trim().toLowerCase();
   if (!userId) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`account-delete:${userId}`, 3, 60 * 60_000);
+  if (limited) return limited;
 
   await db.delete(knowledgeAuditLog).where(
     email
