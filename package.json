@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.2",
+    "@napi-rs/canvas": "^0.1.80",
     "@neondatabase/serverless": "^1.1.0",
     "@sentry/nextjs": "^10.73.0",
     "@tailwindcss/typography": "^0.5.20",
@@ -35,6 +36,7 @@
     "next-auth": "5.0.0-beta.32",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
+    "pdfjs-dist": "^5.4.296",
     "postgres": "^3.4.7",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

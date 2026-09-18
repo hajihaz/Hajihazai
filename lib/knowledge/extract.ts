@@ -31,17 +31,18 @@ export async function extractText(
 
   if (ext === "pdf") {
     try {
-      // pdf-parse is loaded only for PDF requests so TXT/MD/DOCX routes do not
-      // pull PDF.js into their module graph. Its Node parser handles normal
-      // text PDFs without requiring browser APIs.
-      const { PDFParse } = await import("pdf-parse");
-      const parser = new PDFParse({ data: buf });
-      try {
-        const result = await parser.getText();
-        return acceptExtractedText(result.text);
-      } finally {
-        await parser.destroy().catch(() => undefined);
+      const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+      const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buf), useWorkerFetch: false, isEvalSupported: false });
+      const doc = await loadingTask.promise;
+      let text = "";
+      for (let pageNo = 1; pageNo <= doc.numPages; pageNo += 1) {
+        const page = await doc.getPage(pageNo);
+        const content = await page.getTextContent();
+        const pageText = content.items.map((item) => ("str" in item ? item.str : "")).join(" ").trim();
+        if (pageText) text += pageText + "\n\n";
       }
+      await doc.destroy();
+      return acceptExtractedText(text.trim());
     } catch (error) {
       console.warn("[knowledge] PDF extraction failed:", error);
       return { ok: false, error: "Could not read the PDF. Please check that it is a valid, text-readable PDF." };
