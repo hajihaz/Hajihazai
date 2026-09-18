@@ -255,11 +255,11 @@ export async function POST(req: Request) {
   const hasWriteIntent =
     !admin && WRITE_INTENT_RE.test(message) && !!session.user.email;
 
-  const [convo, memory, tool, brainForSmart, writePermitted, webEnabled] =
+  const convo = await getConversation(session.user.id, conversationId);
+  const [memory, tool, brainForSmart, writePermitted, webEnabled] =
     await Promise.all([
-      getConversation(session.user.id, conversationId),
       wantRetrieval
-        ? buildMemoryContext(session.user.id, { query: retrievalQuery }).catch(
+        ? buildMemoryContext(session.user.id, { query: retrievalQuery, projectId: convo?.projectId }).catch(
             (err) => {
               console.warn("[chat] memory context failed:", err);
               return EMPTY_MEMORY;

@@ -1,6 +1,6 @@
-import { and, cosineDistance, desc, eq, gt, isNotNull, lte, or, isNull, sql } from "drizzle-orm";
+import { and, cosineDistance, desc, eq, gt, isNotNull, lte, or, isNull, sql, exists, notExists } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { userMemory } from "@/lib/db/schema";
+import { projectMemories, userMemory } from "@/lib/db/schema";
 import { embed } from "@/lib/ai/embeddings/router";
 
 /**
@@ -30,6 +30,7 @@ export async function semanticSearch(
   query: string,
   limit = 10,
   threshold = DEFAULT_SIMILARITY_THRESHOLD,
+  projectId?: string | null,
 ): Promise<SemanticHit[]> {
   if (!query || !query.trim()) return [];
 
@@ -37,6 +38,20 @@ export async function semanticSearch(
 
   // cosine similarity = 1 - cosine distance
   const similarity = sql<number>`1 - (${cosineDistance(userMemory.embedding, queryVector)})`;
+
+  const scope = projectId
+    ? or(
+        exists(db.select({ id: projectMemories.id }).from(projectMemories).where(and(
+          eq(projectMemories.memoryId, userMemory.id),
+          eq(projectMemories.userId, userId),
+          eq(projectMemories.projectId, projectId),
+        ))),
+        notExists(db.select({ id: projectMemories.id }).from(projectMemories).where(and(
+          eq(projectMemories.memoryId, userMemory.id),
+          eq(projectMemories.userId, userId),
+        ))),
+      )
+    : eq(userMemory.userId, userId);
 
   const rows = await db
     .select({
@@ -49,6 +64,7 @@ export async function semanticSearch(
     .where(
       and(
         eq(userMemory.userId, userId), // user isolation
+        ...(projectId ? [scope!] : []),
         eq(userMemory.status, "active"), // active only (excludes pending/deleted)
         lte(userMemory.validFrom, new Date()),
         or(isNull(userMemory.validUntil), gt(userMemory.validUntil, new Date())),

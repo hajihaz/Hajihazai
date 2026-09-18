@@ -2,6 +2,8 @@ import { auth } from "@/auth";
 import { getProject, updateProject, deleteProject } from "@/lib/db/project-queries";
 import { listProjectConversations } from "@/lib/db/queries";
 import { listProjectDocuments } from "@/lib/db/knowledge-queries";
+import { listProjectMemories } from "@/lib/db/project-queries";
+import { listAutomations } from "@/lib/db/automation-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
 
@@ -21,9 +23,11 @@ export async function GET(
   const project = await getProject(session.user.id, id);
   if (!project) return new Response("Not found", { status: 404 });
 
-  const [chats, documents] = await Promise.all([
+  const [chats, documents, memories, automations] = await Promise.all([
     listProjectConversations(session.user.id, id),
     listProjectDocuments(session.user.id, id),
+    listProjectMemories(session.user.id, id),
+    listAutomations(session.user.id, id),
   ]);
   return Response.json({
     project,
@@ -33,6 +37,23 @@ export async function GET(
       title: d.title,
       status: d.status,
       createdAt: d.createdAt,
+    })),
+    memories: memories.map((m) => ({
+      id: m.memory.id,
+      type: m.memory.type,
+      title: m.memory.title,
+      content: m.memory.content,
+      status: m.memory.status,
+    })),
+    automations: automations.map((a) => ({
+      id: a.id,
+      name: a.name,
+      schedule: a.schedule,
+      timezone: a.timezone,
+      status: a.status,
+      nextRunAt: a.nextRunAt,
+      lastRunAt: a.lastRunAt,
+      lastStatus: a.lastStatus,
     })),
   }, { headers: PRIVATE_NO_STORE });
 }

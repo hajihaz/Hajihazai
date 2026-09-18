@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "./index";
-import { projects, conversations, type Project } from "./schema";
+import { projects, conversations, projectMemories, userMemory, type Project } from "./schema";
 
 const PROJECT_LIST_LIMIT = 200;
 
@@ -84,6 +84,42 @@ export async function deleteProject(userId: string, id: string): Promise<boolean
     .where(and(eq(projects.id, id), eq(projects.userId, userId)))
     .returning();
   return !!row;
+}
+
+/** Move a chat into a project (or out of one with null). Ownership-checked. */
+export async function listProjectMemories(userId: string, projectId: string) {
+  return db
+    .select({ memory: userMemory, linkedAt: projectMemories.createdAt })
+    .from(projectMemories)
+    .innerJoin(userMemory, eq(userMemory.id, projectMemories.memoryId))
+    .where(and(eq(projectMemories.userId, userId), eq(projectMemories.projectId, projectId)))
+    .orderBy(desc(userMemory.updatedAt))
+    .limit(500);
+}
+
+export async function attachMemoryToProject(userId: string, projectId: string, memoryId: string) {
+  const project = await getProject(userId, projectId);
+  if (!project) return null;
+  const [memory] = await db
+    .select({ id: userMemory.id })
+    .from(userMemory)
+    .where(and(eq(userMemory.id, memoryId), eq(userMemory.userId, userId)))
+    .limit(1);
+  if (!memory) return null;
+  const [row] = await db
+    .insert(projectMemories)
+    .values({ userId, projectId, memoryId })
+    .onConflictDoNothing()
+    .returning();
+  return row ?? { projectId, memoryId };
+}
+
+export async function detachMemoryFromProject(userId: string, projectId: string, memoryId: string) {
+  const [row] = await db
+    .delete(projectMemories)
+    .where(and(eq(projectMemories.userId, userId), eq(projectMemories.projectId, projectId), eq(projectMemories.memoryId, memoryId)))
+    .returning();
+  return row ?? null;
 }
 
 /** Move a chat into a project (or out of one with null). Ownership-checked. */

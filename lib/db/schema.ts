@@ -552,6 +552,84 @@ export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
 
 /* ------------------------------------------------------------------ */
+/* Project-scoped memory + automations                                  */
+/* ------------------------------------------------------------------ */
+
+export const projectMemories = pgTable(
+  "project_memory",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    memoryId: text("memory_id").notNull().references(() => userMemory.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("project_memory_unique_idx").on(t.projectId, t.memoryId),
+    index("project_memory_project_idx").on(t.projectId),
+    index("project_memory_memory_idx").on(t.memoryId),
+    index("project_memory_user_idx").on(t.userId),
+  ],
+);
+
+export type ProjectMemory = typeof projectMemories.$inferSelect;
+
+export const automationStatus = pgEnum("automation_status", [
+  "active",
+  "paused",
+  "completed",
+  "failed",
+]);
+
+export const automations = pgTable(
+  "automation",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
+    name: text("name").notNull(),
+    prompt: text("prompt").notNull(),
+    schedule: text("schedule").notNull(),
+    timezone: text("timezone").notNull().default("UTC"),
+    status: automationStatus("status").notNull().default("active"),
+    nextRunAt: timestamp("next_run_at", { mode: "date" }),
+    lastRunAt: timestamp("last_run_at", { mode: "date" }),
+    lastStatus: text("last_status"),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("automation_user_idx").on(t.userId),
+    index("automation_project_idx").on(t.projectId),
+    index("automation_due_idx").on(t.status, t.nextRunAt),
+  ],
+);
+
+export type Automation = typeof automations.$inferSelect;
+
+export const automationRuns = pgTable(
+  "automation_run",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    automationId: text("automation_id").notNull().references(() => automations.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    startedAt: timestamp("started_at", { mode: "date" }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { mode: "date" }),
+    status: text("status").notNull().default("running"),
+    output: text("output"),
+    error: text("error"),
+    modelId: text("model_id"),
+  },
+  (t) => [
+    index("automation_run_automation_idx").on(t.automationId, t.startedAt),
+    index("automation_run_user_idx").on(t.userId),
+  ],
+);
+
+export type AutomationRun = typeof automationRuns.$inferSelect;
+
+/* ------------------------------------------------------------------ */
 /* Platform — Username/password credentials + password reset           */
 /* ------------------------------------------------------------------ */
 

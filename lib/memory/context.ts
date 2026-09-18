@@ -54,7 +54,7 @@ export interface MemoryContext {
  */
 export async function buildMemoryContext(
   userId: string,
-  opts: { query?: string; budgetTokens?: number } = {},
+  opts: { query?: string; budgetTokens?: number; projectId?: string | null } = {},
 ): Promise<MemoryContext> {
   const budget = opts.budgetTokens ?? DEFAULT_BUDGET_TOKENS;
   const query = opts.query?.trim();
@@ -72,11 +72,12 @@ export async function buildMemoryContext(
       query,
       SEMANTIC_LIMIT,
       DEFAULT_SIMILARITY_THRESHOLD,
+      opts.projectId,
     ).catch((err) => {
       console.warn("[memory] semantic search failed; preserving keyword results:", err);
       return [] as Awaited<ReturnType<typeof semanticSearch>>;
     });
-    const keywordPromise = searchMemories(userId, query)
+    const keywordPromise = searchMemories(userId, query, opts.projectId)
       .catch((err) => {
         console.warn("[memory] keyword search failed; preserving semantic results:", err);
         return [];
@@ -91,7 +92,7 @@ export async function buildMemoryContext(
     // No query is intentional for non-chat callers such as the memory page.
     fallbackUsed = true;
     retrievalMethod = "keyword-fallback";
-    const active = await getActiveMemories(userId);
+    const active = await getActiveMemories(userId, opts.projectId);
     const ranked = rankMemories(active, undefined, Date.now());
     items = ranked.map((m) => ({ id: m.id, type: m.type, content: m.content }));
   }
