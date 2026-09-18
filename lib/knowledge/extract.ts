@@ -1,6 +1,7 @@
 /** Text extraction for uploaded knowledge documents. */
 
 import mammoth from "mammoth";
+import CSSMatrix from "@thednp/dommatrix";
 
 export const SUPPORTED_EXTS = ["pdf", "docx", "txt", "md"] as const;
 export const MAX_EXTRACTED_CHARS = 2_000_000;
@@ -31,6 +32,8 @@ export async function extractText(
 
   if (ext === "pdf") {
     try {
+      const globals = globalThis as typeof globalThis & { DOMMatrix?: unknown };
+      if (!globals.DOMMatrix) globals.DOMMatrix = CSSMatrix as unknown as typeof globalThis.DOMMatrix;
       const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
       const loadingTask = pdfjs.getDocument({ data: new Uint8Array(buf), useWorkerFetch: false, isEvalSupported: false });
       const doc = await loadingTask.promise;
