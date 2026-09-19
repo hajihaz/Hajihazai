@@ -331,10 +331,17 @@ const Sidebar = memo(function Sidebar({
   }
 
   const q = searchQuery.toLowerCase().trim();
+  const projectNameById = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
 
   const filteredConversations = useMemo(
-    () => (q ? conversations.filter((c) => c.title.toLowerCase().includes(q)) : conversations),
-    [conversations, q],
+    () => (q
+      ? conversations.filter((c) => {
+          const title = c.title.toLowerCase();
+          const project = c.projectId ? (projectNameById.get(c.projectId) ?? "").toLowerCase() : "";
+          return title.includes(q) || project.includes(q);
+        })
+      : conversations),
+    [conversations, q, projectNameById],
   );
 
   const pinnedConvs = useMemo(
@@ -355,8 +362,6 @@ const Sidebar = memo(function Sidebar({
       }),
     [projects],
   );
-  const projectNameById = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
-
   return (
     <>
       {open ? (
@@ -685,6 +690,7 @@ const Sidebar = memo(function Sidebar({
                         <li key={c.id}>
                           <ConvRow
                             c={c}
+                            projectName={c.projectId ? projectNameById.get(c.projectId) : undefined}
                             isPinned={false}
                             isActive={activeId === c.id}
                             isRenaming={inlineRenameId === c.id}
