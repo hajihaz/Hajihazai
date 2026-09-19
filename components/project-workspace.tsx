@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Brain,
@@ -115,6 +115,7 @@ export default function ProjectWorkspace({
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [memoryBusy, setMemoryBusy] = useState<string | null>(null);
+  const [memoryMsg, setMemoryMsg] = useState<string | null>(null);
   const [automationBusy, setAutomationBusy] = useState<string | null>(null);
   const [automationMsg, setAutomationMsg] = useState<string | null>(null);
   const [editingAutomation, setEditingAutomation] = useState<string | null>(null);
@@ -128,6 +129,22 @@ export default function ProjectWorkspace({
   });
   const [editForm, setEditForm] = useState(form);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const refreshMemoryState = async () => {
+      const res = await fetch("/api/projects/" + project.id, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setMemories(data.memories ?? []);
+    };
+    const onReturn = () => void refreshMemoryState();
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => {
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
+  }, [project.id]);
 
   async function saveProjectDetails() {
     setProjectMsg(null);
@@ -197,9 +214,11 @@ export default function ProjectWorkspace({
   }
 
   async function openMemoryPicker() {
+    setMemoryMsg(null);
     setShowMemoryPicker(true);
-    const res = await fetch("/api/memories?status=visible");
+    const res = await fetch("/api/memories?status=visible", { cache: "no-store" });
     if (res.ok) setAvailableMemories((await res.json()).memories ?? []);
+    else setMemoryMsg("Could not load your memories. Please try again.");
   }
 
   async function attachMemory(memoryId: string) {
@@ -215,10 +234,13 @@ export default function ProjectWorkspace({
         const memory = data.memory;
         if (memory) setMemories((p) => [...p, memory]);
         else {
-          const refreshed = await fetch("/api/projects/" + project.id);
+          const refreshed = await fetch("/api/projects/" + project.id, { cache: "no-store" });
           if (refreshed.ok) setMemories((await refreshed.json()).memories ?? []);
         }
+        setMemoryMsg("Memory attached to this project.");
         setShowMemoryPicker(false);
+      } else {
+        setMemoryMsg((await res.text().catch(() => "")) || "Could not attach memory.");
       }
     } finally {
       setMemoryBusy(null);
@@ -232,7 +254,12 @@ export default function ProjectWorkspace({
         "/api/projects/" + project.id + "/memories?memoryId=" + encodeURIComponent(memoryId),
         { method: "DELETE" },
       );
-      if (res.ok) setMemories((p) => p.filter((m) => m.id !== memoryId));
+      if (res.ok) {
+        setMemories((p) => p.filter((m) => m.id !== memoryId));
+        setMemoryMsg("Memory detached. It is now unscoped and available to project chats again.");
+      } else {
+        setMemoryMsg((await res.text().catch(() => "")) || "Could not detach memory.");
+      }
     } finally {
       setMemoryBusy(null);
     }
@@ -468,7 +495,7 @@ export default function ProjectWorkspace({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-sm font-semibold"><Brain className="size-4" /> Project Memory</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Explicitly attached: {memories.length}. Project chats also include your unscoped memories; memories attached only to other projects stay excluded.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Explicitly attached: {memories.length}. Unscoped memories are also available to project chats; memories attached only to other projects stay excluded.</p>
           </div>
           <button onClick={openMemoryPicker} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:bg-accent">
             <Link2 className="size-4" /> Attach memory
@@ -482,6 +509,7 @@ export default function ProjectWorkspace({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full bg-muted px-2 py-0.5 text-xs">{m.type}</span>
+                  <span className="rounded-full border px-2 py-0.5 text-xs">Explicit</span>
                   {m.title ? <span className="text-xs font-medium">{m.title}</span> : null}
                   <span className={"rounded-full px-2 py-0.5 text-xs " + statusClass(m.status)}>{m.status}</span>
                 </div>
@@ -493,6 +521,7 @@ export default function ProjectWorkspace({
             </div>
           ))}
         </div>
+        {memoryMsg ? <p className="text-xs text-muted-foreground" role="status">{memoryMsg}</p> : null}
         {showMemoryPicker ? (
           <div className="rounded-xl border bg-background p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between gap-3">
