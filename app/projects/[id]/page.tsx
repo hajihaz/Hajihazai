@@ -34,6 +34,7 @@ export default async function ProjectPage({
         name: project.name,
         description: project.description,
         instructions: project.instructions,
+        isSystem: project.isSystem,
       }}
       initialChats={chats.map((c) => ({ id: c.id, title: c.title }))}
       initialDocs={documents.map((d) => ({

@@ -65,6 +65,9 @@ export async function PATCH(
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
+  const current = await getProject(session.user.id, id);
+  if (!current) return new Response("Not found", { status: 404 });
+  if (current.isSystem) return new Response("System projects cannot be modified", { status: 403 });
 
   const limited = await rateLimitResponse(`project-mutation:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
@@ -73,6 +76,7 @@ export async function PATCH(
   if (oversized) return oversized;
 
   const body = await req.json().catch(() => null);
+
   const patch: { name?: string; description?: string | null; instructions?: string | null } = {};
   if (typeof body?.name === "string") {
     const n = body.name.trim();
@@ -94,6 +98,9 @@ export async function DELETE(
   const session = await auth();
   if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
   const { id } = await params;
+  const current = await getProject(session.user.id, id);
+  if (!current) return new Response("Not found", { status: 404 });
+  if (current.isSystem) return new Response("System projects cannot be deleted", { status: 403 });
   const limited = await rateLimitResponse(`project-mutation:${session.user.id}`, 60, 60_000);
   if (limited) return limited;
 

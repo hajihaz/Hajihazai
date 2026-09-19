@@ -86,6 +86,7 @@ export default function ProjectWorkspace({
     name: string;
     description: string | null;
     instructions: string | null;
+    isSystem?: boolean;
   };
   initialChats: Chat[];
   initialDocs: Doc[];
@@ -106,6 +107,10 @@ export default function ProjectWorkspace({
     { title: string; kind: string; id: string }[]
   >([]);
   const [instructions, setInstructions] = useState(project.instructions ?? "");
+  const [projectName, setProjectName] = useState(project.name);
+  const [projectDescription, setProjectDescription] = useState(project.description ?? "");
+  const [editingProject, setEditingProject] = useState(false);
+  const [projectMsg, setProjectMsg] = useState<string | null>(null);
   const [instrMsg, setInstrMsg] = useState<string | null>(null);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -123,6 +128,27 @@ export default function ProjectWorkspace({
   });
   const [editForm, setEditForm] = useState(form);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  async function saveProjectDetails() {
+    setProjectMsg(null);
+    const name = projectName.trim();
+    if (!name) { setProjectMsg("Name is required"); return; }
+    const res = await fetch("/api/projects/" + project.id, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description: projectDescription }),
+    });
+    if (res.ok) { setProjectName(name); setEditingProject(false); setProjectMsg("Saved"); }
+    else { setProjectMsg((await res.text().catch(() => "")) || "Could not save"); }
+  }
+
+  async function deleteProject() {
+    if (project.isSystem) return;
+    if (!window.confirm("Delete this project? Chats will return to Recent Chats; project memories and automations will be removed.")) return;
+    const res = await fetch("/api/projects/" + project.id, { method: "DELETE" });
+    if (res.ok) window.location.href = "/";
+    else setProjectMsg("Could not delete project");
+  }
 
   async function saveInstructions() {
     setInstrMsg(null);
@@ -361,15 +387,36 @@ export default function ProjectWorkspace({
         <ArrowLeft className="size-4" /> Back to chat
       </a>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">{project.name}</h1>
-          {project.description ? (
-            <p className="mt-1 text-sm text-muted-foreground">{project.description}</p>
-          ) : null}
+        <div className="min-w-0 flex-1">
+          {editingProject ? (
+            <div className="space-y-2">
+              <input value={projectName} onChange={(e) => setProjectName(e.target.value)} maxLength={100} autoFocus className="w-full rounded-lg border bg-background px-3 py-2 text-xl font-semibold outline-none focus:ring-2 focus:ring-ring" />
+              <input value={projectDescription} onChange={(e) => setProjectDescription(e.target.value)} maxLength={4000} placeholder="Short project description" className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+              <div className="flex flex-wrap items-center gap-2">
+                <button onClick={saveProjectDetails} className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground">Save</button>
+                <button onClick={() => { setProjectName(project.name); setProjectDescription(project.description ?? ""); setEditingProject(false); }} className="rounded-lg border px-3 py-1.5 text-sm">Cancel</button>
+                {projectMsg ? <span className="text-xs text-muted-foreground">{projectMsg}</span> : null}
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl font-semibold">{projectName}</h1>
+              {projectDescription ? <p className="mt-1 text-sm text-muted-foreground">{projectDescription}</p> : null}
+              {projectMsg ? <p className="mt-1 text-xs text-muted-foreground">{projectMsg}</p> : null}
+            </>
+          )}
         </div>
-        <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">
-          Project workspace
-        </span>
+        <div className="flex items-center gap-2">
+          {project.isSystem ? (
+            <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">Global project</span>
+          ) : (
+            <>
+              <button onClick={() => setEditingProject(true)} aria-label="Edit project" title="Edit project" className="rounded-lg border p-2 text-muted-foreground hover:bg-accent hover:text-foreground"><Pencil className="size-4" /></button>
+              <button onClick={deleteProject} aria-label="Delete project" title="Delete project" className="rounded-lg border p-2 text-muted-foreground hover:bg-accent hover:text-destructive"><Trash2 className="size-4" /></button>
+            </>
+          )}
+          <span className="rounded-full bg-muted px-2.5 py-1 text-xs text-muted-foreground">Project workspace</span>
+        </div>
       </div>
 
       <section className="mt-8 space-y-2">
