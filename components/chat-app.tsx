@@ -381,9 +381,13 @@ export default function ChatApp({
     }
   }, []);
 
-  const newChat = useCallback(async () => {
+  const newChat = useCallback(async (projectId?: string | null) => {
     try {
-      const res = await fetch("/api/conversations", { method: "POST" });
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: projectId ? { "Content-Type": "application/json" } : undefined,
+        body: projectId ? JSON.stringify({ projectId }) : undefined,
+      });
       if (!res.ok) {
         notify("Couldn't create a new chat");
         return;
@@ -398,6 +402,13 @@ export default function ChatApp({
       notify("Couldn't create a new chat");
     }
   }, [notify]);
+
+  const newChatInProject = useCallback(
+    async (projectId: string) => {
+      await newChat(projectId);
+    },
+    [newChat],
+  );
 
   async function confirmDelete() {
     if (!pendingDelete) return;
@@ -998,8 +1009,9 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
         brains={brains}
         activeId={activeId}
         onSelect={openConversation}
-        onNew={newChat}
+        onNew={() => void newChat(activeProject?.id)}
         onNewProject={newProject}
+        onNewProjectChat={newChatInProject}
         onDelete={(id) =>
           setPendingDelete(conversations.find((c) => c.id === id) ?? null)
         }
@@ -1023,7 +1035,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           </button>
           <button
             type="button"
-            onClick={newChat}
+            onClick={() => void newChat(activeProject?.id)}
             aria-label="New chat"
             className="flex size-10 shrink-0 items-center justify-center rounded-lg hover:bg-accent md:hidden"
           >

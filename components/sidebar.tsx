@@ -177,6 +177,7 @@ const Sidebar = memo(function Sidebar({
   onSelect,
   onNew,
   onNewProject,
+  onNewProjectChat,
   onDelete,
   onRename,
   onArchive,
@@ -192,6 +193,7 @@ const Sidebar = memo(function Sidebar({
   onSelect: (id: string) => void;
   onNew: () => void;
   onNewProject: () => void;
+  onNewProjectChat: (projectId: string) => void;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onArchive: (id: string, archived: boolean) => void;
@@ -468,6 +470,18 @@ const Sidebar = memo(function Sidebar({
                           </span>
                         ) : null}
                       </a>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNewProjectChat(p.id);
+                        }}
+                        aria-label={"New chat in " + p.name}
+                        title="New chat in project"
+                        className="flex size-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
+                      >
+                        <Plus className="size-3.5" />
+                      </button>
                     </div>
                     {isOpen && (
                       <ul className="ml-5 mt-0.5 space-y-0.5 border-l pl-2">
