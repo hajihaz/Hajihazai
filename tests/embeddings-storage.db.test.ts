@@ -21,8 +21,8 @@ describe.skipIf(!hasDb)("pgvector storage & isolation (db)", () => {
     ({ db } = await import("@/lib/db"));
     schema = await import("@/lib/db/schema");
     svc = await import("@/lib/memory/embed-memory");
-    const { neon } = await import("@neondatabase/serverless");
-    rawSql = neon(process.env.DATABASE_URL as string);
+    const postgres = (await import("postgres")).default;
+    rawSql = postgres(process.env.DATABASE_URL as string);
 
     try {
       const base = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/api";
@@ -78,7 +78,7 @@ describe.skipIf(!hasDb)("pgvector storage & isolation (db)", () => {
     await svc.embedMemory; // ensure import resolved
     const [m] = await db
       .insert(schema.userMemory)
-      .values({ userId: A, content: "Owns Suplaykart", status: "active" })
+      .values({ userId: A, content: "Owns Suplaykart", status: "active", validFrom: new Date(), updatedAt: new Date() })
       .returning();
 
     const result = await svc.embedMemory(A, m.id);
@@ -98,7 +98,7 @@ describe.skipIf(!hasDb)("pgvector storage & isolation (db)", () => {
     }
     const [bm] = await db
       .insert(schema.userMemory)
-      .values({ userId: B, content: "B private fact", status: "active" })
+      .values({ userId: B, content: "B private fact", status: "active", validFrom: new Date(), updatedAt: new Date() })
       .returning();
 
     const res = await svc.embedAllMemories(A);
@@ -117,7 +117,7 @@ describe.skipIf(!hasDb)("pgvector storage & isolation (db)", () => {
     }
     const [m] = await db
       .insert(schema.userMemory)
-      .values({ userId: A, content: "Original semantic fact", status: "active" })
+      .values({ userId: A, content: "Original semantic fact", status: "active", validFrom: new Date(), updatedAt: new Date() })
       .returning();
 
     await svc.embedMemory(A, m.id);

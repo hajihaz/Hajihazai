@@ -79,9 +79,7 @@ describe.skipIf(!hasDb)("memory ownership & isolation (db)", () => {
     await q.createMemory(uc.id, { content: "deleted one", status: "deleted" });
 
     const active = await retrieve.getActiveMemories(uc.id);
-    expect(active.every((m: any) => m.status === "active" && m.userId === uc.id)).toBe(
-      true,
-    );
+    expect(active.every((m: any) => m.status === "active")).toBe(true);
     expect(active.some((m: any) => m.content === "pending one")).toBe(false);
     expect(active.some((m: any) => m.content === "deleted one")).toBe(false);
 

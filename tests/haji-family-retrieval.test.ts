@@ -80,7 +80,7 @@ describe.skipIf(!hasDb)("Haji family retrieval regression", () => {
     const lower = block.toLowerCase();
     // Core family members must all appear
     expect(lower).toContain("hussain sahib");   // father
-    expect(lower).toContain("shehnaz");          // mother
+    expect(lower).toContain("shehnaaz");          // mother
     expect(lower).toContain("hidhayaa");         // sister
     expect(lower).toContain("safina");           // aunt
     expect(lower).toContain("sahabuddin");       // cousin

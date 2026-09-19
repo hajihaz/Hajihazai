@@ -25,8 +25,8 @@ describe.skipIf(!hasDb)("knowledge chunk embeddings (db)", () => {
     chunkFn = await import("@/lib/knowledge/chunk");
     embedSvc = await import("@/lib/knowledge/embed-chunks");
     embQ = await import("@/lib/db/knowledge-embedding-queries");
-    const { neon } = await import("@neondatabase/serverless");
-    rawSql = neon(process.env.DATABASE_URL as string);
+    const postgres = (await import("postgres")).default;
+    rawSql = postgres(process.env.DATABASE_URL as string);
 
     try {
       const base = process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/api";

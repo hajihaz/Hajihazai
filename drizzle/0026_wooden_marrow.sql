@@ -1,0 +1,2 @@
+ALTER TABLE "artifact" ADD COLUMN "source_document_id" text;--> statement-breakpoint
+ALTER TABLE "artifact" ADD CONSTRAINT "artifact_source_document_id_knowledge_document_id_fk" FOREIGN KEY ("source_document_id") REFERENCES "public"."knowledge_document"("id") ON DELETE set null ON UPDATE no action;

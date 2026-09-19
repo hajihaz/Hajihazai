@@ -52,6 +52,8 @@ describe.skipIf(!hasDb)("tools (db + router)", () => {
       type: "fact",
       content: "The user owns a company called Acme Corporation.",
       status: "active",
+      validFrom: new Date(),
+      updatedAt: new Date(),
     });
     await memEmbed.embedAllMemories(A);
 

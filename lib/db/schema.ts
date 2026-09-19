@@ -402,6 +402,7 @@ export const artifacts = pgTable(
     id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
     userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     conversationId: text("conversation_id").references(() => conversations.id, { onDelete: "set null" }),
+    sourceDocumentId: text("source_document_id").references(() => knowledgeDocument.id, { onDelete: "set null" }),
     title: text("title").notNull().default("Untitled artifact"),
     content: text("content").notNull().default(""),
     createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),

@@ -35,6 +35,7 @@ export async function createMemory(
       ...(input.status ? { status: input.status } : {}),
       ...(input.confidence !== undefined ? { confidence: Math.max(0, Math.min(100, Math.round(input.confidence))) } : {}),
       validFrom: input.validFrom ?? new Date(),
+      updatedAt: new Date(),
       ...(input.validUntil !== undefined ? { validUntil: input.validUntil } : {}),
     })
     .returning();

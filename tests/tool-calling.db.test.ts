@@ -50,6 +50,8 @@ describe.skipIf(!hasDb)("single tool calling — memory/knowledge (db)", () => {
       type: "fact",
       content: "The user owns a company called Acme Corporation.",
       status: "active",
+      validFrom: new Date(),
+      updatedAt: new Date(),
     });
     await memEmbed.embedAllMemories(A);
 

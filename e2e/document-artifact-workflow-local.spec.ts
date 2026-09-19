@@ -31,6 +31,7 @@ test("document attachment and artifact persist together for one conversation", a
   const artifact = await page.request.post("/api/artifacts", {
     data: {
       conversationId: conversation.id,
+      sourceDocumentId: uploaded.documentId,
       title: "Workflow E2E Artifact",
       content: "Generated from the attached source material.",
     },
@@ -51,7 +52,9 @@ test("document attachment and artifact persist together for one conversation", a
 
   const detail = await page.request.get("/api/artifacts/" + createdArtifact.artifact.id);
   expect(detail.status()).toBe(200);
-  expect((await detail.json()).artifact.content).toContain("attached source material");
+  const artifactDetail = (await detail.json()).artifact;
+  expect(artifactDetail.content).toContain("attached source material");
+  expect(artifactDetail.sourceDocumentId).toBe(uploaded.documentId);
 
   const deletedArtifact = await page.request.delete("/api/artifacts/" + createdArtifact.artifact.id);
   expect(deletedArtifact.status()).toBe(204);

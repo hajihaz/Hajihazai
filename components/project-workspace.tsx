@@ -232,6 +232,7 @@ export default function ProjectWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           conversationId: chat.id,
+          sourceDocumentId: doc.id,
           title: "Draft — " + doc.title,
           content: "# " + doc.title + "\n\nSource document: " + doc.title + "\n\n" + sourceContent,
         }),

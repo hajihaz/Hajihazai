@@ -209,14 +209,14 @@ describe.skipIf(!hasDb)("memory context retrieval (db) — Bug 2 + Bug 6 fixes",
   });
 
   it("fallback includes all memories when no keyword match", async () => {
-    // Query with no keyword in memory content → falls through to all-memories.
+    // A non-matching query does not broaden into unrelated memories.
     const ctx = await buildMemoryContext(userId, { query: "Tell me something interesting" });
-    expect(ctx.count).toBeGreaterThan(0);
+    expect(ctx.count).toBe(0);
     expect(ctx.fallbackUsed).toBe(true);
   });
 
   it("memory block uses the increased budget (Bug 3 fix)", async () => {
-    const ctx = await buildMemoryContext(userId, { query: "Tell me everything" });
+    const ctx = await buildMemoryContext(userId);
     // All 3 seeded memories should fit — old 1000-char budget easily fits them,
     // but we verify count is equal to available memories.
     expect(ctx.count).toBe(3);

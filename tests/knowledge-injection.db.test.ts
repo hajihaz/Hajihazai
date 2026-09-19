@@ -73,7 +73,7 @@ describe.skipIf(!hasDb)("knowledge context injection (db)", () => {
     // A memory so we can verify memory still works alongside knowledge.
     await db
       .insert(schema.userMemory)
-      .values({ userId: A, type: "preference", content: "Prefers concise answers", status: "active" });
+      .values({ userId: A, type: "preference", content: "Prefers concise answers", status: "active", validFrom: new Date(), updatedAt: new Date() });
     await memSvc.embedAllMemories(A);
   });
 

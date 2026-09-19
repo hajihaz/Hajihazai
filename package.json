@@ -11,6 +11,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:test:seed": "node scripts/seed-disposable-db.mjs",
+    "test:db": "npm run db:migrate && npm run db:test:seed && npm test -- --run",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "seed:admin": "node --env-file=.env.local scripts/seed-admin.mjs",

@@ -20,7 +20,7 @@ describe.skipIf(!hasDb)("semantic retrieval (db)", () => {
   async function addMemory(userId: string, content: string, status: string) {
     const [row] = await db
       .insert(schema.userMemory)
-      .values({ userId, content, status })
+       .values({ userId, content, status, validFrom: new Date(), updatedAt: new Date() })
       .returning();
     return row.id as string;
   }
