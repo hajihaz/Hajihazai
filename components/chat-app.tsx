@@ -255,6 +255,21 @@ export default function ChatApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep project names/context fresh when returning from the Projects dashboard
+  // or a project workspace in another tab/window.
+  useEffect(() => {
+    const refreshProjectsOnReturn = () => {
+      if (document.visibilityState === "visible") void loadProjects();
+    };
+    window.addEventListener("focus", refreshProjectsOnReturn);
+    document.addEventListener("visibilitychange", refreshProjectsOnReturn);
+    return () => {
+      window.removeEventListener("focus", refreshProjectsOnReturn);
+      document.removeEventListener("visibilitychange", refreshProjectsOnReturn);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function loadBrains() {
     try {
       const res = await fetch("/api/brains");

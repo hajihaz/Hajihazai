@@ -277,6 +277,21 @@ const Sidebar = memo(function Sidebar({
     if (!projectChats[id]) await refreshProjectChats(id);
   }
 
+  // Revalidate expanded project chat lists when returning to the app so chats
+  // created from a project workspace or another tab appear without a reload.
+  useEffect(() => {
+    const refreshExpandedProjects = () => {
+      if (document.visibilityState !== "visible") return;
+      for (const id of expanded) void refreshProjectChats(id);
+    };
+    window.addEventListener("focus", refreshExpandedProjects);
+    document.addEventListener("visibilitychange", refreshExpandedProjects);
+    return () => {
+      window.removeEventListener("focus", refreshExpandedProjects);
+      document.removeEventListener("visibilitychange", refreshExpandedProjects);
+    };
+  }, [expanded]);
+
   async function toggleArchivedView() {
     const next = !showArchived;
     setShowArchived(next);
