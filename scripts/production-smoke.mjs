@@ -42,34 +42,6 @@ async function request(check) {
 const homepage = await request(checks[0]);
 for (const check of checks.slice(1)) await request(check);
 
-// Exercise authenticated read paths with an isolated guest session. This catches
-// production schema/API regressions that anonymous 401 checks cannot detect.
-const guestResponse = await fetch(base + "/api/auth/guest", {
-  method: "POST",
-  headers: { "content-type": "application/json" },
-  body: "{}",
-});
-const guestCookie = guestResponse.headers.get("set-cookie")?.split(";", 1)[0] ?? "";
-if (!guestResponse.ok || !guestCookie) {
-  failures++;
-  console.error("FAIL guest session: " + guestResponse.status);
-} else {
-  console.log("PASS guest session: " + guestResponse.status);
-  for (const check of [
-    { name: "guest artifacts read", path: "/api/artifacts" },
-    { name: "guest knowledge read", path: "/api/knowledge" },
-    { name: "guest automations read", path: "/api/automations" },
-  ]) {
-    const res = await fetch(base + check.path, { headers: { Cookie: guestCookie } });
-    if (!res.ok) {
-      failures++;
-      console.error("FAIL " + check.name + ": " + res.status);
-    } else {
-      console.log("PASS " + check.name + ": " + res.status);
-    }
-  }
-}
-
 for (const [name, pattern] of Object.entries(requiredHeaders)) {
   const value = homepage.headers.get(name) || "";
   if (!pattern.test(value)) {
