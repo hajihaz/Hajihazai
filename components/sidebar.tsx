@@ -20,7 +20,7 @@ import {
   X,
 } from "lucide-react";
 
-type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean; pinned?: boolean };
+type Conv = { id: string; title: string; projectId?: string | null; updatedAt?: string | null; archived?: boolean; pinned?: boolean };
 type Proj = { id: string; name: string; isSystem?: boolean };
 type BrainEntry = { id: string; name: string; slug: string; icon: string; color: string };
 
@@ -77,6 +77,7 @@ function useSectionCollapse() {
 // (An inner component would get a new type each render, causing remount + focus loss during rename.)
 function ConvRow({
   c,
+  projectName,
   isPinned,
   isActive,
   isRenaming,
@@ -92,6 +93,7 @@ function ConvRow({
   onDelete,
 }: {
   c: Conv;
+  projectName?: string;
   isPinned: boolean;
   isActive: boolean;
   isRenaming: boolean;
@@ -129,9 +131,16 @@ function ConvRow({
           className="min-w-0 flex-1 rounded bg-background px-1 py-0.5 text-sm outline-none ring-1 ring-ring"
         />
       ) : (
-        <span onClick={onSelect} className="min-w-0 flex-1 truncate">
-          {c.title}
-        </span>
+        <>
+          <span onClick={onSelect} className="min-w-0 flex-1 truncate">
+            {c.title}
+          </span>
+          {projectName ? (
+            <span className="hidden max-w-24 shrink-0 truncate rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline" title={projectName}>
+              {projectName}
+            </span>
+          ) : null}
+        </>
       )}
 
       {!isRenaming && (
@@ -346,6 +355,7 @@ const Sidebar = memo(function Sidebar({
       }),
     [projects],
   );
+  const projectNameById = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
 
   return (
     <>
@@ -561,6 +571,7 @@ const Sidebar = memo(function Sidebar({
                   <ConvRow
                     key={c.id}
                     c={c}
+                    projectName={c.projectId ? projectNameById.get(c.projectId) : undefined}
                     isPinned={false}
                     isActive={activeId === c.id}
                     isRenaming={false}
@@ -612,6 +623,7 @@ const Sidebar = memo(function Sidebar({
                       <li key={c.id}>
                         <ConvRow
                           c={c}
+                          projectName={c.projectId ? projectNameById.get(c.projectId) : undefined}
                           isPinned
                           isActive={activeId === c.id}
                           isRenaming={inlineRenameId === c.id}
@@ -643,6 +655,7 @@ const Sidebar = memo(function Sidebar({
                     <li key={c.id}>
                       <ConvRow
                         c={c}
+                        projectName={c.projectId ? projectNameById.get(c.projectId) : undefined}
                         isPinned={false}
                         isActive={activeId === c.id}
                         isRenaming={inlineRenameId === c.id}
