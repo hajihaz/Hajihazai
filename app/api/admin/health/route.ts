@@ -75,6 +75,18 @@ export async function GET() {
           { "x-goog-api-key": geminiKey },
         )
       : checkProvider("Google Gemini", "https://generativelanguage.googleapis.com/v1beta/models", undefined),
+    geminiKey
+      ? checkProvider(
+          "Google Gemini Image",
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image",
+          geminiKey,
+          { "x-goog-api-key": geminiKey },
+        )
+      : checkProvider(
+          "Google Gemini Image",
+          "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image",
+          undefined,
+        ),
   ]);
 
   const memUsage = process.memoryUsage();
