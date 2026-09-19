@@ -410,6 +410,27 @@ export default function ChatApp({
     [newChat],
   );
 
+  const switchProject = useCallback(
+    async (projectId: string) => {
+      if (!projectId) {
+        const globalChat = conversations.find((c) => !c.projectId);
+        if (globalChat) {
+          await openConversation(globalChat.id);
+        } else {
+          await newChat(null);
+        }
+        return;
+      }
+      const projectChat = conversations.find((c) => c.projectId === projectId);
+      if (projectChat) {
+        await openConversation(projectChat.id);
+      } else {
+        await newChat(projectId);
+      }
+    },
+    [conversations, newChat, openConversation],
+  );
+
   async function confirmDelete() {
     if (!pendingDelete) return;
     const id = pendingDelete.id;
@@ -1062,16 +1083,32 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           </div>
 
           <div className="ml-auto flex min-w-0 items-center gap-2">
-            {activeProject ? (
-              <a
-                href={"/projects/" + activeProject.id}
-                className="hidden max-w-48 items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-left sm:flex"
-                title={"Open " + activeProject.name}
+            <div className="hidden items-center gap-2 sm:flex">
+              <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+              <select
+                value={activeProject?.id ?? ""}
+                onChange={(e) => void switchProject(e.target.value)}
+                aria-label="Switch project"
+                className="max-w-48 truncate rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs font-medium outline-none hover:bg-accent"
               >
-                <Folder className="size-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate text-xs font-medium">{activeProject.name}</span>
-              </a>
-            ) : null}
+                <option value="">Global chat</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}{project.isSystem ? " (Global)" : ""}
+                  </option>
+                ))}
+              </select>
+              {activeProject ? (
+                <a
+                  href={"/projects/" + activeProject.id}
+                  className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                  title={"Open " + activeProject.name + " workspace"}
+                  aria-label={"Open " + activeProject.name + " workspace"}
+                >
+                  <span className="text-[11px]">↗</span>
+                </a>
+              ) : null}
+            </div>
             {isAdmin ? (
               <button
                 type="button"

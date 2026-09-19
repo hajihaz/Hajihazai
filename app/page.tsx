@@ -146,6 +146,7 @@ export default async function Home({
   const conversations = rows.map((c) => ({
     id: c.id,
     title: c.title,
+    projectId: c.projectId ?? null,
     updatedAt: c.updatedAt?.toISOString() ?? null,
   }));
 
