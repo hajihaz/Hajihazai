@@ -21,7 +21,7 @@ import {
   Zap,
 } from "lucide-react";
 
-type Chat = { id: string; title: string };
+type Chat = { id: string; title: string; updatedAt?: string | null };
 type Doc = { id: string; title: string; status: string };
 type Artifact = {
   id: string;
@@ -58,7 +58,7 @@ type Run = {
   modelId: string | null;
 };
 
-function fmtDate(value: string | null) {
+function fmtDate(value: string | null | undefined) {
   if (!value) return "—";
   return new Date(value).toLocaleString();
 }
@@ -430,8 +430,10 @@ export default function ProjectWorkspace({
           {chats.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted-foreground">No chats in this project yet.</p>
           ) : chats.map((c) => (
-            <a key={c.id} href={"/?c=" + c.id} className="block border-b px-3 py-2.5 text-sm last:border-0 hover:bg-accent">
-              {c.title}
+            <a key={c.id} href={"/?c=" + c.id} className="flex items-center gap-3 border-b px-3 py-2.5 text-sm last:border-0 hover:bg-accent">
+              <MessageSquarePlus className="size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">{c.title}</span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{fmtDate(c.updatedAt)}</span>
             </a>
           ))}
         </div>
