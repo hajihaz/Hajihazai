@@ -37,10 +37,10 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: psql -h 127.0.0.1 -U postgres -d hajihazai_test -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS vector;"
-      - name: Apply migrations
+      - name: Apply current schema
         env:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/hajihazai_test
-        run: npm run db:migrate
+        run: npx drizzle-kit push --force
       - name: Seed deterministic fixtures
         env:
           DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/hajihazai_test
