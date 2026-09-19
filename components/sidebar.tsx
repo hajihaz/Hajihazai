@@ -414,13 +414,18 @@ const Sidebar = memo(function Sidebar({
         <nav className="flex-1 overflow-y-auto overscroll-contain px-2 pb-3">
           {/* Projects */}
           <div className="mb-1 flex items-center justify-between px-2 pt-1">
-            <button
-              onClick={() => toggleSection("projects")}
-              className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
-            >
-              <ChevronRight className={`size-3 transition-transform ${collapsed.has("projects") ? "" : "rotate-90"}`} />
-              Projects
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => toggleSection("projects")}
+                aria-label="Collapse projects"
+                className="flex size-6 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
+              >
+                <ChevronRight className={`size-3 transition-transform ${collapsed.has("projects") ? "" : "rotate-90"}`} />
+              </button>
+              <a href="/projects" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground">
+                Projects
+              </a>
+            </div>
             <button
               onClick={onNewProject}
               aria-label="New project"
