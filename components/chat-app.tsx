@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bug, Download, GitFork, Menu, PlusCircle, Share2, Paperclip } from "lucide-react";
+import { Bug, Download, Folder, GitFork, Menu, PlusCircle, Share2, Paperclip } from "lucide-react";
 import Sidebar from "./sidebar";
 import Chat from "./chat";
 import Modal from "./modal";
@@ -11,7 +11,7 @@ import ImageGenerator from "./image-generator";
 import CanvasWorkspace from "./canvas-workspace";
 import FileLibrary from "./file-library";
 
-type Conv = { id: string; title: string; updatedAt?: string | null; archived?: boolean; pinned?: boolean; intelligenceLevel?: string };
+type Conv = { id: string; title: string; projectId?: string | null; updatedAt?: string | null; archived?: boolean; pinned?: boolean; intelligenceLevel?: string };
 type Proj = { id: string; name: string; isSystem?: boolean };
 type LevelOption = {
   level: string;
@@ -132,6 +132,10 @@ export default function ChatApp({
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [projects, setProjects] = useState<Proj[]>([]);
+  const activeConversation = activeId ? conversations.find((c) => c.id === activeId) : null;
+  const activeProject = activeConversation?.projectId
+    ? projects.find((p) => p.id === activeConversation.projectId)
+    : null;
 
   const [levels, setLevels] = useState<LevelOption[]>(initialLevels);
   const [level, setLevel] = useState<string>(
@@ -1046,6 +1050,16 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           </div>
 
           <div className="ml-auto flex min-w-0 items-center gap-2">
+            {activeProject ? (
+              <a
+                href={"/projects/" + activeProject.id}
+                className="hidden max-w-48 items-center gap-2 rounded-lg border bg-muted/40 px-2.5 py-1.5 text-left sm:flex"
+                title={"Open " + activeProject.name}
+              >
+                <Folder className="size-3.5 shrink-0 text-muted-foreground" />
+                <span className="truncate text-xs font-medium">{activeProject.name}</span>
+              </a>
+            ) : null}
             {isAdmin ? (
               <button
                 type="button"
