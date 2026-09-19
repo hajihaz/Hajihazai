@@ -113,6 +113,8 @@ export default function ProjectWorkspace({
   const [projectMsg, setProjectMsg] = useState<string | null>(null);
   const [instrMsg, setInstrMsg] = useState<string | null>(null);
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+  const [artifactMsg, setArtifactMsg] = useState<string | null>(null);
+  const [artifactBusy, setArtifactBusy] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [memoryBusy, setMemoryBusy] = useState<string | null>(null);
   const [memoryMsg, setMemoryMsg] = useState<string | null>(null);
@@ -199,6 +201,49 @@ export default function ProjectWorkspace({
       if (fileRef.current) fileRef.current.value = "";
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function createArtifactFromDocument(doc: Doc) {
+    if (artifactBusy) return;
+    setArtifactBusy(doc.id);
+    setArtifactMsg(null);
+    try {
+      const contentRes = await fetch("/api/knowledge/" + doc.id + "/content", { cache: "no-store" });
+      const contentData = await contentRes.json().catch(() => ({}));
+      const sourceContent = typeof contentData.content?.content === "string" ? contentData.content.content : "";
+      if (!contentRes.ok || !sourceContent.trim()) {
+        setArtifactMsg("This document has no readable content yet.");
+        return;
+      }
+
+      const chatRes = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id }),
+      });
+      if (!chatRes.ok) {
+        setArtifactMsg("Could not create a project chat for the artifact.");
+        return;
+      }
+      const chat = await chatRes.json();
+      const artifactRes = await fetch("/api/artifacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationId: chat.id,
+          title: "Draft — " + doc.title,
+          content: "# " + doc.title + "\n\nSource document: " + doc.title + "\n\n" + sourceContent,
+        }),
+      });
+      if (!artifactRes.ok) {
+        setArtifactMsg("The chat was created, but the artifact could not be saved.");
+        return;
+      }
+      setArtifactMsg("Artifact created from “" + doc.title + "”.");
+      window.location.href = "/?c=" + chat.id;
+    } finally {
+      setArtifactBusy(null);
     }
   }
 
@@ -478,6 +523,7 @@ export default function ProjectWorkspace({
         </form>
         <p className="text-xs text-muted-foreground">PDF, DOCX, TXT, and MD supported. Max 5MB.</p>
         {uploadMsg ? <p className="text-xs text-muted-foreground">{uploadMsg}</p> : null}
+        {artifactMsg ? <p className="text-xs text-muted-foreground" role="status">{artifactMsg}</p> : null}
         <div className="overflow-hidden rounded-lg border">
           {docs.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted-foreground">No documents yet.</p>
@@ -486,6 +532,9 @@ export default function ProjectWorkspace({
               <FileText className="size-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate">{d.title}</span>
               <span className="text-xs text-muted-foreground">{d.status}</span>
+              <button onClick={() => void createArtifactFromDocument(d)} disabled={artifactBusy === d.id} className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-accent disabled:opacity-50">
+                {artifactBusy === d.id ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />} Create artifact
+              </button>
             </div>
           ))}
         </div>
