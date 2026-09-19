@@ -207,13 +207,14 @@ async function searchScope(
   query: string,
   projectId: string | null | undefined,
   brainId?: string | null,
+  documentIds?: string[],
 ): Promise<DocumentSearchHit[]> {
   const semanticPromise = semanticDocumentSearch(
     userId,
     query,
     KNOWLEDGE_LIMIT,
     DEFAULT_DOC_SIMILARITY_THRESHOLD,
-    { projectId, brainId },
+    { projectId, brainId, documentIds },
   ).catch((err) => {
     console.warn("[knowledge] semantic search error:", err);
     return [] as DocumentSearchHit[];
@@ -223,6 +224,7 @@ async function searchScope(
     projectId,
     brainId,
     limit: KNOWLEDGE_LIMIT,
+    documentIds,
   }).catch((err) => {
     console.warn("[knowledge] keyword search error; preserving semantic results:", err);
     return [] as DocumentSearchHit[];
@@ -250,12 +252,12 @@ async function searchScope(
  */
 export async function buildKnowledgeContext(
   userId: string,
-  opts: { query?: string; maxChars?: number; projectId?: string | null; brainId?: string | null } = {},
+  opts: { query?: string; maxChars?: number; projectId?: string | null; brainId?: string | null; documentIds?: string[] } = {},
 ): Promise<KnowledgeContext> {
   const query = opts.query?.trim();
   if (!query) return { block: "", chunks: [], count: 0 };
 
-  const hits = await searchScope(userId, query, opts.projectId, opts.brainId);
+  const hits = await searchScope(userId, query, opts.projectId, opts.brainId, opts.documentIds);
 
   // Phase E — exact-title preference: float documents whose title matches the
   // query to the front, keeping the semantic-then-keyword order for ties (stable

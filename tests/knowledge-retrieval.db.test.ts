@@ -17,7 +17,7 @@ const hasDb = !!process.env.DATABASE_URL;
 describe.skipIf(!hasDb)("knowledge retrieval — overrides hallucination (db)", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */
   let db: any, schema: any, ing: any, ctx: any, pq: any;
-  let A = "", projId = "", otherProjId = "";
+  let A = "", projId = "", otherProjId = "", attachedDocId = "";
 
   beforeAll(async () => {
     ({ db } = await import("@/lib/db"));
@@ -31,7 +31,7 @@ describe.skipIf(!hasDb)("knowledge retrieval — overrides hallucination (db)", 
     otherProjId = (await pq.createProject(A, { name: "Law" })).id;
 
     // Use a unique phrase that does NOT appear in any global knowledge document.
-    await ing.ingestDocument(A, {
+    const attached = await ing.ingestDocument(A, {
       filename: "haji.txt",
       buffer: Buffer.from(
         "UNIQUE_KR_TESTPHRASE_ZQ9: User A studies at Kattankulathur private project.",
@@ -39,6 +39,18 @@ describe.skipIf(!hasDb)("knowledge retrieval — overrides hallucination (db)", 
       projectId: projId,
       title: "About User A (private project)",
     });
+    if (!attached.ok) throw new Error(attached.error);
+    attachedDocId = attached.documentId;
+
+    const other = await ing.ingestDocument(A, {
+      filename: "other.txt",
+      buffer: Buffer.from(
+        "UNIQUE_KR_OTHERPHRASE_X7: unrelated project document content.",
+      ),
+      projectId: projId,
+      title: "Unrelated project document",
+    });
+    if (!other.ok) throw new Error(other.error);
   });
 
   afterAll(async () => {
@@ -65,6 +77,16 @@ describe.skipIf(!hasDb)("knowledge retrieval — overrides hallucination (db)", 
       projectId: otherProjId,
     });
     expect(other.block).not.toContain("UNIQUE_KR_TESTPHRASE_ZQ9");
+  });
+
+  it("restricts retrieval to explicitly attached document IDs", async () => {
+    const attachedOnly = await ctx.buildKnowledgeContext(A, {
+      query: "UNIQUE_KR_OTHERPHRASE_X7 UNIQUE_KR_TESTPHRASE_ZQ9",
+      projectId: projId,
+      documentIds: [attachedDocId],
+    });
+    expect(attachedOnly.block).toContain("UNIQUE_KR_TESTPHRASE_ZQ9");
+    expect(attachedOnly.block).not.toContain("UNIQUE_KR_OTHERPHRASE_X7");
   });
 
   it("does NOT surface private project knowledge in a user-level (non-project) chat", async () => {

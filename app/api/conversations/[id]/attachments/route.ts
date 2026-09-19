@@ -15,6 +15,30 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   return Response.json({ attachments: rows }, { headers: NO_STORE });
 }
 
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const session = await auth();
+  if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse(`conversation-attachments:${session.user.id}`, 60, 60_000);
+  if (limited) return limited;
+
+  const { id } = await params;
+  const documentId = new URL(req.url).searchParams.get("documentId")?.trim() ?? "";
+  if (!documentId) return Response.json({ error: "documentId is required" }, { status: 400 });
+
+  const [deleted] = await db
+    .delete(conversationAttachments)
+    .where(
+      and(
+        eq(conversationAttachments.conversationId, id),
+        eq(conversationAttachments.documentId, documentId),
+        eq(conversationAttachments.userId, session.user.id),
+      ),
+    )
+    .returning({ id: conversationAttachments.id });
+
+  return deleted ? new Response(null, { status: 204 }) : new Response("Not found", { status: 404 });
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth(); if (!session?.user?.id) return new Response("Unauthorized", { status: 401 });
   const limited = await rateLimitResponse(`conversation-attachments:${session.user.id}`, 60, 60_000); if (limited) return limited;

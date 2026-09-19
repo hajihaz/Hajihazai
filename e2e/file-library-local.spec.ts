@@ -38,6 +38,15 @@ test("persistent file library upload -> search -> reuse -> delete", async ({ pag
   expect(detail.status()).toBe(200);
   expect((await detail.json()).preview.content).toContain("Persistent server-backed content.");
 
+  const detached = await page.request.delete(`/api/conversations/${conversation.id}/attachments?documentId=${encodeURIComponent(uploaded.documentId)}`);
+  expect(detached.status()).toBe(204);
+  const afterDetach = await page.request.get(`/api/conversations/${conversation.id}/attachments`);
+  expect(afterDetach.status()).toBe(200);
+  expect((await afterDetach.json()).attachments.some((a: { documentId:string }) => a.documentId === uploaded.documentId)).toBe(false);
+
+  const reattached = await page.request.post(`/api/conversations/${conversation.id}/attachments`, { data: { documentId: uploaded.documentId } });
+  expect(reattached.status()).toBe(201);
+
   const deleted = await page.request.delete(`/api/knowledge/${uploaded.documentId}`);
   expect(deleted.status()).toBe(204);
   expect((await page.request.get(`/api/knowledge/${uploaded.documentId}`)).status()).toBe(404);

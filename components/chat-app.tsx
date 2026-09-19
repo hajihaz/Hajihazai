@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bug, Download, Folder, GitFork, Menu, PlusCircle, Share2, Paperclip } from "lucide-react";
+import { Bug, Download, Folder, GitFork, Menu, PlusCircle, Share2, Paperclip, X } from "lucide-react";
 import Sidebar from "./sidebar";
 import Chat from "./chat";
 import Modal from "./modal";
@@ -109,11 +109,13 @@ export default function ChatApp({
   user,
   initialConversations,
   levels: initialLevels,
+  initialProjects,
   isAdmin,
   openConversationId,
 }: {
   user: User;
   initialConversations: Conv[];
+  initialProjects: Proj[];
   levels: LevelOption[];
   isAdmin: boolean;
   openConversationId?: string;
@@ -131,7 +133,8 @@ export default function ChatApp({
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [projects, setProjects] = useState<Proj[]>([]);
+  const [projects, setProjects] = useState<Proj[]>(initialProjects);
+  const projectLoadSeqRef = useRef(0);
   const activeConversation = activeId ? conversations.find((c) => c.id === activeId) : null;
   const activeProject = activeConversation?.projectId
     ? projects.find((p) => p.id === activeConversation.projectId)
@@ -259,7 +262,7 @@ export default function ChatApp({
   // or a project workspace in another tab/window.
   useEffect(() => {
     const refreshProjectsOnReturn = () => {
-      if (document.visibilityState === "visible") void loadProjects();
+      void loadProjects();
     };
     window.addEventListener("focus", refreshProjectsOnReturn);
     document.addEventListener("visibilitychange", refreshProjectsOnReturn);
@@ -309,10 +312,12 @@ export default function ChatApp({
   }
 
   async function loadProjects() {
+    const requestSeq = ++projectLoadSeqRef.current;
     try {
-      const res = await fetch("/api/projects");
-      if (!res.ok) return;
+      const res = await fetch("/api/projects", { cache: "no-store" });
+      if (!res.ok || requestSeq !== projectLoadSeqRef.current) return;
       const data = await res.json();
+      if (requestSeq !== projectLoadSeqRef.current) return;
       setProjects(
         (data.projects ?? []).map(
           (p: { id: string; name: string; isSystem?: boolean }) => ({
@@ -700,6 +705,14 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     void runChat(text, { userLocalId: localId });
   }
 
+  async function detachAttachment(documentId: string) {
+    if (!activeId) return;
+    const res = await fetch(`/api/conversations/${activeId}/attachments?documentId=${encodeURIComponent(documentId)}`, {
+      method: "DELETE",
+    });
+    if (res.ok) setAttachments((current) => current.filter((item) => item.documentId !== documentId));
+  }
+
   async function sendAttachments(files: File[], prompt: string) {
     files = files.slice(0, 5);
     const pdfs = files.filter((f) => /\.pdf$/i.test(f.name));
@@ -736,7 +749,21 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           const stored = await fetch("/api/knowledge/upload", { method: "POST", body: store });
           if (!stored.ok) { const data = await stored.json().catch(() => null); throw new Error(data?.error || `Couldn't save ${image.name}`); }
           const storedData = await stored.json();
-          if (activeId && storedData.documentId) { await fetch(`/api/conversations/${activeId}/attachments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: storedData.documentId }) }); }
+          if (activeId && storedData.documentId) {
+            const attached = await fetch(`/api/conversations/${activeId}/attachments`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ documentId: storedData.documentId }),
+            });
+            const attachedData = await attached.json().catch(() => null);
+            if (attached.ok && attachedData?.attachment) {
+              setAttachments((current) =>
+                current.some((item) => item.documentId === storedData.documentId)
+                  ? current
+                  : [...current, { ...attachedData.attachment, title: image.name }],
+              );
+            }
+          }
         }
         const form = new FormData();
         for (const image of images.slice(0, 4)) form.append("image", image);
@@ -756,12 +783,24 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           if (!res.ok) { const data = await res.json().catch(() => null); throw new Error(data?.error || `Couldn't upload ${file.name} (HTTP ${res.status})`); }
           uploaded.push(file.name);
           const uploadedData = await res.clone().json().catch(() => null);
-          if (activeId && uploadedData?.documentId) await fetch(`/api/conversations/${activeId}/attachments`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ documentId: uploadedData.documentId }) });
+          if (activeId && uploadedData?.documentId) {
+            const attached = await fetch(`/api/conversations/${activeId}/attachments`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ documentId: uploadedData.documentId }),
+            });
+            const attachedData = await attached.json().catch(() => null);
+            if (attached.ok && attachedData?.attachment) {
+              setAttachments((current) =>
+                current.some((item) => item.documentId === uploadedData.documentId)
+                  ? current
+                  : [...current, attachedData.attachment],
+              );
+            }
+          }
         }
         const attachmentPrompt = `${prompt || "Analyze the attached files and summarize the most important information."}\n\nUse these newly attached files as the primary source for this response: ${uploaded.join(", ")}. If the request asks for facts from the files, distinguish file content from general knowledge.`;
-        const localUser = uuid();
-        setMessages((p) => [...p, { id: localUser, role: "user", content: attachmentPrompt, isNew: true }]);
-        await runChat(attachmentPrompt, { userLocalId: localUser });
+        await runChat(attachmentPrompt, { userLocalId: localId });
       }
     } catch (error) {
       setMessages((p) => [...p, { id: uuid(), role: "assistant", content: `⚠️ ${error instanceof Error ? error.message : "File processing failed. Please try again."}`, error: true, isNew: true }]);
@@ -1221,7 +1260,15 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
 
         {attachments.length > 0 ? (
           <div className="flex shrink-0 gap-2 overflow-x-auto border-b px-3 py-2 text-xs">
-            {attachments.map((a) => <span key={a.id} className="inline-flex shrink-0 items-center gap-1 rounded-full border bg-muted/40 px-2.5 py-1"><Paperclip className="size-3" />{a.originalName ?? a.title}</span>)}
+            {attachments.map((a) => (
+              <span key={a.id} className="inline-flex shrink-0 items-center gap-1 rounded-full border bg-muted/40 px-2.5 py-1">
+                <Paperclip className="size-3" />
+                <span className="max-w-48 truncate">{a.originalName ?? a.title}</span>
+                <button type="button" onClick={() => void detachAttachment(a.documentId)} aria-label={"Detach " + (a.originalName ?? a.title)} title="Detach from conversation" className="rounded-full p-0.5 hover:bg-accent">
+                  <X className="size-3" />
+                </button>
+              </span>
+            ))}
           </div>
         ) : null}
 

@@ -3,6 +3,7 @@ import { Brain, Globe2, LockKeyhole } from "lucide-react";
 import Image from "next/image"
 import { auth } from "@/auth";
 import { listConversations } from "@/lib/db/queries";
+import { listProjects } from "@/lib/db/project-queries";
 import { getProfile, isProfileComplete } from "@/lib/db/profile-queries";
 import { listLevels } from "@/lib/ai/levels";
 import { isAdmin } from "@/lib/auth/admin";
@@ -142,7 +143,10 @@ export default async function Home({
     redirect("/onboarding");
   }
 
-  const rows = await listConversations(session.user.id);
+  const [rows, projectRows] = await Promise.all([
+    listConversations(session.user.id),
+    listProjects(session.user.id),
+  ]);
   const conversations = rows.map((c) => ({
     id: c.id,
     title: c.title,
@@ -164,6 +168,11 @@ export default async function Home({
         image: profile?.profilePicture ?? session.user.image,
       }}
       initialConversations={conversations}
+      initialProjects={projectRows.map((p) => ({
+        id: p.id,
+        name: p.name,
+        isSystem: p.isSystem,
+      }))}
       levels={levels}
       isAdmin={admin}
       openConversationId={openConversationId}

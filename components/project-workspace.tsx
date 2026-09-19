@@ -319,7 +319,7 @@ export default function ProjectWorkspace({
       const res = await fetch("/api/automations/" + a.id + "/run", { method: "POST" });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setAutomationMsg("“" + a.name + "” finished a manual run.");
+        setAutomationMsg(a.status === "failed" ? "“" + a.name + "” was retried successfully." : "“" + a.name + "” finished a manual run.");
         await refreshAutomation(a.id);
         await loadRuns(a.id);
       } else setAutomationMsg(data.error ?? "Run failed");
@@ -468,7 +468,7 @@ export default function ProjectWorkspace({
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-sm font-semibold"><Brain className="size-4" /> Project Memory</h2>
-            <p className="mt-1 text-xs text-muted-foreground">Only linked memories and unscoped memories are used in project chats.</p>
+            <p className="mt-1 text-xs text-muted-foreground">Explicitly attached: {memories.length}. Project chats also include your unscoped memories; memories attached only to other projects stay excluded.</p>
           </div>
           <button onClick={openMemoryPicker} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:bg-accent">
             <Link2 className="size-4" /> Attach memory
@@ -571,7 +571,7 @@ export default function ProjectWorkspace({
                       ) : (
                         <button onClick={() => setAutomationStatus(a, "active")} disabled={automationBusy === a.id} title="Resume" className="rounded-lg p-2 text-muted-foreground hover:bg-accent"><Play className="size-4" /></button>
                       )}
-                      <button onClick={() => runNow(a)} disabled={automationBusy === a.id || a.status !== "active"} title="Run now" className="rounded-lg p-2 text-muted-foreground hover:bg-accent disabled:opacity-40"><Zap className="size-4" /></button>
+                      <button onClick={() => runNow(a)} disabled={automationBusy === a.id || (a.status !== "active" && a.status !== "failed")} title={a.status === "failed" ? "Retry failed automation" : "Run now"} aria-label={a.status === "failed" ? "Retry automation" : "Run now"} className="rounded-lg p-2 text-muted-foreground hover:bg-accent disabled:opacity-40"><Zap className="size-4" /></button>
                       <button onClick={() => loadRuns(a.id)} title="Run history" className="rounded-lg p-2 text-muted-foreground hover:bg-accent"><History className="size-4" /></button>
                       <button onClick={() => startAutomationEdit(a)} title="Edit" className="rounded-lg p-2 text-muted-foreground hover:bg-accent"><Pencil className="size-4" /></button>
                       <button onClick={() => deleteAutomation(a.id)} disabled={automationBusy === a.id} title="Delete" className="rounded-lg p-2 text-muted-foreground hover:text-destructive"><Trash2 className="size-4" /></button>

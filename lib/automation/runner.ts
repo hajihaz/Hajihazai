@@ -123,10 +123,32 @@ export async function runDueAutomations(now = new Date(), limit = 10) {
 export async function runAutomationNow(userId: string, automationId: string) {
   const automation = await getAutomation(userId, automationId);
   if (!automation) return { status: "not_found" as const };
-  if (automation.status !== "active") {
+  if (automation.status !== "active" && automation.status !== "failed") {
     return { status: "not_active" as const };
   }
+
+  // A failed scheduled job has no nextRunAt by design. A manual retry reactivates
+  // it first and restores the next scheduled run so one transient provider error
+  // does not permanently disable the automation.
+  const runnable =
+    automation.status === "failed"
+      ? {
+          ...automation,
+          status: "active" as const,
+          nextRunAt: nextAutomationRun(automation.schedule, automation.timezone),
+        }
+      : automation;
+
+  if (automation.status === "failed") {
+    await markAutomationResult(userId, automation.id, {
+      status: "active",
+      lastStatus: "retrying",
+      nextRunAt: runnable.nextRunAt,
+      lastError: null,
+    });
+  }
+
   const run = await createAutomationRun(userId, automation.id);
   if (!run) return { status: "error" as const, error: "Could not create run" };
-  return executeAutomation(automation, run.id, true);
+  return executeAutomation(runnable, run.id, true);
 }

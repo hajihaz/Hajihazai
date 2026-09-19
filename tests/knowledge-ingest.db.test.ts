@@ -53,13 +53,21 @@ describe.skipIf(!hasDb)("knowledge ingestion (db)", () => {
     }
   });
 
-  it("rejects PDF uploads until a parser is configured", async () => {
+  it("ingests a readable PDF into chunks", async () => {
+    const { PDFDocument, StandardFonts } = await import("pdf-lib");
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([400, 300]);
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    page.drawText("UNIQUE_PDF_INGEST_TEST", { x: 40, y: 240, font, size: 16 });
+    const bytes = await pdf.save();
+
     const r = await ing.ingestDocument(A, {
       filename: "doc.pdf",
-      buffer: Buffer.from("%PDF-1.4"),
+      buffer: Buffer.from(bytes),
       projectId: null,
     });
-    expect(r.ok).toBe(false);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.chunks).toBeGreaterThan(0);
   });
 
   it("rejects empty files", async () => {

@@ -1,4 +1,7 @@
 import { auth } from "@/auth";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { conversationAttachments } from "@/lib/db/schema";
 import {
   addMessage,
   addOwnedMessage,
@@ -84,6 +87,7 @@ async function retrieveMultiBrain(
   query: string,
   projectId: string | null,
   slugs: string[],
+  documentIds?: string[],
 ) {
   const brains = (
     await Promise.all(slugs.map((s) => getBrainBySlug(s).catch(() => null)))
@@ -95,6 +99,7 @@ async function retrieveMultiBrain(
           query,
           projectId,
           brainId: b.id,
+          documentIds,
         }).catch(() => null),
       ),
     )
@@ -302,6 +307,17 @@ export async function POST(req: Request) {
   }
 
   const projectId = convo.projectId ?? null;
+  const attachmentRows = await db
+    .select({ documentId: conversationAttachments.documentId })
+    .from(conversationAttachments)
+    .where(
+      and(
+        eq(conversationAttachments.conversationId, conversationId),
+        eq(conversationAttachments.userId, session.user.id),
+      ),
+    );
+  const attachedDocumentIds = attachmentRows.map((row) => row.documentId);
+
   const resolvedBrainId: string | null =
     effectiveBrainMode === "smart"
       ? (brainForSmart?.id ?? null)
@@ -336,11 +352,13 @@ export async function POST(req: Request) {
               retrievalQuery,
               projectId,
               multiBrains,
+              attachedDocumentIds.length ? attachedDocumentIds : undefined,
             )
           : buildKnowledgeContext(session.user.id, {
               query: retrievalQuery,
               projectId,
               brainId: resolvedBrainId ?? undefined,
+              documentIds: attachedDocumentIds.length ? attachedDocumentIds : undefined,
             })
         ).catch((err) => {
           console.warn("[chat] knowledge context failed:", err);

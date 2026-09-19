@@ -19,9 +19,9 @@ export async function POST(
   const { id } = await params;
   const automation = await getAutomation(session.user.id, id);
   if (!automation) return new Response("Not found", { status: 404 });
-  if (automation.status !== "active") {
+  if (automation.status !== "active" && automation.status !== "failed") {
     return Response.json(
-      { error: "Automation must be active to run now" },
+      { error: "Automation must be active or failed to run now" },
       { status: 409 },
     );
   }
@@ -30,7 +30,7 @@ export async function POST(
   if (result.status === "not_found") return new Response("Not found", { status: 404 });
   if (result.status === "not_active") {
     return Response.json(
-      { error: "Automation must be active to run now" },
+      { error: "Automation must be active or failed to run now" },
       { status: 409 },
     );
   }

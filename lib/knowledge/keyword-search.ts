@@ -1,4 +1,4 @@
-import { and, desc, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { knowledgeChunk, knowledgeDocument } from "@/lib/db/schema";
 import { projectScope, brainScope } from "./scope";
@@ -72,7 +72,7 @@ export function expandedTerms(query: string): string[] {
 export async function keywordDocumentSearch(
   userId: string,
   query: string,
-  opts: { projectId?: string | null; brainId?: string | null; limit?: number } = {},
+  opts: { projectId?: string | null; brainId?: string | null; limit?: number; documentIds?: string[] } = {},
 ): Promise<DocumentSearchHit[]> {
   const terms = expandedTerms(query);
   if (terms.length === 0) return [];
@@ -122,6 +122,7 @@ export async function keywordDocumentSearch(
         ownerClause,
         eq(knowledgeDocument.status, "active"),
         brainScope(opts.brainId),
+        ...(opts.documentIds?.length ? [inArray(knowledgeDocument.id, opts.documentIds)] : []),
         anyMatch,
       ),
     )

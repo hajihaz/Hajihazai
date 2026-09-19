@@ -1,4 +1,4 @@
-import { and, cosineDistance, desc, eq, gt, isNotNull, or, sql } from "drizzle-orm";
+import { and, cosineDistance, desc, eq, gt, inArray, isNotNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { knowledgeChunk, knowledgeDocument } from "@/lib/db/schema";
 import { embed } from "@/lib/ai/embeddings/router";
@@ -36,7 +36,7 @@ export async function semanticDocumentSearch(
   query: string,
   limit = 10,
   threshold = DEFAULT_DOC_SIMILARITY_THRESHOLD,
-  opts: { projectId?: string | null; brainId?: string | null } = {},
+  opts: { projectId?: string | null; brainId?: string | null; documentIds?: string[] } = {},
 ): Promise<DocumentSearchHit[]> {
   if (!query || !query.trim()) return [];
 
@@ -72,6 +72,7 @@ export async function semanticDocumentSearch(
         ownerClause,
         eq(knowledgeDocument.status, "active"),
         brainScope(opts.brainId),
+        ...(opts.documentIds?.length ? [inArray(knowledgeDocument.id, opts.documentIds)] : []),
         isNotNull(knowledgeChunk.embedding),
         gt(similarity, threshold),
       ),
