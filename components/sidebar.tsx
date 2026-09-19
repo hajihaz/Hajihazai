@@ -202,7 +202,7 @@ const Sidebar = memo(function Sidebar({
   onSelect: (id: string) => void;
   onNew: () => void;
   onNewProject: () => void;
-  onNewProjectChat: (projectId: string) => void;
+  onNewProjectChat: (projectId: string) => void | Promise<void>;
   onDelete: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onArchive: (id: string, archived: boolean) => void;
@@ -255,24 +255,26 @@ const Sidebar = memo(function Sidebar({
     }
   }, [inlineRenameId]);
 
+  async function refreshProjectChats(id: string) {
+    setLoadingProj(id);
+    try {
+      const res = await fetch(`/api/projects/${id}`, { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setProjectChats((prev) => ({ ...prev, [id]: data.chats ?? [] }));
+      }
+    } finally {
+      setLoadingProj(null);
+    }
+  }
+
   async function toggleProject(id: string) {
     if (expanded.has(id)) {
       setExpanded((prev) => { const next = new Set(prev); next.delete(id); return next; });
       return;
     }
     setExpanded((prev) => new Set([...prev, id]));
-    if (!projectChats[id]) {
-      setLoadingProj(id);
-      try {
-        const res = await fetch(`/api/projects/${id}`);
-        if (res.ok) {
-          const data = await res.json();
-          setProjectChats((prev) => ({ ...prev, [id]: data.chats ?? [] }));
-        }
-      } finally {
-        setLoadingProj(null);
-      }
-    }
+    if (!projectChats[id]) await refreshProjectChats(id);
   }
 
   async function toggleArchivedView() {
@@ -494,9 +496,10 @@ const Sidebar = memo(function Sidebar({
                       </a>
                       <button
                         type="button"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          onNewProjectChat(p.id);
+                          await onNewProjectChat(p.id);
+                          if (expanded.has(p.id)) await refreshProjectChats(p.id);
                         }}
                         aria-label={"New chat in " + p.name}
                         title="New chat in project"
