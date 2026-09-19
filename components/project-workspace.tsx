@@ -27,8 +27,10 @@ type Artifact = {
   id: string;
   title: string;
   conversationId: string | null;
+  sourceDocumentId?: string | null;
   updatedAt: string;
 };
+type ArtifactVersion = { id: string; title: string; content: string; createdAt: string };
 type Memory = {
   id: string;
   type: string;
@@ -115,6 +117,8 @@ export default function ProjectWorkspace({
   const [uploadMsg, setUploadMsg] = useState<string | null>(null);
   const [artifactMsg, setArtifactMsg] = useState<string | null>(null);
   const [artifactBusy, setArtifactBusy] = useState<string | null>(null);
+  const [artifactDetail, setArtifactDetail] = useState<{ artifact: Artifact; versions: ArtifactVersion[] } | null>(null);
+  const [artifactDetailBusy, setArtifactDetailBusy] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [memoryBusy, setMemoryBusy] = useState<string | null>(null);
   const [memoryMsg, setMemoryMsg] = useState<string | null>(null);
@@ -245,6 +249,18 @@ export default function ProjectWorkspace({
       window.location.href = "/?c=" + chat.id;
     } finally {
       setArtifactBusy(null);
+    }
+  }
+
+  async function openArtifactDetail(artifact: Artifact) {
+    setArtifactDetailBusy(artifact.id);
+    try {
+      const res = await fetch("/api/artifacts/" + artifact.id, { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      setArtifactDetail({ artifact: data.artifact, versions: data.versions ?? [] });
+    } finally {
+      setArtifactDetailBusy(null);
     }
   }
 
@@ -701,10 +717,16 @@ export default function ProjectWorkspace({
           {artifacts.length === 0 ? (
             <p className="px-3 py-4 text-sm text-muted-foreground">Artifacts created in project chats appear here.</p>
           ) : artifacts.map((a) => (
-            <a key={a.id} href={a.conversationId ? "/?c=" + a.conversationId : "/"} className="block border-b px-3 py-2 text-sm last:border-0 hover:bg-accent">
-              <span className="font-medium">{a.title}</span>
-              <span className="ml-2 text-xs text-muted-foreground">{new Date(a.updatedAt).toLocaleString()}</span>
-            </a>
+            <div key={a.id} className="flex items-center gap-2 border-b px-3 py-2 last:border-0">
+              <a href={a.conversationId ? "/?c=" + a.conversationId : "/"} className="min-w-0 flex-1 hover:underline">
+                <span className="font-medium">{a.title}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{new Date(a.updatedAt).toLocaleString()}</span>
+                {a.sourceDocumentId ? <span className="ml-2 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">source-linked</span> : null}
+              </a>
+              <button type="button" onClick={() => void openArtifactDetail(a)} disabled={artifactDetailBusy === a.id} title="View artifact versions" aria-label={"View versions for " + a.title} className="rounded-lg p-2 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50">
+                <History className="size-4" />
+              </button>
+            </div>
           ))}
         </div>
         <form onSubmit={async (e) => {
@@ -729,6 +751,28 @@ export default function ProjectWorkspace({
           {instrMsg ? <span className="text-xs text-muted-foreground">{instrMsg}</span> : null}
         </div>
       </section>
+
+      {artifactDetail ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-label="Artifact version history">
+          <div className="w-full max-w-2xl rounded-2xl border bg-background p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h2 className="truncate text-lg font-semibold">{artifactDetail.artifact.title}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">{artifactDetail.artifact.sourceDocumentId ? "Linked to its source document" : "No source document linked"} · {artifactDetail.versions.length} saved version{artifactDetail.versions.length === 1 ? "" : "s"}</p>
+              </div>
+              <button type="button" onClick={() => setArtifactDetail(null)} aria-label="Close version history" className="rounded-lg p-2 hover:bg-accent"><X className="size-4" /></button>
+            </div>
+            <div className="mt-4 max-h-[60vh] space-y-2 overflow-auto">
+              {artifactDetail.versions.length === 0 ? <p className="text-sm text-muted-foreground">No saved versions yet.</p> : artifactDetail.versions.map((version, index) => (
+                <details key={version.id} open={index === 0} className="rounded-lg border p-3">
+                  <summary className="cursor-pointer text-sm font-medium">Version {artifactDetail.versions.length - index} · {fmtDate(version.createdAt)}</summary>
+                  <pre className="mt-3 whitespace-pre-wrap text-xs leading-5 text-muted-foreground">{version.content}</pre>
+                </details>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </main>
   );
 }

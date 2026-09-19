@@ -22,6 +22,15 @@ async function checkDatabase(): Promise<{ ok: boolean; latencyMs: number; error?
   }
 }
 
+async function checkAutomationHealth() {
+  try {
+    const result = (await db.execute(sql`SELECT (SELECT count(*) FROM automations WHERE status = 'active')::int AS active, (SELECT count(*) FROM automations WHERE status = 'failed')::int AS failed, (SELECT count(*) FROM automations WHERE status = 'active' AND next_run_at <= now())::int AS due, (SELECT count(*) FROM automation_runs WHERE started_at >= now() - interval '24 hours')::int AS runs24h, (SELECT count(*) FROM automation_runs WHERE status = 'failed' AND started_at >= now() - interval '24 hours')::int AS failedRuns24h`)) as unknown as { rows: Array<Record<string, unknown>> };
+    return result.rows[0] ?? {};
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 async function checkProvider(
   name: string,
   url: string,
@@ -63,8 +72,9 @@ export async function GET() {
   if (readLimited) return readLimited;
 
   const geminiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  const [database, ...providers] = await Promise.all([
+  const [database, automation, ...providers] = await Promise.all([
     checkDatabase(),
+    checkAutomationHealth(),
     checkProvider("Groq", "https://api.groq.com/openai/v1/models", process.env.GROQ_API_KEY),
     checkProvider("OpenRouter", "https://openrouter.ai/api/v1/models", process.env.OPENROUTER_API_KEY),
     geminiKey
@@ -96,6 +106,12 @@ export async function GET() {
     status: database.ok && !providerFailure ? "healthy" : "degraded",
     checkedAt: new Date().toISOString(),
     database,
+    automation,
+    deployment: {
+      environment: process.env.VERCEL_ENV ?? "local",
+      commit: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+      region: process.env.VERCEL_REGION ?? null,
+    },
     providers,
     memory: {
       heapUsedMB: Math.round(memUsage.heapUsed / 1024 / 1024),
