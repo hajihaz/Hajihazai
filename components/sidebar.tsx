@@ -221,6 +221,7 @@ const Sidebar = memo(function Sidebar({
 
   // Search
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchProjectId, setSearchProjectId] = useState<string>("");
 
   // Pin
   const [pinned, setPinned] = useState<Set<string>>(() => new Set());
@@ -334,14 +335,14 @@ const Sidebar = memo(function Sidebar({
   const projectNameById = useMemo(() => new Map(projects.map((p) => [p.id, p.name])), [projects]);
 
   const filteredConversations = useMemo(
-    () => (q
-      ? conversations.filter((c) => {
-          const title = c.title.toLowerCase();
-          const project = c.projectId ? (projectNameById.get(c.projectId) ?? "").toLowerCase() : "";
-          return title.includes(q) || project.includes(q);
-        })
-      : conversations),
-    [conversations, q, projectNameById],
+    () => conversations.filter((c) => {
+      const title = c.title.toLowerCase();
+      const project = c.projectId ? (projectNameById.get(c.projectId) ?? "").toLowerCase() : "";
+      const matchesQuery = !q || title.includes(q) || project.includes(q);
+      const matchesProject = !searchProjectId || (searchProjectId === "__global__" ? !c.projectId : c.projectId === searchProjectId);
+      return matchesQuery && matchesProject;
+    }),
+    [conversations, q, searchProjectId, projectNameById],
   );
 
   const pinnedConvs = useMemo(
@@ -423,9 +424,15 @@ const Sidebar = memo(function Sidebar({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search… ⌘K"
               aria-label="Search conversations"
-              className="w-full rounded-lg border bg-muted/40 py-2 pl-8 pr-3 text-base outline-none focus:bg-background focus:ring-2 focus:ring-ring sm:text-sm"
+              className="w-full rounded-lg border bg-muted/40 py-2 pl-8 pr-9 text-base outline-none focus:bg-background focus:ring-2 focus:ring-ring sm:text-sm"
             />
+            {searchQuery ? <button type="button" onClick={() => setSearchQuery("")} aria-label="Clear search" title="Clear search" className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"><X className="size-3.5" /></button> : null}
           </div>
+          <select value={searchProjectId} onChange={(e) => setSearchProjectId(e.target.value)} aria-label="Filter chats by project" className="mt-1.5 w-full rounded-lg border bg-background px-2.5 py-1.5 text-xs text-muted-foreground outline-none focus:ring-2 focus:ring-ring">
+            <option value="">All projects</option>
+            <option value="__global__">Global chats</option>
+            {sorted.filter((p) => !p.isSystem).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
         </div>
 
         <nav className="flex-1 overflow-y-auto overscroll-contain px-2 pb-3">
@@ -650,11 +657,11 @@ const Sidebar = memo(function Sidebar({
               )}
 
               {/* Search: flat results (no date groups) */}
-              {q && filteredConversations.length === 0 ? (
+              {(q || searchProjectId) && filteredConversations.length === 0 ? (
                 <p className="px-3 py-4 text-center text-sm text-muted-foreground">
-                  No results for "{searchQuery}"
+                  {q ? <>No results for "{searchQuery}"</> : "No chats match this project filter."}
                 </p>
-              ) : q ? (
+              ) : q || searchProjectId ? (
                 <ul className="space-y-0.5">
                   {unpinnedConvs.map((c) => (
                     <li key={c.id}>
