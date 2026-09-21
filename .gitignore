@@ -18,7 +18,8 @@ next-env.d.ts
 !.env.test.example
 
 # drizzle
-/drizzle/meta
+/drizzle/meta/*
+!/drizzle/meta/_journal.json
 
 # misc
 .DS_Store
