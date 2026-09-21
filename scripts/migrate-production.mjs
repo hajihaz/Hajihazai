@@ -1,4 +1,6 @@
-import { spawnSync } from "node:child_process";
+import postgres from "postgres";
+import { drizzle } from "drizzle-orm/postgres-js";
+import { migrate } from "drizzle-orm/postgres-js/migrator";
 
 const isVercelProduction = process.env.VERCEL === "1" && process.env.VERCEL_ENV === "production";
 
@@ -13,12 +15,18 @@ if (!process.env.DATABASE_URL) {
 }
 
 console.log("[db] applying Drizzle migrations before the production build");
-const result = spawnSync("npx", ["drizzle-kit", "migrate"], {
-  stdio: "inherit",
-  env: process.env,
+const sql = postgres(process.env.DATABASE_URL, {
+  max: 1,
+  onnotice: (notice) => console.log("[db] postgres notice:", notice.message),
 });
-if (result.error) {
-  console.error("[db] migration process failed to start:", result.error);
-  process.exit(1);
+const db = drizzle(sql);
+
+try {
+  await migrate(db, { migrationsFolder: "./drizzle" });
+  console.log("[db] production migrations applied successfully");
+} catch (error) {
+  console.error("[db] production migration failed:", error);
+  process.exitCode = 1;
+} finally {
+  await sql.end();
 }
-process.exit(result.status ?? 1);
