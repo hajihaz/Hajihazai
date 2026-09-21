@@ -29,7 +29,14 @@ export async function POST(req: Request) {
       googleName: "Guest",
     });
     await createUserSession(id, isSecureRequest(req), GUEST_SESSION_TTL_MS);
-    return Response.json({ ok: true, guest: true });
+    return Response.json(
+      { ok: true, guest: true },
+      {
+        headers: {
+          "Cache-Control": "private, no-store, max-age=0",
+        },
+      },
+    );
   } catch (err) {
     console.error("[auth] guest account creation failed:", err);
     return Response.json(

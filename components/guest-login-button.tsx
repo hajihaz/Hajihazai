@@ -11,7 +11,11 @@ export default function GuestLoginButton() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/guest", { method: "POST" });
+      const res = await fetch("/api/auth/guest", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setError(data.error ?? "Guest access is temporarily unavailable");
