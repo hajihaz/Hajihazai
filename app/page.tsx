@@ -163,7 +163,10 @@ export default async function Home({
   return (
     <ChatApp
       user={{
-        name: profile?.googleName ?? session.user.name,
+        // Use the HajiHaz username as the in-app display name. Google name is
+        // retained as provider metadata and should not override the user's
+        // chosen identity inside the app.
+        name: profile?.username?.trim() || session.user.name,
         email: profile?.email ?? session.user.email,
         image: profile?.profilePicture ?? session.user.image,
       }}
