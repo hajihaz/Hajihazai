@@ -225,7 +225,9 @@ export async function selectAndRunTool(
     audit?: boolean;
   } = {},
 ): Promise<ToolExecution> {
-  const deterministicExpression = extractDeterministicCalculatorExpression(userMessage);
+  const deterministicExpression = !opts.selectTools
+    ? extractDeterministicCalculatorExpression(userMessage)
+    : null;
   if (deterministicExpression) {
     // Arithmetic is deterministic: use the local calculator directly instead
     // of asking an LLM whether it should call the calculator. This guarantees

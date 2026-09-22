@@ -93,7 +93,6 @@ describe("selectAndRunTool (native selection, single execution)", () => {
     const r = await selectAndRunTool(
       "u1",
       "What is 22 * 475000? Use the calculator tool and answer with the exact number only.",
-      { selectTools: select([]) },
     );
     expect(r.toolRequested?.tool).toBe("calculator");
     expect(r.toolExecuted).toBe(true);

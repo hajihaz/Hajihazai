@@ -29,6 +29,12 @@ export async function POST(req: Request) {
       googleName: "Guest",
     });
     await createUserSession(id, isSecureRequest(req), GUEST_SESSION_TTL_MS);
+
+    const redirectMode = new URL(req.url).searchParams.get("redirect") === "1";
+    if (redirectMode) {
+      return Response.redirect(new URL("/", req.url), 303);
+    }
+
     return Response.json(
       { ok: true, guest: true },
       {
