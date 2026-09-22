@@ -47,6 +47,12 @@ describe("admin security", () => {
     expect(src).not.toContain("sessionToken");
   });
 
+  it("marks the entire admin API namespace private and non-cacheable", () => {
+    const src = readFileSync("next.config.ts", "utf8");
+    expect(src).toContain('source: "/api/admin/:path*"');
+    expect(src).toContain('value: "private, no-store, max-age=0, must-revalidate"');
+  });
+
   it("removes the 'initialize first admin' path from the portal UI", () => {
     const ui = readFileSync("components/admin-portal.tsx", "utf8");
     expect(ui).not.toContain("bootstrap");

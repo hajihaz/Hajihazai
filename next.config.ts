@@ -12,6 +12,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       {
+        source: "/api/admin/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0, must-revalidate" },
+        ],
+      },
+      {
         source: "/(.*)",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },
@@ -23,6 +29,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
 };
 
 export default withSentryConfig(nextConfig, {
