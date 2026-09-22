@@ -1137,7 +1137,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
             </div>
           </div>
 
-          <div className="ml-auto flex min-w-0 items-center gap-2">
+          <div className="ml-auto flex min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="hidden items-center gap-2 sm:flex">
               <Folder className="size-3.5 shrink-0 text-muted-foreground" />
               <select

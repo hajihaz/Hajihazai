@@ -533,15 +533,16 @@ const Sidebar = memo(function Sidebar({
                         )}
                         {chats?.map((c) => (
                           <li key={c.id}>
-                            <div
+                            <button
+                              type="button"
                               onClick={() => { onSelect(c.id); onClose(); }}
-                              className={`flex min-h-9 cursor-pointer items-center gap-1.5 rounded-lg px-2 text-sm ${
+                              className={`flex min-h-9 w-full items-center gap-1.5 rounded-lg px-2 text-left text-sm ${
                                 activeId === c.id ? "bg-accent" : "active:bg-accent/60 md:hover:bg-accent/60"
                               }`}
                             >
-                              <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" />
+                              <MessageSquare className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
                               <span className="min-w-0 flex-1 truncate">{c.title}</span>
-                            </div>
+                            </button>
                           </li>
                         ))}
                       </ul>

@@ -51,6 +51,7 @@ export default function AuthForm() {
         <input
           className={input}
           placeholder="Username or email"
+          aria-label="Username or email"
           autoComplete="username"
           value={identifier}
           onChange={(e) => setIdentifier(e.target.value)}
@@ -60,6 +61,7 @@ export default function AuthForm() {
           <input
             className={input}
             placeholder="Username"
+            aria-label="Username"
             autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
@@ -67,6 +69,7 @@ export default function AuthForm() {
           <input
             className={input}
             placeholder="Email"
+            aria-label="Email"
             type="email"
             autoComplete="email"
             value={email}
@@ -77,13 +80,14 @@ export default function AuthForm() {
       <input
         className={input}
         placeholder="Password"
+        aria-label="Password"
         type="password"
         autoComplete={mode === "signin" ? "current-password" : "new-password"}
         value={password}
         onChange={(e) => setPassword(e.target.value)}
       />
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
 
       <button
         disabled={busy}
