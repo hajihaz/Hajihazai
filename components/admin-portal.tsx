@@ -89,6 +89,7 @@ type Analytics = {
       feedback: Array<{ date: string; helpful: number; notHelpful: number }>;
       latency: Array<{ date: string; avgMs: number }>;
     };
+    usage: { promptTokens: number; completionTokens: number; totalTokens: number; measuredTurns: number; fallbackTurns: number; fallbackRate: number; providers: Array<{ provider: string; count: number }> };
   };
 };
 
@@ -943,6 +944,19 @@ export default function AdminPortal() {
                 ].map(({ label, value }) => (
                   <div key={label} className="rounded-xl border p-3 text-center">
                     <p className="text-lg font-semibold tabular-nums">{typeof value === "number" ? value.toLocaleString() : value}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  { label: "Approx AI tokens", value: analytics.retrieval.usage.totalTokens.toLocaleString() },
+                  { label: "Measured turns", value: analytics.retrieval.usage.measuredTurns.toLocaleString() },
+                  { label: "Fallback turns", value: `${analytics.retrieval.usage.fallbackTurns} (${Math.round(analytics.retrieval.usage.fallbackRate * 100)}%)` },
+                  { label: "Prompt / completion", value: `${analytics.retrieval.usage.promptTokens.toLocaleString()} / ${analytics.retrieval.usage.completionTokens.toLocaleString()}` },
+                ].map(({ label, value }) => (
+                  <div key={label} className="rounded-xl border p-3 text-center">
+                    <p className="text-lg font-semibold tabular-nums">{value}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
                   </div>
                 ))}

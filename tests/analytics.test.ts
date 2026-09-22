@@ -161,3 +161,17 @@ describe("retrieval analytics aggregators", () => {
     expect(a.latency.count).toBe(0);
   });
 });
+
+
+describe("retrieval usage telemetry", () => {
+  it("parses provider, attempts, and approximate tokens", async () => {
+    const { eventFromMetadata, computeRetrievalAnalytics } = await import("@/lib/admin/analytics");
+    const e = eventFromMetadata({ kind: "retrieval", query: "hello", provider: "groq", attempts: 2, promptTokens: 100, completionTokens: 40 }, new Date("2026-09-20T10:00:00Z"));
+    expect(e?.provider).toBe("groq");
+    expect(e?.attempts).toBe(2);
+    const a = computeRetrievalAnalytics(e ? [e] : []);
+    expect(a.usage.totalTokens).toBe(140);
+    expect(a.usage.fallbackTurns).toBe(1);
+    expect(a.usage.providers[0]).toEqual({ provider: "groq", count: 1 });
+  });
+});

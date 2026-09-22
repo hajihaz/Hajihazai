@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { randomUUID } from "node:crypto";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { conversationAttachments } from "@/lib/db/schema";
@@ -113,6 +114,7 @@ async function retrieveMultiBrain(
 
 export async function POST(req: Request) {
   const requestStartMs = Date.now();
+  const requestId = randomUUID();
   const session = await auth();
   if (!session?.user?.id) {
     return new Response("Unauthorized", { status: 401 });
@@ -558,6 +560,7 @@ export async function POST(req: Request) {
         "Content-Type": "text/event-stream",
         "Cache-Control": "no-cache",
         "X-Accel-Buffering": "no",
+      "X-Request-ID": requestId,
       },
     });
   }
@@ -677,6 +680,7 @@ export async function POST(req: Request) {
   const streamResult = await routeChatStream(chatMessages, {
     preferredModelId,
   });
+  const estimateTokens = (text: string) => Math.round(text.length / 4);
   let firstTokenMs: number | null = null;
   let finalTokenMs: number | null = null;
 
@@ -717,6 +721,10 @@ export async function POST(req: Request) {
             content: fullText.trimEnd() + "\n\n*[Response interrupted]*",
             modelId: streamResult.modelId,
             metadata: {
+              provider: streamResult.provider,
+              attempts: streamResult.attempts,
+              promptTokens: estimateTokens(chatMessages.map((m) => m.content).join("\n")),
+              completionTokens: estimateTokens(fullText),
               ...retrievalMeta,
               errorReason: (err as { timedOut?: boolean }).timedOut
                 ? "timeout"
@@ -765,6 +773,10 @@ export async function POST(req: Request) {
             modelId: streamResult.modelId,
             metadata: {
               ...retrievalMeta,
+              provider: streamResult.provider,
+              attempts: streamResult.attempts,
+              promptTokens: estimateTokens(chatMessages.map((m) => m.content).join("\n")),
+              completionTokens: estimateTokens(fullText),
               latencyMs: Date.now() - requestStartMs,
               latency: {
                 requestToRoutingMs: routingCompleteMs - requestStartMs,
@@ -798,7 +810,7 @@ export async function POST(req: Request) {
         persistenceMs,
         totalMs,
       };
-      console.info("[chat.latency]", JSON.stringify(latency));
+      console.info("[chat.latency]", JSON.stringify({ requestId, ...latency, provider: streamResult.provider, model: streamResult.modelId, attempts: streamResult.attempts }));
 
       controller.enqueue(
         sse({

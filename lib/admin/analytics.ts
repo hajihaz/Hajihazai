@@ -50,6 +50,10 @@ export interface RetrievalEvent {
   errorReason: string | null;
   /** ISO date (yyyy-mm-dd) of the turn, for daily trends. */
   day: string | null;
+  provider: string | null;
+  attempts: number | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
 }
 
 export type DayCount = { date: string; count: number };
@@ -74,6 +78,15 @@ export interface RetrievalAnalytics {
     clarification: DayCount[];
     feedback: Array<{ date: string; helpful: number; notHelpful: number }>;
     latency: Array<{ date: string; avgMs: number }>;
+  };
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    measuredTurns: number;
+    fallbackTurns: number;
+    fallbackRate: number;
+    providers: Array<{ provider: string; count: number }>;
   };
 }
 
@@ -208,6 +221,20 @@ function dailySeries(events: RetrievalEvent[], keep: (e: RetrievalEvent) => bool
 /** Compose every metric from a raw event list (newest-first). */
 export function computeRetrievalAnalytics(events: RetrievalEvent[]): RetrievalAnalytics {
   const zeroResults = aggregateZeroResults(events);
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let measuredTurns = 0;
+  let fallbackTurns = 0;
+  const providerCounts = new Map<string, number>();
+  for (const e of events) {
+    if (typeof e.promptTokens === "number" || typeof e.completionTokens === "number") {
+      promptTokens += e.promptTokens ?? 0;
+      completionTokens += e.completionTokens ?? 0;
+      measuredTurns++;
+    }
+    if (typeof e.attempts === "number" && e.attempts > 1) fallbackTurns++;
+    if (e.provider) providerCounts.set(e.provider, (providerCounts.get(e.provider) ?? 0) + 1);
+  }
 
   // Feedback per day.
   const fbByDay = new Map<string, { helpful: number; notHelpful: number }>();
@@ -245,6 +272,17 @@ export function computeRetrievalAnalytics(events: RetrievalEvent[]): RetrievalAn
       feedback: [...fbByDay.entries()].map(([date, v]) => ({ date, ...v })).sort((a, b) => a.date.localeCompare(b.date)),
       latency: [...latByDay.entries()].map(([date, v]) => ({ date, avgMs: Math.round(v.sum / v.n) })).sort((a, b) => a.date.localeCompare(b.date)),
     },
+    usage: {
+      promptTokens,
+      completionTokens,
+      totalTokens: promptTokens + completionTokens,
+      measuredTurns,
+      fallbackTurns,
+      fallbackRate: events.length ? fallbackTurns / events.length : 0,
+      providers: [...providerCounts.entries()]
+        .map(([provider, count]) => ({ provider, count }))
+        .sort((a, b) => b.count - a.count || a.provider.localeCompare(b.provider)),
+    },
   };
 }
 
@@ -271,6 +309,10 @@ export function eventFromMetadata(md: unknown, createdAt?: Date | string | null)
     latencyMs: typeof r.latencyMs === "number" ? r.latencyMs : null,
     errorReason: typeof r.errorReason === "string" ? r.errorReason : null,
     day,
+    provider: typeof r.provider === "string" ? r.provider : null,
+    attempts: typeof r.attempts === "number" ? r.attempts : null,
+    promptTokens: typeof r.promptTokens === "number" ? r.promptTokens : null,
+    completionTokens: typeof r.completionTokens === "number" ? r.completionTokens : null,
   };
 }
 
