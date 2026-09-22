@@ -89,6 +89,17 @@ describe("selectAndRunTool (native selection, single execution)", () => {
     expect(r.run).toBeNull();
   });
 
+  it("deterministically executes calculator for explicit arithmetic", async () => {
+    const r = await selectAndRunTool(
+      "u1",
+      "What is 22 * 475000? Use the calculator tool and answer with the exact number only.",
+      { selectTools: select([]) },
+    );
+    expect(r.toolRequested?.tool).toBe("calculator");
+    expect(r.toolExecuted).toBe(true);
+    expect(r.toolResult).toEqual({ result: 10_450_000 });
+  });
+
   it("executes the tool the model selected", async () => {
     const r = await selectAndRunTool("u1", "compute it", {
       selectTools: select([

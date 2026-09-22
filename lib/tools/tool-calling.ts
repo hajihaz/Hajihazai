@@ -136,6 +136,70 @@ type SelectFn = (
   tools: NativeToolDefinition[],
 ) => Promise<{ toolCalls: NativeToolCall[] }>;
 
+const CALCULATOR_INTENT = /\b(calculate|computed?|compute|what(?:'s| is)\b.*(?:\d.*[+\-*/×x].*\d|\d.*\b(?:plus|minus|times|multiplied|divided by)\b)|how much is\b.*\d.*[+\-*/×x].*\d)\b/i;
+const CALCULATOR_EXPRESSION = /[\d().+\-*/×x\s]+/g;
+
+function extractDeterministicCalculatorExpression(message: string): string | null {
+  if (!CALCULATOR_INTENT.test(message)) return null;
+
+  const candidates = message.match(CALCULATOR_EXPRESSION) ?? [];
+  let best: string | null = null;
+  let bestLength = 0;
+
+  for (const raw of candidates) {
+    const normalized = raw.trim().replace(/[×x]/gi, "*");
+    if (!normalized || !/[+\-*/]/.test(normalized)) continue;
+    const numberCount = normalized.match(/\d+(?:\.\d+)?/g)?.length ?? 0;
+    if (numberCount < 2 || normalized.length <= bestLength) continue;
+    try {
+      // Validate the extracted expression before bypassing model selection.
+      const tool = getTool("calculator");
+      if (!tool) continue;
+      const valid = validateToolInput(tool, { expression: normalized });
+      if (!valid.ok) continue;
+      // The parser itself is the final authority on whether this is arithmetic.
+      // This call is intentionally side-effect free.
+      const parsed = (valid.data as { expression: string }).expression;
+      if (!parsed) continue;
+      best = parsed;
+      bestLength = parsed.length;
+    } catch {
+      // Leave ambiguous expressions to the normal native selector.
+    }
+  }
+
+  return best;
+}
+
+async function finishToolExecution(
+  userId: string,
+  call: DetectedToolCall,
+  opts: { timeoutMs?: number; audit?: boolean },
+): Promise<ToolExecution> {
+  const run = await executeDetectedToolCall(userId, call, opts.timeoutMs);
+
+  if (opts.audit && run.status !== "rejected") {
+    await recordToolInvocation({
+      userId,
+      toolName: call.tool,
+      input: call.input,
+      output: run.result,
+      status: run.status,
+      durationMs: run.durationMs,
+      error: run.error,
+    });
+  }
+
+  return {
+    toolRequested: call,
+    toolExecuted: run.success,
+    toolResult: run.result,
+    run,
+    durationMs: run.durationMs,
+    error: run.error,
+  };
+}
+
 const NO_TOOL: ToolExecution = {
   toolRequested: null,
   toolExecuted: false,
@@ -161,6 +225,18 @@ export async function selectAndRunTool(
     audit?: boolean;
   } = {},
 ): Promise<ToolExecution> {
+  const deterministicExpression = extractDeterministicCalculatorExpression(userMessage);
+  if (deterministicExpression) {
+    // Arithmetic is deterministic: use the local calculator directly instead
+    // of asking an LLM whether it should call the calculator. This guarantees
+    // exact arithmetic and keeps the tool path auditable.
+    return finishToolExecution(
+      userId,
+      { tool: "calculator", input: { expression: deterministicExpression } },
+      opts,
+    );
+  }
+
   const tools = toToolDefinitions();
   const select: SelectFn =
     opts.selectTools ??
@@ -186,26 +262,5 @@ export async function selectAndRunTool(
   const call: DetectedToolCall = { tool: first.name, input: first.arguments };
 
   // SINGLE execution — only the first call, no loop.
-  const run = await executeDetectedToolCall(userId, call, opts.timeoutMs);
-
-  if (opts.audit && run.status !== "rejected") {
-    await recordToolInvocation({
-      userId,
-      toolName: call.tool,
-      input: call.input,
-      output: run.result,
-      status: run.status,
-      durationMs: run.durationMs,
-      error: run.error,
-    });
-  }
-
-  return {
-    toolRequested: call,
-    toolExecuted: run.success,
-    toolResult: run.result,
-    run,
-    durationMs: run.durationMs,
-    error: run.error,
-  };
+  return finishToolExecution(userId, call, opts);
 }
