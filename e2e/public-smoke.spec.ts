@@ -11,6 +11,17 @@ test.describe("public production smoke", () => {
     await expect(page.getByRole("button", { name: /Create an account/i })).toBeVisible();
   });
 
+  test("Google OAuth initiation reaches Google", async ({ page }) => {
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: /Continue with Google/i }).click();
+    await expect.poll(() => new URL(page.url()).host, {
+      timeout: 15_000,
+      message: "Google OAuth should redirect away from the app to accounts.google.com",
+    }).toBe("accounts.google.com");
+    expect(page.url()).not.toMatch(/\/api\/auth\/error/i);
+    await expect(page).toHaveTitle(/Sign in - Google Accounts/i);
+  });
+
   test("protected APIs reject anonymous access", async ({ request }) => {
     for (const path of ["/api/models", "/api/brains", "/api/conversations"]) {
       const response = await request.get(path);
