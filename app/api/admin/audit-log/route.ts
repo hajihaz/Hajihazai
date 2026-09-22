@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/admin/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
-import { listKnowledgeAuditLog } from "@/lib/admin/queries";
+import { listKnowledgeAuditLog, listAdminAuditLog } from "@/lib/admin/queries";
 
 export async function GET(req: Request) {
   const sess = await requireAdmin();
@@ -8,7 +8,11 @@ export async function GET(req: Request) {
   const readLimited = await rateLimitResponse(`admin-read:audit-log:${sess.adminId}`, 60, 60_000);
   if (readLimited) return readLimited;
 
-  const limit = Math.min(200, Number(new URL(req.url).searchParams.get("limit") ?? "50"));
-  const entries = await listKnowledgeAuditLog(limit);
-  return Response.json({ entries });
+  const requested = Number(new URL(req.url).searchParams.get("limit") ?? "50");
+  const limit = Number.isFinite(requested) ? Math.min(200, Math.max(1, Math.floor(requested))) : 50;
+  const [entries, securityEntries] = await Promise.all([
+    listKnowledgeAuditLog(limit),
+    listAdminAuditLog(limit),
+  ]);
+  return Response.json({ entries, securityEntries });
 }

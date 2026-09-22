@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { scryptSync, randomBytes } from "node:crypto";
 import { verifyPassword } from "@/lib/auth/password";
@@ -9,20 +10,41 @@ describe("admin security", () => {
     expect(existsSync("app/api/admin/bootstrap/route.ts")).toBe(false);
   });
 
-  it("guards every admin management route with requireAdmin", () => {
-    for (const f of [
-      "app/api/admin/admins/route.ts",
-      "app/api/admin/admins/[id]/route.ts",
-      "app/api/admin/data/route.ts",
-      "app/api/admin/knowledge/route.ts",
-      "app/api/admin/knowledge/[id]/route.ts",
-      "app/api/admin/projects/route.ts",
-    ]) {
+  it("guards every admin API route except login/logout", () => {
+    const files = execFileSync("find", ["app/api/admin", "-type", "f", "-name", "route.ts"], { encoding: "utf8" })
+      .trim().split("\n").filter(Boolean);
+    for (const f of files) {
+      if (f.endsWith("/login/route.ts") || f.endsWith("/logout/route.ts")) continue;
       const src = readFileSync(f, "utf8");
-      expect(src).toContain("requireAdmin");
-      // Each route must also check the return value — not just call it.
-      expect(src).toContain("if (!sess)");
+      expect(src, f).toContain("requireAdmin");
+      expect(src, f).toContain("if (!sess)");
     }
+  });
+
+  it("rate-limits every state-changing admin API route", () => {
+    const files = execFileSync("find", ["app/api/admin", "-type", "f", "-name", "route.ts"], { encoding: "utf8" })
+      .trim().split("\n").filter(Boolean);
+    for (const f of files) {
+      const src = readFileSync(f, "utf8");
+      if (/export async function (POST|PATCH|PUT|DELETE)\b/.test(src)) {
+        expect(src, f).toContain("rateLimitResponse");
+      }
+    }
+  });
+
+  it("keeps high-cost admin password reset input bounded", () => {
+    const src = readFileSync("app/api/admin/users/[id]/reset-password/route.ts", "utf8");
+    expect(src).toContain("validatePassword");
+    expect(src).toContain("adminResetUserPassword");
+  });
+
+  it("protects the security-audit export and keeps it rate-limited", () => {
+    const src = readFileSync("app/api/admin/export/security-audit/route.ts", "utf8");
+    expect(src).toContain("requireAdmin");
+    expect(src).toContain("rateLimitResponse");
+    expect(src).toContain("Cache-Control");
+    expect(src).not.toContain("passwordHash");
+    expect(src).not.toContain("sessionToken");
   });
 
   it("removes the 'initialize first admin' path from the portal UI", () => {

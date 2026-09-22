@@ -1,6 +1,6 @@
 import { requireAdmin } from "@/lib/admin/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
-import { adminGetUserDetail, adminDeleteUser } from "@/lib/admin/queries";
+import { adminGetUserDetail, adminDeleteUser, recordAdminAuditEvent } from "@/lib/admin/queries";
 
 export async function GET(
   _req: Request,
@@ -29,5 +29,6 @@ export async function DELETE(
   const { id } = await params;
   const ok = await adminDeleteUser(id);
   if (!ok) return Response.json({ error: "Not found" }, { status: 404 });
+  await recordAdminAuditEvent({ adminId: sess.adminId, action: "user_deleted", targetType: "user", targetId: id });
   return Response.json({ ok: true });
 }

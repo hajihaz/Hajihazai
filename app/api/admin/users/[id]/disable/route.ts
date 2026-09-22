@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
-import { rejectOversizedBody } from "@/lib/auth/request";
-import { adminSetUserDisabled, adminGetUserDetail, adminRevokeUserSessions } from "@/lib/admin/queries";
+import { getClientIp, rejectOversizedBody } from "@/lib/auth/request";
+import { adminSetUserDisabled, adminGetUserDetail, adminRevokeUserSessions, recordAdminAuditEvent } from "@/lib/admin/queries";
 import { syncEventToSheets } from "@/lib/google-sheets";
 
 export async function POST(
@@ -30,6 +30,7 @@ export async function POST(
   if (user?.email) {
     syncEventToSheets({ email: user.email, eventType: disabled ? "account_disabled" : "account_enabled", detail: `by admin ${sess.adminId}` });
   }
+  await recordAdminAuditEvent({ adminId: sess.adminId, action: disabled ? "user_disabled" : "user_enabled", targetType: "user", targetId: id, ipAddress: getClientIp(req) });
 
   return Response.json({ ok: true, disabled });
 }

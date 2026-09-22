@@ -116,6 +116,16 @@ type AuditEntry = {
   contentAfter: string | null;
   createdAt: string;
 };
+type SecurityAuditEntry = {
+  id: string;
+  adminId: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  metadata: Record<string, unknown> | null;
+  ipAddress: string | null;
+  createdAt: string;
+};
 
 type KDoc = {
   id: string;
@@ -227,6 +237,7 @@ export default function AdminPortal() {
 
   /* audit log tab */
   const [auditLog, setAuditLog] = useState<AuditEntry[]>([]);
+  const [securityAuditLog, setSecurityAuditLog] = useState<SecurityAuditEntry[]>([]);
   const [auditExpanded, setAuditExpanded] = useState<string | null>(null);
 
   /* knowledge list */
@@ -411,6 +422,7 @@ export default function AdminPortal() {
     if (!res.ok) return;
     const d = await res.json().catch(() => ({}));
     setAuditLog(d.entries ?? []);
+    setSecurityAuditLog(d.securityEntries ?? []);
   }
 
   async function loadNotifications() {
@@ -1340,8 +1352,35 @@ export default function AdminPortal() {
             </div>
           )}
           <div className="mt-2 flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">{auditLog.length} audit entr{auditLog.length === 1 ? "y" : "ies"}</p>
-            <a href="/api/admin/export/audit-log" className="text-xs text-muted-foreground hover:text-foreground" download>Export CSV</a>
+            <p className="text-xs text-muted-foreground">{auditLog.length} knowledge audit entr{auditLog.length === 1 ? "y" : "ies"}</p>
+            <span className="flex gap-3">
+              <a href="/api/admin/export/audit-log" className="text-xs text-muted-foreground hover:text-foreground" download>Export knowledge CSV</a>
+              <a href="/api/admin/export/security-audit" className="text-xs text-muted-foreground hover:text-foreground" download>Export security CSV</a>
+            </span>
+          </div>
+
+          <div className="mt-8">
+            <h3 className="mb-3 text-sm font-semibold">Security Activity</h3>
+            {securityAuditLog.length === 0 ? (
+              <p className="py-6 text-center text-sm text-muted-foreground">No security activity recorded yet.</p>
+            ) : (
+              <div className="overflow-hidden rounded-xl border">
+                <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <span>Action</span>
+                  <span>Target</span>
+                  <span className="w-36 text-right">Admin</span>
+                  <span className="w-28 text-right">Time</span>
+                </div>
+                {securityAuditLog.map((entry) => (
+                  <div key={entry.id} className="grid grid-cols-[auto_1fr_auto_auto] items-center gap-3 border-b px-4 py-3 text-sm last:border-0">
+                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium">{entry.action}</span>
+                    <span className="truncate text-muted-foreground">{entry.targetType ?? "—"}{entry.targetId ? ` · ${entry.targetId}` : ""}</span>
+                    <span className="w-36 truncate text-right text-xs text-muted-foreground">{entry.adminId ?? "system"}</span>
+                    <span className="w-28 text-right text-xs text-muted-foreground">{new Date(entry.createdAt).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       )}

@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
-import { adminSuspendUser, adminRestoreUser, adminRevokeUserSessions } from "@/lib/admin/queries";
+import { adminSuspendUser, adminRestoreUser, adminRevokeUserSessions, adminGetUserDetail, recordAdminAuditEvent } from "@/lib/admin/queries";
 
 export async function POST(
   req: Request,
@@ -18,6 +18,8 @@ export async function POST(
 
   const body = await req.json().catch(() => ({}));
   const suspend = body.suspend !== false;
+  const user = await adminGetUserDetail(id);
+  if (!user) return Response.json({ error: "User not found" }, { status: 404 });
 
   if (suspend) {
     await adminSuspendUser(id);
@@ -26,6 +28,7 @@ export async function POST(
   } else {
     await adminRestoreUser(id);
   }
+  await recordAdminAuditEvent({ adminId: sess.adminId, action: suspend ? "user_suspended" : "user_restored", targetType: "user", targetId: id });
 
   return Response.json({ ok: true, suspended: suspend });
 }

@@ -693,6 +693,30 @@ export const adminSessions = pgTable(
 
 export type AdminSession = typeof adminSessions.$inferSelect;
 
+/* Security — admin audit trail. Never store passwords, session tokens, or API keys. */
+export const adminAuditLog = pgTable(
+  "admin_audit_log",
+  {
+    id: text("id")
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    adminId: text("admin_id").references(() => admins.id, { onDelete: "set null" }),
+    action: text("action").notNull(),
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    metadata: jsonb("metadata"),
+    ipAddress: text("ip_address"),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("admin_audit_log_admin_idx").on(t.adminId),
+    index("admin_audit_log_created_idx").on(t.createdAt),
+    index("admin_audit_log_action_idx").on(t.action),
+  ],
+);
+
+export type AdminAuditLog = typeof adminAuditLog.$inferSelect;
+
 /* ------------------------------------------------------------------ */
 /* Brain System (Phase 1)                                              */
 /* Global knowledge domains managed by admin; users select per-chat.  */

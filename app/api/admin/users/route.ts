@@ -10,8 +10,10 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const search = url.searchParams.get("search") ?? undefined;
-  const page = Math.max(1, Number(url.searchParams.get("page") ?? "1"));
-  const limit = Math.min(100, Math.max(1, Number(url.searchParams.get("limit") ?? "20")));
+  const pageRaw = Number(url.searchParams.get("page") ?? "1");
+  const limitRaw = Number(url.searchParams.get("limit") ?? "20");
+  const page = Number.isFinite(pageRaw) ? Math.max(1, Math.floor(pageRaw)) : 1;
+  const limit = Number.isFinite(limitRaw) ? Math.min(100, Math.max(1, Math.floor(limitRaw))) : 20;
 
   const result = await adminListUsersPage({ search, page, limit });
   return Response.json(result);

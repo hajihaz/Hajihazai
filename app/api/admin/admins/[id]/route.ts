@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
-import { deleteAdmin, resetAdminPassword, countAdmins } from "@/lib/admin/queries";
+import { deleteAdmin, resetAdminPassword, countAdmins, recordAdminAuditEvent } from "@/lib/admin/queries";
 import { hashPassword, validatePassword } from "@/lib/auth/password";
 
 /** Reset an admin's password. */
@@ -24,6 +24,12 @@ export async function PATCH(
 
   const ok = await resetAdminPassword(id, await hashPassword(pw.value));
   if (!ok) return new Response("Not found", { status: 404 });
+  await recordAdminAuditEvent({
+    adminId: sess.adminId,
+    action: "admin_password_reset",
+    targetType: "admin",
+    targetId: id,
+  });
   return Response.json({ ok: true });
 }
 
@@ -37,11 +43,21 @@ export async function DELETE(
   if (limited) return limited;
   const { id } = await params;
 
+  if (id === sess.adminId) {
+    return Response.json({ error: "Cannot delete the currently signed-in admin" }, { status: 409 });
+  }
+
   // Never allow deleting the last admin (would lock everyone out).
   if ((await countAdmins()) <= 1) {
     return Response.json({ error: "Cannot delete the last admin" }, { status: 409 });
   }
   const ok = await deleteAdmin(id);
   if (!ok) return new Response("Not found", { status: 404 });
+  await recordAdminAuditEvent({
+    adminId: sess.adminId,
+    action: "admin_deleted",
+    targetType: "admin",
+    targetId: id,
+  });
   return new Response(null, { status: 204 });
 }

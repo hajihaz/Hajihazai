@@ -1,8 +1,8 @@
-import { getAdminByUsername } from "@/lib/admin/queries";
+import { getAdminByUsername, recordAdminAuditEvent } from "@/lib/admin/queries";
 import { createAdminSession } from "@/lib/admin/session";
 import { verifyPassword } from "@/lib/auth/password";
 import { isSecureRequest } from "@/lib/auth/session";
-import { rejectOversizedBody } from "@/lib/auth/request";
+import { getClientIp, rateLimitIdentity, rejectOversizedBody } from "@/lib/auth/request";
 import { rateLimitResponse } from "@/lib/ratelimit";
 
 /** Admin portal login. Anyone may attempt; only valid admins get a session. */
@@ -16,6 +16,9 @@ export async function POST(req: Request) {
   if (!username || !password) {
     return Response.json({ error: "Username and password are required" }, { status: 400 });
   }
+
+  const ipLimited = await rateLimitResponse(rateLimitIdentity(req, "admin-login"), 30, 60_000);
+  if (ipLimited) return ipLimited;
 
   const limited = await rateLimitResponse(`admin-login:${username.toLowerCase()}`, 8, 60_000);
   if (limited) return limited;
@@ -31,5 +34,12 @@ export async function POST(req: Request) {
   if (!ok) return invalid();
 
   await createAdminSession(admin.id, isSecureRequest(req));
-  return Response.json({ ok: true, username: admin.username });
+  await recordAdminAuditEvent({
+    adminId: admin.id,
+    action: "login_success",
+    targetType: "admin",
+    targetId: admin.id,
+    ipAddress: getClientIp(req),
+  });
+  return Response.json({ ok: true, username: admin.username }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -1,7 +1,7 @@
 import { requireAdmin } from "@/lib/admin/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
-import { adminGetUserDetail, adminTerminateUser } from "@/lib/admin/queries";
+import { adminGetUserDetail, adminTerminateUser, recordAdminAuditEvent } from "@/lib/admin/queries";
 import { syncEventToSheets } from "@/lib/google-sheets";
 
 export async function POST(
@@ -20,5 +20,6 @@ export async function POST(
 
   await adminTerminateUser(id, user.email);
   syncEventToSheets({ email: user.email, eventType: "account_terminated", detail: `by admin ${sess.adminId}` });
+  await recordAdminAuditEvent({ adminId: sess.adminId, action: "user_terminated", targetType: "user", targetId: id });
   return Response.json({ ok: true });
 }

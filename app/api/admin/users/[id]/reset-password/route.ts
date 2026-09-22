@@ -1,7 +1,8 @@
 import { requireAdmin } from "@/lib/admin/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
-import { adminResetUserPassword } from "@/lib/admin/queries";
+import { validatePassword } from "@/lib/auth/password";
+import { adminResetUserPassword, recordAdminAuditEvent } from "@/lib/admin/queries";
 
 export async function POST(
   req: Request,
@@ -17,13 +18,16 @@ export async function POST(
   if (oversized) return oversized;
 
   const body = await req.json().catch(() => ({}));
-  const newPassword = typeof body.password === "string" ? body.password.trim() : "";
+  const pw = validatePassword(body?.password);
+  if (!pw.ok) return Response.json({ error: pw.error }, { status: 400 });
 
-  if (!newPassword || newPassword.length < 8) {
-    return Response.json({ error: "Password must be at least 8 characters" }, { status: 400 });
-  }
-
-  const ok = await adminResetUserPassword(id, newPassword);
+  const ok = await adminResetUserPassword(id, pw.value);
   if (!ok) return Response.json({ error: "User not found" }, { status: 404 });
+  await recordAdminAuditEvent({
+    adminId: sess.adminId,
+    action: "user_password_reset",
+    targetType: "user",
+    targetId: id,
+  });
   return Response.json({ ok: true });
 }

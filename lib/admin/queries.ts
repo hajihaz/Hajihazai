@@ -2,6 +2,8 @@ import { and, count, desc, eq, gte, ilike, inArray, isNull, or, sql } from "driz
 import { db } from "@/lib/db";
 import {
   admins,
+  adminAuditLog,
+  adminSessions,
   users,
   userProfiles,
   sessions,
@@ -89,12 +91,51 @@ export async function resetAdminPassword(
   id: string,
   passwordHash: string,
 ): Promise<boolean> {
-  const [row] = await db
-    .update(admins)
-    .set({ passwordHash })
-    .where(eq(admins.id, id))
-    .returning();
-  return !!row;
+  const result = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(admins)
+      .set({ passwordHash })
+      .where(eq(admins.id, id))
+      .returning({ id: admins.id });
+    if (!row) return false;
+
+    // Password rotation is a credential boundary: invalidate every existing
+    // session for the target admin so an old session cannot survive takeover.
+    await tx.delete(adminSessions).where(eq(adminSessions.adminId, id));
+    return true;
+  });
+  return result;
+}
+
+export async function recordAdminAuditEvent(input: {
+  adminId?: string | null;
+  action: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  metadata?: Record<string, string | number | boolean | null>;
+  ipAddress?: string | null;
+}): Promise<void> {
+  try {
+    await db.insert(adminAuditLog).values({
+      adminId: input.adminId ?? null,
+      action: input.action,
+      targetType: input.targetType ?? null,
+      targetId: input.targetId ?? null,
+      metadata: input.metadata ?? null,
+      ipAddress: input.ipAddress ?? null,
+    });
+  } catch (error) {
+    // Security telemetry must never break an admin operation.
+    console.error("[admin-audit] write failed (non-fatal):", error);
+  }
+}
+
+export async function listAdminAuditLog(limit = 100) {
+  return db
+    .select()
+    .from(adminAuditLog)
+    .orderBy(desc(adminAuditLog.createdAt))
+    .limit(Math.min(Math.max(limit, 1), 200));
 }
 
 /* ----------------------------- admin views ----------------------------- */
