@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, inArray, isNull, or, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import {
   admins,
@@ -17,6 +17,7 @@ import {
   knowledgeAuditLog,
   notifications,
   userNotifications,
+  notificationTargets,
   type Admin,
   type BlockedEmail,
   type KnowledgePermission,
@@ -654,31 +655,69 @@ export async function adminCreateNotification(data: {
   title: string;
   message: string;
   targetType: "all" | "specific";
+  targetUserIds?: string[];
   createdBy?: string;
 }): Promise<typeof notifications.$inferSelect> {
-  const [row] = await db.insert(notifications).values(data).returning();
+  const targetUserIds = [...new Set(data.targetUserIds ?? [])].filter(Boolean);
+  if (data.targetType === "specific" && targetUserIds.length === 0) {
+    throw new Error("At least one recipient is required for a specific notification");
+  }
+  if (targetUserIds.length > 0) {
+    const existing = await db.select({ id: users.id }).from(users).where(inArray(users.id, targetUserIds));
+    if (existing.length !== targetUserIds.length) throw new Error("One or more notification recipients do not exist");
+  }
+
+  const [row] = await db.insert(notifications).values({
+    title: data.title,
+    message: data.message,
+    targetType: data.targetType,
+    createdBy: data.createdBy,
+  }).returning();
+  if (targetUserIds.length) {
+    await db.insert(notificationTargets).values(
+      targetUserIds.map((userId) => ({ notificationId: row.id, userId })),
+    ).onConflictDoNothing();
+  }
   return row;
 }
 
-export async function adminSendNotification(id: string): Promise<void> {
+export async function adminSendNotification(id: string): Promise<number> {
   const notif = await adminGetNotification(id);
   if (!notif) throw new Error("Notification not found");
+  if (notif.sentAt) throw new Error("Notification has already been sent");
 
-  await db.update(notifications).set({ sentAt: new Date() }).where(eq(notifications.id, id));
-
-  if (notif.targetType === "all") {
+  let recipientIds: string[];
+  if (notif.targetType === "specific") {
+    const targets = await db
+      .select({ id: users.id })
+      .from(notificationTargets)
+      .innerJoin(users, eq(users.id, notificationTargets.userId))
+      .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .where(and(
+        eq(notificationTargets.notificationId, id),
+        eq(userProfiles.isDisabled, false),
+        eq(userProfiles.isTerminated, false),
+      ));
+    recipientIds = targets.map((u) => u.id);
+  } else {
     const allUsers = await db
       .select({ id: users.id })
       .from(users)
-      .leftJoin(userProfiles, eq(userProfiles.userId, users.id))
+      .innerJoin(userProfiles, eq(userProfiles.userId, users.id))
       .where(and(eq(userProfiles.isDisabled, false), eq(userProfiles.isTerminated, false)));
-
-    if (allUsers.length > 0) {
-      await db.insert(userNotifications).values(
-        allUsers.map((u) => ({ userId: u.id, notificationId: id })),
-      );
-    }
+    recipientIds = allUsers.map((u) => u.id);
   }
+
+  if (recipientIds.length) {
+    await db.insert(userNotifications).values(
+      recipientIds.map((userId) => ({ userId, notificationId: id })),
+    ).onConflictDoNothing();
+  }
+
+  await db.update(notifications).set({ sentAt: new Date() }).where(
+    and(eq(notifications.id, id), isNull(notifications.sentAt)),
+  );
+  return recipientIds.length;
 }
 
 export async function adminDeleteNotification(id: string): Promise<void> {
@@ -693,6 +732,7 @@ export async function getUserNotifications(userId: string) {
       title: notifications.title,
       message: notifications.message,
       isRead: userNotifications.isRead,
+      readAt: userNotifications.readAt,
       createdAt: notifications.createdAt,
     })
     .from(userNotifications)
@@ -702,11 +742,30 @@ export async function getUserNotifications(userId: string) {
     .limit(20);
 }
 
-export async function markNotificationRead(userNotifId: string, userId: string): Promise<void> {
-  await db
+export async function countUnreadNotifications(userId: string): Promise<number> {
+  const [row] = await db
+    .select({ count: count() })
+    .from(userNotifications)
+    .where(and(eq(userNotifications.userId, userId), eq(userNotifications.isRead, false)));
+  return Number(row?.count ?? 0);
+}
+
+export async function markNotificationRead(userNotifId: string, userId: string): Promise<boolean> {
+  const result = await db
     .update(userNotifications)
     .set({ isRead: true, readAt: new Date() })
-    .where(and(eq(userNotifications.id, userNotifId), eq(userNotifications.userId, userId)));
+    .where(and(eq(userNotifications.id, userNotifId), eq(userNotifications.userId, userId), eq(userNotifications.isRead, false)))
+    .returning({ id: userNotifications.id });
+  return result.length > 0;
+}
+
+export async function markAllNotificationsRead(userId: string): Promise<number> {
+  const result = await db
+    .update(userNotifications)
+    .set({ isRead: true, readAt: new Date() })
+    .where(and(eq(userNotifications.userId, userId), eq(userNotifications.isRead, false)))
+    .returning({ id: userNotifications.id });
+  return result.length;
 }
 
 /* ------------------------------------------------------------------ */

@@ -10,6 +10,7 @@ import type { BrainOption, BrainMode } from "./brain-selector";
 import ImageGenerator from "./image-generator";
 import CanvasWorkspace from "./canvas-workspace";
 import FileLibrary from "./file-library";
+import NotificationCenter from "./notification-center";
 
 type Conv = { id: string; title: string; projectId?: string | null; updatedAt?: string | null; archived?: boolean; pinned?: boolean; intelligenceLevel?: string };
 type Proj = { id: string; name: string; isSystem?: boolean };
@@ -1254,6 +1255,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
               ))}
             </select>
 
+            <NotificationCenter />
             <ProfileMenu name={user.name} image={user.image} />
           </div>
         </header>

@@ -877,7 +877,29 @@ export const userNotifications = pgTable(
   (t) => [
     index("user_notifications_user_idx").on(t.userId),
     index("user_notifications_notification_idx").on(t.notificationId),
+    uniqueIndex("user_notifications_unique_idx").on(t.userId, t.notificationId),
   ],
 );
 
 export type UserNotification = typeof userNotifications.$inferSelect;
+
+export const notificationTargets = pgTable(
+  "notification_targets",
+  {
+    id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+    notificationId: text("notification_id")
+      .notNull()
+      .references(() => notifications.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("notification_targets_unique_idx").on(t.notificationId, t.userId),
+    index("notification_targets_notification_idx").on(t.notificationId),
+    index("notification_targets_user_idx").on(t.userId),
+  ],
+);
+
+export type NotificationTarget = typeof notificationTargets.$inferSelect;

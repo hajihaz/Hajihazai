@@ -48,8 +48,8 @@ export async function POST(
 
   const { id } = await params;
   try {
-    await adminSendNotification(id);
-    return Response.json({ ok: true });
+    const recipientCount = await adminSendNotification(id);
+    return Response.json({ ok: true, recipientCount });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Failed";
     return Response.json({ error: msg }, { status: 400 });

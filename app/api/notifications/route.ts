@@ -1,5 +1,5 @@
 import { auth } from "@/auth";
-import { getUserNotifications, markNotificationRead } from "@/lib/admin/queries";
+import { countUnreadNotifications, getUserNotifications, markAllNotificationsRead, markNotificationRead } from "@/lib/admin/queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
 
@@ -11,8 +11,11 @@ export async function GET() {
   if (readLimited) return readLimited;
 
 
-  const items = await getUserNotifications(session.user.id);
-  return Response.json({ notifications: items }, { headers: PRIVATE_NO_STORE });
+  const [items, unreadCount] = await Promise.all([
+    getUserNotifications(session.user.id),
+    countUnreadNotifications(session.user.id),
+  ]);
+  return Response.json({ notifications: items, unreadCount }, { headers: PRIVATE_NO_STORE });
 }
 
 export async function POST(req: Request) {
@@ -26,9 +29,14 @@ export async function POST(req: Request) {
   if (oversized) return oversized;
 
   const body = await req.json().catch(() => ({}));
+  if (body.action === "mark_all_read") {
+    const count = await markAllNotificationsRead(session.user.id);
+    return Response.json({ ok: true, count }, { headers: PRIVATE_NO_STORE });
+  }
+
   const id = body.id;
   if (typeof id !== "string" || !id) return Response.json({ error: "id required" }, { status: 400 });
 
   await markNotificationRead(id, session.user.id);
-  return Response.json({ ok: true });
+  return Response.json({ ok: true }, { headers: PRIVATE_NO_STORE });
 }

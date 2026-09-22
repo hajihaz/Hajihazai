@@ -29,17 +29,24 @@ export async function POST(req: Request) {
   const title = body.title?.trim();
   const message = body.message?.trim();
   const targetType = body.targetType === "specific" ? "specific" : "all";
+  const targetUserIds = Array.isArray(body.targetUserIds) ? body.targetUserIds.filter((id: unknown): id is string => typeof id === "string") : [];
 
   if (!title || !message) {
     return Response.json({ error: "title and message are required" }, { status: 400 });
   }
 
-  const notif = await adminCreateNotification({
-    title,
-    message,
-    targetType,
-    createdBy: sess.adminId,
-  });
+  try {
+    const notif = await adminCreateNotification({
+      title,
+      message,
+      targetType,
+      targetUserIds,
+      createdBy: sess.adminId,
+    });
 
-  return Response.json({ notification: notif }, { status: 201 });
+    return Response.json({ notification: notif }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Could not create notification";
+    return Response.json({ error: message }, { status: 400 });
+  }
 }

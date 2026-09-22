@@ -308,6 +308,7 @@ export default function AdminPortal() {
   const [notifTitle, setNotifTitle] = useState("");
   const [notifMessage, setNotifMessage] = useState("");
   const [notifTarget, setNotifTarget] = useState<"all" | "specific">("all");
+  const [notifTargetUsers, setNotifTargetUsers] = useState<string[]>([]);
   const [notifSending, setNotifSending] = useState<string | null>(null);
 
   /* maintenance */
@@ -464,9 +465,18 @@ export default function AdminPortal() {
     const res = await fetch("/api/admin/notifications", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: notifTitle, message: notifMessage, targetType: notifTarget }),
+      body: JSON.stringify({ title: notifTitle, message: notifMessage, targetType: notifTarget, targetUserIds: notifTargetUsers }),
     });
-    if (res.ok) { setNotifTitle(""); setNotifMessage(""); await loadNotifications(); }
+    if (res.ok) {
+      setNotifTitle("");
+      setNotifMessage("");
+      setNotifTarget("all");
+      setNotifTargetUsers([]);
+      await loadNotifications();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      setError(d.error ?? "Could not create notification");
+    }
   }
 
   async function deleteNotification(id: string) {
@@ -1352,11 +1362,28 @@ export default function AdminPortal() {
               </div>
               <div>
                 <label className="mb-1 block text-xs font-medium text-muted-foreground">Target</label>
-                <select className={input} value={notifTarget} onChange={(e) => setNotifTarget(e.target.value as "all" | "specific")}>
+                <select className={input} value={notifTarget} onChange={(e) => { setNotifTarget(e.target.value as "all" | "specific"); setNotifTargetUsers([]); }}>
                   <option value="all">All active users</option>
-                  <option value="specific">Specific users (send manually)</option>
+                  <option value="specific">Specific users</option>
                 </select>
               </div>
+              {notifTarget === "specific" ? (
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Recipients *</label>
+                  <select
+                    multiple
+                    className={`${input} min-h-32`}
+                    value={notifTargetUsers}
+                    onChange={(e) => setNotifTargetUsers(Array.from(e.target.selectedOptions, (option) => option.value))}
+                    aria-label="Notification recipients"
+                  >
+                    {allUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.email ?? u.id}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Hold Command/Ctrl to select multiple users.</p>
+                </div>
+              ) : null}
               <button type="submit" className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">Create</button>
             </form>
           </div>
