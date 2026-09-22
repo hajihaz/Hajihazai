@@ -16,6 +16,7 @@ async function executeAutomation(
   automation: Awaited<ReturnType<typeof getAutomation>>,
   runId: string,
   manual = false,
+  referenceTime = new Date(),
 ) {
   if (!automation) throw new Error("Automation not found");
   try {
@@ -59,7 +60,7 @@ async function executeAutomation(
       modelId: stream.modelId,
     });
     if (!manual) {
-      const next = nextAutomationRun(automation.schedule, automation.timezone);
+      const next = nextAutomationRun(automation.schedule, automation.timezone, referenceTime);
       await markAutomationResult(automation.userId, automation.id, {
         status: "active",
         lastStatus: "success",
@@ -114,7 +115,7 @@ export async function runDueAutomations(now = new Date(), limit = 10) {
   for (const automation of claimed) {
     const run = await createAutomationRun(automation.userId, automation.id);
     if (!run) continue;
-    const result = await executeAutomation(automation, run.id);
+    const result = await executeAutomation(automation, run.id, false, now);
     results.push({ id: automation.id, ...result });
   }
   return { claimed: claimed.length, results };
