@@ -3,6 +3,7 @@ import { memorySearchTool } from "./memory-search";
 import { knowledgeSearchTool } from "./knowledge-search";
 import { calculatorTool } from "./calculator";
 import { currentTimeTool } from "./current-time";
+import { hajihazCommanderTool } from "./hajihaz-commander";
 
 /**
  * Single source of truth for available tools (Phase 8.0).
@@ -13,6 +14,7 @@ export const TOOLS: Tool[] = [
   knowledgeSearchTool,
   calculatorTool,
   currentTimeTool,
+  hajihazCommanderTool,
 ];
 
 const TOOL_MAP: Record<string, Tool> = Object.fromEntries(
