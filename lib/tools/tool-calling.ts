@@ -233,11 +233,17 @@ export async function selectAndRunTool(
   if (!opts.selectTools && COMMANDER_INTENT.test(userMessage)) {
     // Explicit Commander requests are deterministic: do not leave the decision
     // to a second model, because that can silently decline a real Mac operation.
-    return finishToolExecution(
+    console.info("[tool-calling] explicit Commander intent matched");
+    const result = await finishToolExecution(
       userId,
       { tool: "hajihaz_commander", input: { instruction: userMessage } },
       opts,
     );
+    console.info("[tool-calling] Commander execution finished", {
+      status: result.run?.status,
+      success: result.toolExecuted,
+    });
+    return result;
   }
   if (deterministicExpression) {
     // Arithmetic is deterministic: use the local calculator directly instead

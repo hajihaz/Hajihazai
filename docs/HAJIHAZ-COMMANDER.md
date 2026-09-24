@@ -35,7 +35,7 @@ Add these Vercel environment variables to HajiHaz AI:
 
 - `OPENAI_API_KEY` — an OpenAI API key authorized to use Responses API and the target tunnel.
 - `HHJZ_COMMANDER_TUNNEL_ID` — the OpenAI Secure MCP Tunnel ID. The code currently defaults to the HajiHaz Commander tunnel, but keeping it as an environment variable makes rotation explicit.
-- `HHJZ_COMMANDER_MODEL` — optional Responses API model override; defaults to `gpt-5.4`.
+- `HHJZ_COMMANDER_MODEL` — optional Responses API model override; defaults to `gpt-6-astra`.
 
 Do not put the tunnel runtime API key in HajiHaz AI. That key belongs only to the local `tunnel-client` daemon.
 

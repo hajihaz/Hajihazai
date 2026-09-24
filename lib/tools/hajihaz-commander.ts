@@ -3,7 +3,7 @@ import type { Tool } from "./types";
 import { ToolError } from "./types";
 
 const COMMANDER_TUNNEL_ID = process.env.HHJZ_COMMANDER_TUNNEL_ID || "tunnel_6ab41d9403848191af41352aafaf55d2";
-const COMMANDER_MODEL = process.env.HHJZ_COMMANDER_MODEL || "gpt-5.4";
+const COMMANDER_MODEL = process.env.HHJZ_COMMANDER_MODEL || "gpt-6-astra";
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
 
 /**
@@ -35,6 +35,10 @@ export const hajihazCommanderTool: Tool = {
       throw new ToolError("input.instruction must be a non-empty string", "invalid_input");
     }
 
+    console.info("[commander-bridge] starting Responses API MCP request", {
+      model: COMMANDER_MODEL,
+      tunnelId: COMMANDER_TUNNEL_ID,
+    });
     const response = await fetch(OPENAI_RESPONSES_URL, {
       method: "POST",
       headers: {
@@ -59,10 +63,15 @@ export const hajihazCommanderTool: Tool = {
             require_approval: "never",
           },
         ],
+        // An explicit Commander request is already an execution request.
+        // Force the nested Responses turn to use a tool instead of replying
+        // with instructions for the user to operate the Mac manually.
+        tool_choice: "required",
       }),
       cache: "no-store",
     });
 
+    console.info("[commander-bridge] Responses API HTTP status", response.status);
     const data = (await response.json()) as {
       output_text?: string;
       error?: { message?: string };
@@ -70,6 +79,10 @@ export const hajihazCommanderTool: Tool = {
     };
 
     if (!response.ok) {
+      console.error("[commander-bridge] Responses API error", {
+        status: response.status,
+        message: data.error?.message ?? "unknown error",
+      });
       throw new ToolError(
         data.error?.message || `OpenAI Commander bridge failed with HTTP ${response.status}`,
         "execution_error",
