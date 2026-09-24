@@ -34,6 +34,9 @@ const TOOL_SIGNALS: RegExp[] = [
   /\b(remember|recall|my memory|what do you know about me|do i have|did i)\b/,
   // knowledge base
   /\b(document|handbook|policy|knowledge base|in my (docs|files|notes)|according to (my|the) )\b/,
+  // HajiHaz Commander / Mac execution intent
+  /\bhajihaz\s+commander\b/,
+  /\b(?:run|execute|open|create|delete|move|read|write|check|inspect|control)\b.{0,80}\b(?:my|the)\s+mac\b/i,
   // explicit search intent
   /\bsearch\b/,
 ];

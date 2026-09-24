@@ -139,6 +139,8 @@ type SelectFn = (
 const CALCULATOR_INTENT = /\b(calculate|computed?|compute|what(?:'s| is)\b.*(?:\d.*[+\-*/×x].*\d|\d.*\b(?:plus|minus|times|multiplied|divided by)\b)|how much is\b.*\d.*[+\-*/×x].*\d)\b/i;
 const CALCULATOR_EXPRESSION = /[\d().+\-*/×x\s]+/g;
 
+const COMMANDER_INTENT = /\bhajihaz\s+commander\b|\b(?:run|execute|open|create|delete|move|read|write|check|inspect|control)\b.{0,100}\b(?:my|the)\s+mac\b/i;
+
 function extractDeterministicCalculatorExpression(message: string): string | null {
   if (!CALCULATOR_INTENT.test(message)) return null;
 
@@ -228,6 +230,15 @@ export async function selectAndRunTool(
   const deterministicExpression = !opts.selectTools
     ? extractDeterministicCalculatorExpression(userMessage)
     : null;
+  if (!opts.selectTools && COMMANDER_INTENT.test(userMessage)) {
+    // Explicit Commander requests are deterministic: do not leave the decision
+    // to a second model, because that can silently decline a real Mac operation.
+    return finishToolExecution(
+      userId,
+      { tool: "hajihaz_commander", input: { instruction: userMessage } },
+      opts,
+    );
+  }
   if (deterministicExpression) {
     // Arithmetic is deterministic: use the local calculator directly instead
     // of asking an LLM whether it should call the calculator. This guarantees
