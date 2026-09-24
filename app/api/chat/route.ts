@@ -572,6 +572,75 @@ export async function POST(req: Request) {
       serialized = serialized.slice(0, TOOL_RESULT_MAX_CHARS) + "…[truncated]";
     }
     toolBlock = wrapToolOutput(tool.toolRequested?.tool ?? "tool", serialized);
+  } else if (tool.toolRequested && !tool.toolExecuted && tool.error) {
+    // Never let a failed real-world action fall through to a normal model answer.
+    // Otherwise the chat model can incorrectly claim it lacks access or explain
+    // how the user could perform the action manually. Surface the concrete tool
+    // failure as authoritative context instead.
+    toolBlock = wrapToolOutput(
+      tool.toolRequested.tool,
+      JSON.stringify({ success: false, error: tool.error }),
+    );
+  }
+
+  const commanderToolFailed =
+    tool.toolRequested?.tool === "hajihaz_commander" &&
+    !tool.toolExecuted &&
+    !!tool.error;
+
+  if (commanderToolFailed) {
+    const errorText = `HajiHaz Commander could not execute the Mac request.\n\n${tool.error}`;
+    const body = new ReadableStream({
+      async start(controller) {
+        controller.enqueue(sse({ t: "chunk", text: errorText }));
+        let assistantMsgId: string | null = null;
+        let title = convo.title;
+        if (!debug) {
+          try {
+            const m = await addMessage({
+              conversationId,
+              role: "assistant",
+              content: errorText,
+              modelId: "hajihaz-commander-error",
+              metadata: {
+                ...retrievalMeta,
+                tool: tool.toolRequested,
+                toolError: tool.error,
+                latencyMs: Date.now() - requestStartMs,
+              },
+            });
+            assistantMsgId = m.id;
+            if (convo.title === "New chat") {
+              title = message.trim().slice(0, 60);
+              await setConversationTitle(session.user.id, conversationId, title);
+            }
+          } catch (err) {
+            console.error("[chat] Commander error persistence failed:", err);
+          }
+        }
+        controller.enqueue(
+          sse({
+            t: "done",
+            conversationId,
+            userMessageId: userMsg?.id ?? null,
+            assistantMessageId: assistantMsgId,
+            title,
+            modelId: "hajihaz-commander-error",
+            requestedModelId: preferredModelId ?? null,
+            clarify: null,
+          }),
+        );
+        controller.close();
+      },
+    });
+    return new Response(body, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+        "X-Request-ID": requestId,
+      },
+    });
   }
 
   const writeIntentBlock =
