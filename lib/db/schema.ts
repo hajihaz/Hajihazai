@@ -11,7 +11,7 @@ import {
   uniqueIndex,
   vector,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 /* ------------------------------------------------------------------ */
 /* Auth.js core tables                                                 */
@@ -506,6 +506,9 @@ export const userProfiles = pgTable(
     uniqueIndex("user_profiles_google_id_idx").on(t.googleId),
     uniqueIndex("user_profiles_email_idx").on(t.email),
     index("user_profiles_username_idx").on(t.username),
+    // Keep the case-insensitive uniqueness constraint in the schema itself so
+    // fresh `drizzle-kit push` databases match migration 0012 and production.
+    uniqueIndex("user_profiles_username_lower_unique").on(sql`lower(${t.username})`),
     index("user_profiles_created_idx").on(t.createdAt),
   ],
 );

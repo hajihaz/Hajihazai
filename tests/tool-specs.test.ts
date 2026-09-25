@@ -2,12 +2,13 @@ import { describe, it, expect } from "vitest";
 import { exportToolSpecs } from "@/lib/tools/specs";
 
 describe("tool specs export", () => {
-  it("exports all four tools with schemas", () => {
+  it("exports every registered tool with schemas", () => {
     const specs = exportToolSpecs();
     const names = specs.map((s) => s.name).sort();
     expect(names).toEqual([
       "calculator",
       "current_time",
+      "hajihaz_commander",
       "knowledge_search",
       "memory_search",
     ]);
