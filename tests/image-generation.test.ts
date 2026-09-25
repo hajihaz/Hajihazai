@@ -3,6 +3,7 @@ import {
   buildImagePrompt,
   isImageAspectRatio,
   isImageSize,
+  openAIImageSizeForRatio,
 } from "@/lib/ai/image-generation";
 
 describe("image generation", () => {
@@ -18,6 +19,13 @@ describe("image generation", () => {
     expect(isImageSize("2K")).toBe(true);
     expect(isImageSize("4K")).toBe(true);
     expect(isImageSize("8K")).toBe(false);
+  });
+
+  it("maps requested aspect ratios to supported OpenAI image dimensions", () => {
+    expect(openAIImageSizeForRatio("1:1")).toBe("1024x1024");
+    expect(openAIImageSizeForRatio("9:16")).toBe("1024x1536");
+    expect(openAIImageSizeForRatio("16:9")).toBe("1536x1024");
+    expect(openAIImageSizeForRatio("21:9")).toBe("1536x1024");
   });
 
   it("preserves the user's brief while adding quality direction", () => {
