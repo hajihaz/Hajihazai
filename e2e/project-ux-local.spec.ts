@@ -18,6 +18,8 @@ test.describe("project chat synchronization", () => {
     expect(create.status()).toBe(201);
     const project = (await create.json()).project as { id: string; name: string };
 
+    let artifactId: string | null = null;
+    let automationId: string | null = null;
     try {
       const listed = await page.request.get("/api/projects");
       expect(listed.status()).toBe(200);
@@ -35,19 +37,61 @@ test.describe("project chat synchronization", () => {
       const chatBody = await chat.json();
       expect(chatBody.projectId).toBe(project.id);
 
+      const artifact = await page.request.post("/api/artifacts", {
+        data: {
+          conversationId: chatBody.id,
+          title: "E2E Project Search Artifact",
+          content: "project-v5-needle searchable artifact content",
+        },
+      });
+      expect(artifact.status()).toBe(201);
+      artifactId = (await artifact.json()).artifact.id as string;
+
+      const automation = await page.request.post("/api/automations", {
+        data: {
+          name: "E2E Project Search Automation",
+          prompt: "automation-v5-needle searchable automation prompt",
+          schedule: "0 9 * * *",
+          timezone: "UTC",
+          projectId: project.id,
+        },
+      });
+      expect(automation.status()).toBe(201);
+      automationId = (await automation.json()).automation.id as string;
+
       const workspace = await page.request.get("/api/projects/" + project.id);
       expect(workspace.status()).toBe(200);
       const workspaceBody = await workspace.json();
       expect(workspaceBody.project.name).toBe("E2E Lifecycle Project Renamed");
       expect(workspaceBody.project.instructions).toBe("Use lifecycle instructions.");
       expect(workspaceBody.chats.some((c: { id: string }) => c.id === chatBody.id)).toBe(true);
+      expect(workspaceBody.activity.some((event: { kind: string; title: string }) => event.kind === "artifact" && event.title === "E2E Project Search Artifact")).toBe(true);
+      expect(workspaceBody.activity.some((event: { kind: string; title: string }) => event.kind === "automation" && event.title === "E2E Project Search Automation")).toBe(true);
 
-      const search = await page.request.get("/api/projects/" + project.id + "/search?q=New%20chat");
+      const search = await page.request.get("/api/projects/" + project.id + "/search?q=project-v5-needle");
       expect(search.status()).toBe(200);
+      expect((await search.json()).results.some((result: { kind: string; title: string }) => result.kind === "artifact" && result.title === "E2E Project Search Artifact")).toBe(true);
+
+      const automationSearch = await page.request.get("/api/projects/" + project.id + "/search?q=automation-v5-needle");
+      expect(automationSearch.status()).toBe(200);
+      expect((await automationSearch.json()).results.some((result: { kind: string; title: string }) => result.kind === "automation" && result.title === "E2E Project Search Automation")).toBe(true);
+
+      const instructionSearch = await page.request.get("/api/projects/" + project.id + "/search?q=lifecycle%20instructions");
+      expect(instructionSearch.status()).toBe(200);
+      expect((await instructionSearch.json()).results.some((result: { kind: string }) => result.kind === "project")).toBe(true);
 
       await page.goto("/projects/" + project.id, { waitUntil: "domcontentloaded" });
       await expect(page.getByText("E2E Lifecycle Project Renamed", { exact: true })).toBeVisible({ timeout: 15_000 });
       await expect(page.getByRole("button", { name: "New chat" })).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText("Recent activity", { exact: true })).toBeVisible();
+      await expect(page.getByText("E2E Project Search Artifact", { exact: true }).first()).toBeVisible();
+      await expect(page.getByRole("navigation", { name: "Project sections" })).toBeVisible();
+
+      const projectSearch = page.getByRole("textbox", { name: "Search this project" });
+      await projectSearch.fill("project-v5-needle");
+      await page.getByRole("button", { name: "Search", exact: true }).click();
+      await expect(page.locator("#search").getByText("E2E Project Search Artifact", { exact: true })).toBeVisible();
+
       await page.reload({ waitUntil: "domcontentloaded" });
       await expect(page.getByText("E2E Lifecycle Project Renamed", { exact: true })).toBeVisible({ timeout: 15_000 });
 
@@ -55,6 +99,8 @@ test.describe("project chat synchronization", () => {
       expect(conversations.status()).toBe(200);
       expect((await conversations.json()).conversations.some((c: { id: string; projectId: string | null }) => c.id === chatBody.id && c.projectId === project.id)).toBe(true);
     } finally {
+      if (automationId) await page.request.delete("/api/automations/" + automationId).catch(() => {});
+      if (artifactId) await page.request.delete("/api/artifacts/" + artifactId).catch(() => {});
       await page.request.delete("/api/projects/" + project.id).catch(() => {});
     }
   });

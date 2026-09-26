@@ -3,6 +3,7 @@ import { getProject, updateProject, deleteProject } from "@/lib/db/project-queri
 import { listProjectConversations } from "@/lib/db/queries";
 import { listProjectDocuments } from "@/lib/db/knowledge-queries";
 import { listProjectMemories } from "@/lib/db/project-queries";
+import { listProjectActivity } from "@/lib/db/project-activity";
 import { listAutomations } from "@/lib/db/automation-queries";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
@@ -23,11 +24,12 @@ export async function GET(
   const project = await getProject(session.user.id, id);
   if (!project) return new Response("Not found", { status: 404 });
 
-  const [chats, documents, memories, automations] = await Promise.all([
+  const [chats, documents, memories, automations, activity] = await Promise.all([
     listProjectConversations(session.user.id, id),
     listProjectDocuments(session.user.id, id),
     listProjectMemories(session.user.id, id),
     listAutomations(session.user.id, id),
+    listProjectActivity(session.user.id, id, 30),
   ]);
   return Response.json({
     project,
@@ -45,6 +47,7 @@ export async function GET(
       content: m.memory.content,
       status: m.memory.status,
     })),
+    activity: activity.map((event) => ({ ...event, at: event.at.toISOString() })),
     automations: automations.map((a) => ({
       id: a.id,
       name: a.name,

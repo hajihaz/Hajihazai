@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  Activity,
   ArrowLeft,
   Brain,
   Check,
@@ -59,6 +60,21 @@ type Run = {
   error: string | null;
   modelId: string | null;
 };
+type ActivityEvent = {
+  id: string;
+  kind: "chat" | "file" | "memory" | "artifact" | "automation" | "automation_run";
+  title: string;
+  detail: string | null;
+  href: string | null;
+  at: string;
+};
+type SearchResult = {
+  title: string;
+  kind: string;
+  id: string;
+  snippet?: string | null;
+  href?: string | null;
+};
 
 function fmtDate(value: string | null | undefined) {
   if (!value) return "—";
@@ -82,6 +98,7 @@ export default function ProjectWorkspace({
   initialArtifacts,
   initialMemories,
   initialAutomations,
+  initialActivity,
 }: {
   project: {
     id: string;
@@ -95,19 +112,21 @@ export default function ProjectWorkspace({
   initialArtifacts: Artifact[];
   initialMemories: Memory[];
   initialAutomations: Automation[];
+  initialActivity: ActivityEvent[];
 }) {
   const [chats] = useState(initialChats);
   const [docs, setDocs] = useState(initialDocs);
   const [artifacts] = useState(initialArtifacts);
   const [memories, setMemories] = useState(initialMemories);
   const [automations, setAutomations] = useState(initialAutomations);
+  const [activity, setActivity] = useState(initialActivity);
   const [availableMemories, setAvailableMemories] = useState<Memory[]>([]);
   const [showMemoryPicker, setShowMemoryPicker] = useState(false);
   const [memorySearch, setMemorySearch] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
-  const [searchResults, setSearchResults] = useState<
-    { title: string; kind: string; id: string }[]
-  >([]);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [instructions, setInstructions] = useState(project.instructions ?? "");
   const [projectName, setProjectName] = useState(project.name);
   const [projectDescription, setProjectDescription] = useState(project.description ?? "");
@@ -142,6 +161,7 @@ export default function ProjectWorkspace({
       if (!res.ok) return;
       const data = await res.json();
       setMemories(data.memories ?? []);
+      setActivity(data.activity ?? []);
     };
     const onReturn = () => void refreshMemoryState();
     window.addEventListener("focus", onReturn);
@@ -151,6 +171,34 @@ export default function ProjectWorkspace({
       document.removeEventListener("visibilitychange", onReturn);
     };
   }, [project.id]);
+
+  async function refreshActivity() {
+    const res = await fetch("/api/projects/" + project.id, { cache: "no-store" });
+    if (!res.ok) return;
+    const data = await res.json();
+    setActivity(data.activity ?? []);
+  }
+
+  async function runProjectSearch(e?: React.FormEvent) {
+    e?.preventDefault();
+    const q = projectSearch.trim();
+    setHasSearched(true);
+    if (!q) {
+      setSearchResults([]);
+      return;
+    }
+    setSearching(true);
+    try {
+      const res = await fetch("/api/projects/" + project.id + "/search?q=" + encodeURIComponent(q), { cache: "no-store" });
+      if (!res.ok) {
+        setSearchResults([]);
+        return;
+      }
+      setSearchResults((await res.json()).results ?? []);
+    } finally {
+      setSearching(false);
+    }
+  }
 
   async function saveProjectDetails() {
     setProjectMsg(null);
@@ -202,6 +250,7 @@ export default function ProjectWorkspace({
       setUploadMsg("Added “" + file.name + "” (" + data.chunks + " chunks)");
       const refreshed = await fetch("/api/projects/" + project.id);
       if (refreshed.ok) setDocs((await refreshed.json()).documents ?? []);
+      await refreshActivity();
       if (fileRef.current) fileRef.current.value = "";
     } finally {
       setBusy(false);
@@ -300,6 +349,7 @@ export default function ProjectWorkspace({
           if (refreshed.ok) setMemories((await refreshed.json()).memories ?? []);
         }
         setMemoryMsg("Memory attached to this project.");
+        await refreshActivity();
         setShowMemoryPicker(false);
       } else {
         setMemoryMsg((await res.text().catch(() => "")) || "Could not attach memory.");
@@ -319,6 +369,7 @@ export default function ProjectWorkspace({
       if (res.ok) {
         setMemories((p) => p.filter((m) => m.id !== memoryId));
         setMemoryMsg("Memory detached. It is now unscoped and available to project chats again.");
+        await refreshActivity();
       } else {
         setMemoryMsg((await res.text().catch(() => "")) || "Could not detach memory.");
       }
@@ -351,6 +402,7 @@ export default function ProjectWorkspace({
         timezone: form.timezone,
       });
       setAutomationMsg("Automation created");
+      await refreshActivity();
     } finally {
       setAutomationBusy(null);
     }
@@ -378,6 +430,7 @@ export default function ProjectWorkspace({
       if (res.ok) {
         setAutomations((p) => p.map((a) => (a.id === id ? data.automation : a)));
         setEditingAutomation(null);
+        await refreshActivity();
       } else setAutomationMsg(data.error ?? "Could not save automation");
     } finally {
       setAutomationBusy(null);
@@ -395,6 +448,7 @@ export default function ProjectWorkspace({
       if (res.ok) {
         const data = await res.json();
         setAutomations((p) => p.map((x) => (x.id === a.id ? data.automation : x)));
+        await refreshActivity();
       }
     } finally {
       setAutomationBusy(null);
@@ -411,6 +465,7 @@ export default function ProjectWorkspace({
         setAutomationMsg(a.status === "failed" ? "“" + a.name + "” was retried successfully." : "“" + a.name + "” finished a manual run.");
         await refreshAutomation(a.id);
         await loadRuns(a.id);
+        await refreshActivity();
       } else setAutomationMsg(data.error ?? "Run failed");
     } finally {
       setAutomationBusy(null);
@@ -429,6 +484,7 @@ export default function ProjectWorkspace({
           delete next[id];
           return next;
         });
+        await refreshActivity();
       }
     } finally {
       setAutomationBusy(null);
@@ -508,7 +564,63 @@ export default function ProjectWorkspace({
         </div>
       </div>
 
-      <section className="mt-8 space-y-2">
+      <section id="project-overview" className="mt-6">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+          {[
+            ["Chats", chats.length, "#chats"],
+            ["Files", docs.length, "#files"],
+            ["Memories", memories.length, "#memory"],
+            ["Artifacts", artifacts.length, "#artifacts"],
+            ["Automations", automations.length, "#automations"],
+          ].map(([label, count, href]) => (
+            <a key={String(label)} href={String(href)} className="rounded-xl border bg-card px-3 py-3 hover:bg-accent">
+              <span className="block text-xl font-semibold tabular-nums">{count}</span>
+              <span className="text-xs text-muted-foreground">{label}</span>
+            </a>
+          ))}
+        </div>
+        <nav aria-label="Project sections" className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {[
+            ["Search", "#search"], ["Chats", "#chats"], ["Activity", "#activity"], ["Files", "#files"],
+            ["Memory", "#memory"], ["Automations", "#automations"], ["Artifacts", "#artifacts"], ["Instructions", "#instructions"],
+          ].map(([label, href]) => (
+            <a key={label} href={href} className="shrink-0 rounded-full border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground">{label}</a>
+          ))}
+        </nav>
+      </section>
+
+      <section id="search" className="mt-8 space-y-3 scroll-mt-4">
+        <div>
+          <h2 className="text-sm font-semibold">Search this project</h2>
+          <p className="mt-1 text-xs text-muted-foreground">Search chats, message text, files, artifacts, attached memories, automations, and project instructions.</p>
+        </div>
+        <form onSubmit={runProjectSearch} className="flex gap-2">
+          <input
+            value={projectSearch}
+            onChange={(e) => { setProjectSearch(e.target.value); if (hasSearched) setHasSearched(false); }}
+            aria-label="Search this project"
+            placeholder="Search this project…"
+            className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm"
+          />
+          <button disabled={searching} className="min-w-20 rounded-lg border px-3 text-sm hover:bg-accent disabled:opacity-50">{searching ? "Searching…" : "Search"}</button>
+        </form>
+        {hasSearched && searchResults.length === 0 ? (
+          <div className="rounded-lg border border-dashed px-3 py-5 text-center text-sm text-muted-foreground">No matching project content found.</div>
+        ) : null}
+        {searchResults.length > 0 ? (
+          <div className="overflow-hidden rounded-lg border" aria-live="polite">
+            {searchResults.map((r) => (
+              <a href={r.href ?? "#"} key={r.kind + "-" + r.id} className="block border-b px-3 py-2.5 text-xs last:border-0 hover:bg-accent">
+                <span className="mr-2 rounded bg-muted px-1.5 py-0.5">{r.kind}</span>
+                <span className="font-medium">{r.title}</span>
+                {r.snippet ? <span className="mt-1 block line-clamp-2 text-muted-foreground">{r.snippet}</span> : null}
+              </a>
+            ))}
+          </div>
+        ) : null}
+      </section>
+
+      <section id="chats" className="mt-8 space-y-2 scroll-mt-4">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Project Chats</h2>
           <button onClick={newChat} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90">
@@ -528,7 +640,31 @@ export default function ProjectWorkspace({
         </div>
       </section>
 
-      <section className="mt-8 space-y-2">
+      <section id="activity" className="mt-8 scroll-mt-4 space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="flex items-center gap-2 text-sm font-semibold"><Activity className="size-4" /> Recent activity</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Latest project chats, files, memories, artifacts, and automations in one timeline.</p>
+          </div>
+          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{activity.length}</span>
+        </div>
+        <div className="overflow-hidden rounded-lg border">
+          {activity.length === 0 ? (
+            <p className="px-3 py-4 text-sm text-muted-foreground">Project activity will appear here as you work.</p>
+          ) : activity.slice(0, 12).map((event) => (
+            <a key={event.id} href={event.href ?? "#"} className="flex items-start gap-3 border-b px-3 py-2.5 text-sm last:border-0 hover:bg-accent">
+              <span className="mt-0.5 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">{event.kind.replace("_", " ")}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{event.title}</span>
+                {event.detail ? <span className="block truncate text-xs text-muted-foreground">{event.detail}</span> : null}
+              </span>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{fmtDate(event.at)}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      <section id="files" className="mt-8 scroll-mt-4 space-y-2">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-sm font-semibold">Project Knowledge &amp; Files</h2>
         </div>
@@ -557,7 +693,7 @@ export default function ProjectWorkspace({
         </div>
       </section>
 
-      <section className="mt-8 space-y-3">
+      <section id="memory" className="mt-8 scroll-mt-4 space-y-3">
         <div className="flex items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-sm font-semibold"><Brain className="size-4" /> Project Memory</h2>
@@ -609,7 +745,7 @@ export default function ProjectWorkspace({
         ) : null}
       </section>
 
-      <section className="mt-8 space-y-3">
+      <section id="automations" className="mt-8 scroll-mt-4 space-y-3">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold"><Zap className="size-4" /> Automations</h2>
           <p className="mt-1 text-xs text-muted-foreground">Scheduled prompts run with this project’s instructions and memory context. Hobby hosting checks scheduled jobs daily; use “Run now” for an immediate execution.</p>
@@ -708,7 +844,7 @@ export default function ProjectWorkspace({
         </div>
       </section>
 
-      <section className="mt-8 space-y-3">
+      <section id="artifacts" className="mt-8 scroll-mt-4 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">Project Artifacts</h2>
           <span className="text-xs text-muted-foreground">{artifacts.length}</span>
@@ -729,20 +865,9 @@ export default function ProjectWorkspace({
             </div>
           ))}
         </div>
-        <form onSubmit={async (e) => {
-          e.preventDefault();
-          const q = projectSearch.trim();
-          if (!q) { setSearchResults([]); return; }
-          const r = await fetch("/api/projects/" + project.id + "/search?q=" + encodeURIComponent(q));
-          if (r.ok) setSearchResults((await r.json()).results ?? []);
-        }} className="flex gap-2">
-          <input value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} placeholder="Search this project…" className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm" />
-          <button className="rounded-lg border px-3 text-sm hover:bg-accent">Search</button>
-        </form>
-        {searchResults.length > 0 ? <div className="rounded-lg border p-2">{searchResults.map((r) => <div key={r.kind + "-" + r.id} className="px-2 py-1.5 text-xs"><span className="mr-2 rounded bg-muted px-1.5 py-0.5">{r.kind}</span>{r.title}</div>)}</div> : null}
       </section>
 
-      <section className="mt-8 space-y-2 pb-10">
+      <section id="instructions" className="mt-8 scroll-mt-4 space-y-2 pb-10">
         <h2 className="text-sm font-semibold">Project Instructions</h2>
         <p className="text-xs text-muted-foreground">Added to the system prompt for every chat in this project and automation.</p>
         <textarea value={instructions} onChange={(e) => setInstructions(e.target.value)} rows={5} placeholder="e.g. Always answer as a legal assistant; cite the relevant act." className="w-full resize-y rounded-lg border bg-background px-3 py-2.5 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm" />
