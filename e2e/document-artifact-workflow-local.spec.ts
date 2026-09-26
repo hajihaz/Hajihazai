@@ -1,12 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { ensureE2EAuthenticated } from "./helpers";
 
 test("document attachment and artifact persist together for one conversation", async ({ page }) => {
   const identifier = process.env.E2E_IDENTIFIER;
   const password = process.env.E2E_PASSWORD;
   test.skip(!identifier || !password, "Set E2E_IDENTIFIER and E2E_PASSWORD for the isolated document/artifact journey.");
 
-  const login = await page.request.post("/api/auth/login", { data: { identifier, password } });
-  expect(login.status()).toBe(200);
+  await ensureE2EAuthenticated(page.request);
 
   const conversationResponse = await page.request.post("/api/conversations", { data: {} });
   expect(conversationResponse.status()).toBe(200);

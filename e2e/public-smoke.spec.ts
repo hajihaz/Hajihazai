@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
 
+test.use({ storageState: { cookies: [], origins: [] } });
+
 test.describe("public production smoke", () => {
   test("sign-in page renders", async ({ page }) => {
     const response = await page.goto("/", { waitUntil: "domcontentloaded" });
@@ -19,7 +21,9 @@ test.describe("public production smoke", () => {
       message: "Google OAuth should redirect away from the app to accounts.google.com",
     }).toBe("accounts.google.com");
     expect(page.url()).not.toMatch(/\/api\/auth\/error/i);
-    await expect(page).toHaveTitle(/Sign in - Google Accounts/i);
+    if (process.env.LOCAL_E2E_DB !== "1") {
+      await expect(page).toHaveTitle(/Sign in - Google Accounts/i);
+    }
   });
 
   test("protected APIs reject anonymous access", async ({ request }) => {

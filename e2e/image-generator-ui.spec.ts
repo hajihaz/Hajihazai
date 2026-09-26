@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { ensureE2EAuthenticated } from "./helpers";
 
 const TINY_PNG =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
@@ -9,13 +10,12 @@ test.describe("image generator UI", () => {
   }) => {
     const identifier = process.env.E2E_IDENTIFIER;
     const password = process.env.E2E_PASSWORD;
-    const login =
-      identifier && password
-        ? await page.request.post("/api/auth/login", {
-            data: { identifier, password },
-          })
-        : await page.request.post("/api/auth/guest");
-    expect(login.ok()).toBeTruthy();
+    if (identifier && password) {
+      await ensureE2EAuthenticated(page.request);
+    } else {
+      const login = await page.request.post("/api/auth/guest");
+      expect(login.ok()).toBeTruthy();
+    }
 
     await page.goto("/");
     await expect(

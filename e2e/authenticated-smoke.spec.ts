@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { ensureE2EAuthenticated } from "./helpers";
 
 const E2E_IDENTIFIER = process.env.E2E_IDENTIFIER;
 const E2E_PASSWORD = process.env.E2E_PASSWORD;
@@ -31,17 +32,22 @@ test.describe("authenticated production smoke", () => {
   test("browser composer creates and restores a conversation", async ({ page }) => {
     test.skip(!ALLOW_WRITE, "Set E2E_ALLOW_WRITE=true only for an isolated write-capable test environment.");
     test.setTimeout(120_000);
-    const login = await page.request.post("/api/auth/login", {
-      data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
-    });
-    expect(login.status()).toBe(200);
+    await ensureE2EAuthenticated(page.request);
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByPlaceholder("Message HajiHaz AI…")).toBeVisible();
+    const created = page.waitForResponse((response) =>
+      response.url().endsWith("/api/conversations") &&
+      response.request().method() === "POST" &&
+      response.status() === 200,
+    );
     await page.getByRole("button", { name: "New Chat", exact: true }).click();
+    await created;
     const composer = page.getByPlaceholder("Message HajiHaz AI…");
-    await composer.click();
-    await composer.pressSequentially("Respond with the exact token E2E_UI_OK and nothing else.");
+    await expect(composer).toBeVisible();
+    const prompt = "Respond with the exact token E2E_UI_OK and nothing else.";
+    await composer.fill(prompt);
+    await expect(composer).toHaveValue(prompt);
     await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
     await page.getByRole("button", { name: "Send message" }).click();
     await expect(page.getByText("E2E_UI_OK", { exact: false }).last()).toBeVisible({ timeout: 90_000 });
@@ -51,10 +57,7 @@ test.describe("authenticated production smoke", () => {
   });
 
   test("authenticated read APIs remain available and scoped", async ({ page }) => {
-    const login = await page.request.post("/api/auth/login", {
-      data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
-    });
-    expect(login.status()).toBe(200);
+    await ensureE2EAuthenticated(page.request);
     for (const path of ["/api/conversations", "/api/models", "/api/brains", "/api/projects"]) {
       const response = await page.request.get(path);
       expect(response.status(), path).toBe(200);
@@ -64,10 +67,7 @@ test.describe("authenticated production smoke", () => {
   test("isolated authenticated chat journey persists across reload", async ({ page }) => {
     test.skip(!ALLOW_WRITE, "Set E2E_ALLOW_WRITE=true only for an isolated write-capable test environment.");
     test.setTimeout(120_000);
-    const login = await page.request.post("/api/auth/login", {
-      data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
-    });
-    expect(login.status()).toBe(200);
+    await ensureE2EAuthenticated(page.request);
 
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByPlaceholder("Message HajiHaz AI…")).toBeVisible();

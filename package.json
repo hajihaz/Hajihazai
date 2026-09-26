@@ -23,7 +23,7 @@
     "quality:report": "tsx scripts/quality-report.mts",
     "quality:report:monthly": "tsx scripts/quality-report.mts --monthly",
     "test:e2e": "playwright test",
-    "test:e2e:isolated": "E2E_BASE_URL=http://127.0.0.1:3000 LOCAL_E2E_DB=1 E2E_ALLOW_WRITE=true playwright test",
+    "test:e2e:isolated": "node scripts/run-isolated-e2e.mjs",
     "test:e2e:production": "playwright test e2e/public-smoke.spec.ts e2e/guest-smoke.spec.ts"
   },
   "dependencies": {

@@ -1,11 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { ensureE2EAuthenticated } from "./helpers";
 
 test("persistent file library upload -> search -> reuse -> delete", async ({ page }) => {
   await page.goto("/", { waitUntil: "domcontentloaded" });
   const identifier = process.env.E2E_IDENTIFIER; const password = process.env.E2E_PASSWORD;
   test.skip(!identifier || !password, "Set E2E_IDENTIFIER and E2E_PASSWORD for the isolated file-library journey.");
-  const login = await page.request.post("/api/auth/login", { data: { identifier, password } });
-  expect(login.status()).toBe(200);
+  await ensureE2EAuthenticated(page.request);
   await page.goto("/", { waitUntil: "domcontentloaded" });
   await expect(page.getByPlaceholder("Message HajiHaz AI…")).toBeVisible({ timeout: 30_000 });
 

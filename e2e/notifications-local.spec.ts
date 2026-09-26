@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { eq } from "drizzle-orm";
+import { ensureE2EAuthenticated } from "./helpers";
 
 const E2E_IDENTIFIER = process.env.E2E_IDENTIFIER;
 const E2E_PASSWORD = process.env.E2E_PASSWORD;
@@ -8,10 +9,7 @@ test.describe("notification center", () => {
   test.skip(!E2E_IDENTIFIER || !E2E_PASSWORD, "E2E credentials are required for notification UI coverage.");
 
   test("shows an unread notification and marks it read", async ({ page }) => {
-    const login = await page.request.post("/api/auth/login", {
-      data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
-    });
-    expect(login.status()).toBe(200);
+    await ensureE2EAuthenticated(page.request);
 
     const identifier = E2E_IDENTIFIER!;
     const { db, schema } = await (async () => {

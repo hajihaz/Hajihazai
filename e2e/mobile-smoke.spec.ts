@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("mobile production polish", () => {
-  test.use({ viewport: { width: 390, height: 844 }, isMobile: true });
+  test.use({ viewport: { width: 390, height: 844 }, isMobile: true, storageState: { cookies: [], origins: [] } });
 
   test("landing page fits a phone viewport and exposes accessible controls", async ({ page }) => {
     await page.goto("/", { waitUntil: "domcontentloaded" });

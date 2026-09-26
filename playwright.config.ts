@@ -10,6 +10,7 @@ if (/^https?:\/\/(127\.0\.0\.1|localhost)(?::\d+)?$/i.test(process.env.E2E_BASE_
 const baseURL = process.env.E2E_BASE_URL ?? "https://hajihazai.vercel.app";
 const writeCapable = process.env.E2E_ALLOW_WRITE === "true";
 const localE2E = /^https?:\/\/(127\.0\.0\.1|localhost)(?::\d+)?$/i.test(baseURL);
+if (localE2E) process.env.AUTH_URL = baseURL;
 
 // Write-capable E2E must be physically isolated. This guard intentionally fails
 // before Playwright starts if someone accidentally points it at production.
@@ -23,8 +24,18 @@ export default defineConfig({
   testDir: "./e2e",
   timeout: 30_000,
   retries: process.env.CI ? 2 : 0,
+  globalSetup: localE2E ? "./e2e/global-setup.ts" : undefined,
+  webServer: localE2E && process.env.E2E_MANAGED_SERVER !== "1"
+    ? {
+        command: `npm run dev -- --hostname 127.0.0.1 --port ${new URL(baseURL).port || "3000"}`,
+        url: baseURL,
+        reuseExistingServer: false,
+        timeout: 120_000,
+      }
+    : undefined,
   use: {
     baseURL,
+    storageState: localE2E ? "test-results/.auth/e2e-user.json" : undefined,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

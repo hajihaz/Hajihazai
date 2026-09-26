@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { ensureE2EAuthenticated } from "./helpers";
 
 const E2E_IDENTIFIER = process.env.E2E_IDENTIFIER;
 const E2E_PASSWORD = process.env.E2E_PASSWORD;
@@ -7,10 +8,7 @@ test.describe("project chat synchronization", () => {
   test.skip(!E2E_IDENTIFIER || !E2E_PASSWORD, "E2E credentials are required for authenticated project UX coverage.");
 
   test("covers project CRUD, project chat creation, navigation, reload, and search", async ({ page }) => {
-    const login = await page.request.post("/api/auth/login", {
-      data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
-    });
-    expect(login.status()).toBe(200);
+    await ensureE2EAuthenticated(page.request);
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByPlaceholder("Message HajiHaz AI…")).toBeVisible({ timeout: 30_000 });
 
@@ -62,10 +60,7 @@ test.describe("project chat synchronization", () => {
   });
 
   test("refreshes project context after a project is renamed elsewhere", async ({ page, context }) => {
-    const login = await page.request.post("/api/auth/login", {
-      data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
-    });
-    expect(login.status()).toBe(200);
+    await ensureE2EAuthenticated(page.request);
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.getByPlaceholder("Message HajiHaz AI…")).toBeVisible({ timeout: 30_000 });
 
@@ -77,10 +72,7 @@ test.describe("project chat synchronization", () => {
     const otherTab = await context.newPage();
 
     try {
-      const otherLogin = await otherTab.request.post("/api/auth/login", {
-        data: { identifier: E2E_IDENTIFIER, password: E2E_PASSWORD },
-      });
-      expect(otherLogin.status()).toBe(200);
+      await ensureE2EAuthenticated(otherTab.request);
 
       const rename = await otherTab.request.patch("/api/projects/" + project.id, {
         data: { name: "E2E Sync Project Renamed" },
