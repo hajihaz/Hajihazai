@@ -4,6 +4,9 @@ import {
   withTimeout,
   executeDetectedToolCall,
   selectAndRunTool,
+  resolveToolTimeoutMs,
+  TOOL_TIMEOUT_MS,
+  COMMANDER_TOOL_TIMEOUT_MS,
 } from "@/lib/tools/tool-calling";
 import { getTool } from "@/lib/tools/registry";
 import type { NativeToolCall } from "@/lib/ai/types";
@@ -33,6 +36,21 @@ describe("withTimeout", () => {
   it("rejects when the promise exceeds the timeout", async () => {
     const never = new Promise((r) => setTimeout(r, 5000));
     await expect(withTimeout(never, 30)).rejects.toThrow(/timed out/i);
+  });
+});
+
+describe("tool execution timeout policy", () => {
+  it("keeps normal tools on the fast timeout", () => {
+    expect(resolveToolTimeoutMs("calculator")).toBe(TOOL_TIMEOUT_MS);
+  });
+
+  it("allows Commander enough time for Responses API + MCP execution", () => {
+    expect(resolveToolTimeoutMs("hajihaz_commander")).toBe(COMMANDER_TOOL_TIMEOUT_MS);
+    expect(COMMANDER_TOOL_TIMEOUT_MS).toBeGreaterThan(TOOL_TIMEOUT_MS);
+  });
+
+  it("honors an explicit caller override for every tool", () => {
+    expect(resolveToolTimeoutMs("hajihaz_commander", 50)).toBe(50);
   });
 });
 

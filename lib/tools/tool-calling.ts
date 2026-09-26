@@ -14,7 +14,18 @@ import type { Tool } from "./types";
  */
 
 export const TOOL_TIMEOUT_MS = 10_000;
+export const COMMANDER_TOOL_TIMEOUT_MS = 60_000;
 export const DETECTION_TIMEOUT_MS = 5_000;
+
+/**
+ * Most deterministic tools should fail fast. Commander is different: it makes a
+ * nested Responses API + MCP round-trip and real Mac operations can legitimately
+ * take longer than 10 seconds. Callers may still provide an explicit override.
+ */
+export function resolveToolTimeoutMs(toolName: string, override?: number): number {
+  if (typeof override === "number") return override;
+  return toolName === "hajihaz_commander" ? COMMANDER_TOOL_TIMEOUT_MS : TOOL_TIMEOUT_MS;
+}
 
 export type ToolStatus = "success" | "error" | "timeout" | "rejected";
 
@@ -79,7 +90,7 @@ export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 export async function executeDetectedToolCall(
   userId: string,
   call: DetectedToolCall,
-  timeoutMs: number = TOOL_TIMEOUT_MS,
+  timeoutMs?: number,
 ): Promise<ToolRunResult> {
   const tool = getTool(call.tool);
   if (!tool) {
@@ -109,7 +120,7 @@ export async function executeDetectedToolCall(
   try {
     const result = await withTimeout(
       executeTool(userId, call.tool, valid.data),
-      timeoutMs,
+      resolveToolTimeoutMs(call.tool, timeoutMs),
     );
     return {
       success: true,
