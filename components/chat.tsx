@@ -561,7 +561,7 @@ const Chat = memo(function Chat({
               setAttachmentFiles((current) => [...current, ...valid.filter((f) => f.size <= 12 * 1024 * 1024)].slice(0, 5));
               e.currentTarget.value = "";
             }} />
-            <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
             <textarea
               ref={textareaRef}
               value={input}
@@ -581,8 +581,9 @@ const Chat = memo(function Chat({
               rows={1}
               aria-label="Message"
               placeholder="Message HajiHaz AI…"
-              className="max-h-40 min-h-11 flex-1 resize-none rounded-xl border bg-background px-4 py-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
+              className="max-h-40 min-h-11 w-full min-w-0 flex-1 resize-none rounded-xl border bg-background px-4 py-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
             />
+            <div className="flex min-w-0 items-center justify-end gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <VoiceInput
               value={input}
               onChange={setInput}
@@ -635,6 +636,7 @@ const Chat = memo(function Chat({
                 <Send className="size-4" />
               </button>
             )}
+            </div>
             </div>
           </div>
         </div>

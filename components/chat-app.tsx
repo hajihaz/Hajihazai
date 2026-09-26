@@ -1100,7 +1100,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center gap-2 border-b px-3 py-2.5 sm:px-4 sm:py-3">
+        <header className="pt-safe flex items-center gap-2 border-b px-3 py-2.5 sm:px-4 sm:py-3">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}

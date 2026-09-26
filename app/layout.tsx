@@ -1,12 +1,16 @@
 import type { Metadata, Viewport } from "next";
+import PwaRuntime from "@/components/pwa-runtime";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://hajihazai.vercel.app"),
+  metadataBase: new URL("https://hajihazai.allbeesolutions.com"),
   title: "HajiHaz AI",
   description:
     "Next-generation AI assistant platform powered by memory, retrieval, and multi-model intelligence.",
   applicationName: "HajiHaz AI",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, title: "HajiHaz AI", statusBarStyle: "black-translucent" },
+  formatDetection: { telephone: false },
   openGraph: { title: "HajiHaz AI", description: "Personal intelligence with memory, live evidence, and specialized AI brains.", type: "website", images: [{ url: "/branding/hajihaz-logo.png", alt: "HajiHaz AI" }] },
   twitter: { card: "summary_large_image", title: "HajiHaz AI", description: "Personal intelligence with memory, live evidence, and specialized AI brains.", images: ["/branding/hajihaz-logo.png"] },
   icons: {
@@ -20,6 +24,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  interactiveWidget: "resizes-content",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
     { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
@@ -39,7 +44,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-dvh overflow-x-hidden antialiased">{children}</body>
+      <body className="min-h-dvh overflow-x-hidden antialiased">{children}<PwaRuntime /></body>
     </html>
   );
 }
