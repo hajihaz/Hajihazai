@@ -11,6 +11,7 @@ import ImageGenerator from "./image-generator";
 import CanvasWorkspace from "./canvas-workspace";
 import FileLibrary from "./file-library";
 import NotificationCenter from "./notification-center";
+import GuestAuthGate from "./guest-auth-gate";
 
 type Conv = { id: string; title: string; projectId?: string | null; updatedAt?: string | null; archived?: boolean; pinned?: boolean; intelligenceLevel?: string };
 type Proj = { id: string; name: string; isSystem?: boolean };
@@ -112,6 +113,7 @@ export default function ChatApp({
   levels: initialLevels,
   initialProjects,
   isAdmin,
+  isGuest,
   openConversationId,
 }: {
   user: User;
@@ -119,6 +121,7 @@ export default function ChatApp({
   initialProjects: Proj[];
   levels: LevelOption[];
   isAdmin: boolean;
+  isGuest: boolean;
   openConversationId?: string;
 }) {
   const [conversations, setConversations] =
@@ -150,6 +153,7 @@ export default function ChatApp({
   const [imageGeneratorOpen, setImageGeneratorOpen] = useState(false);
   const [canvasOpen, setCanvasOpen] = useState(false);
   const [fileLibraryOpen, setFileLibraryOpen] = useState(false);
+  const [guestGateOpen, setGuestGateOpen] = useState(false);
   const [attachments, setAttachments] = useState<Array<{id:string;documentId:string;title:string;originalName?:string|null;mimeType?:string|null;byteSize?:number|null}>>([]);
   const abortRef = useRef<AbortController | null>(null);
   // Synchronous concurrency guard — React state lags a frame, so a ref is what
@@ -696,6 +700,10 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
   async function send(files: File[] = []) {
     const text = input.trim();
     if ((!text && files.length === 0) || generatingRef.current) return;
+    if (isGuest && messages.filter((message) => message.role === "user").length >= 5) {
+      setGuestGateOpen(true);
+      return;
+    }
     setInput("");
     if (files.length > 0) {
       await sendAttachments(files, text);
@@ -814,6 +822,10 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
   function sendPrompt(text: string) {
     const t = text.trim();
     if (!t || generatingRef.current) return;
+    if (isGuest && messages.filter((message) => message.role === "user").length >= 5) {
+      setGuestGateOpen(true);
+      return;
+    }
     const localId = uuid();
     setMessages((p) => [
       ...p,
@@ -898,7 +910,17 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
       } finally {
         clearTimeout(timer);
       }
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) {
+        if (isGuest && res.status === 403) {
+          const data = await res.clone().json().catch(() => null);
+          if (data?.error === "guest_message_limit") {
+            setGuestGateOpen(true);
+            if (opts.userLocalId) setMessages((current) => current.filter((item) => item.id !== opts.userLocalId));
+            return;
+          }
+        }
+        throw new Error(`HTTP ${res.status}`);
+      }
       if (!res.body) throw new Error("No response body");
 
       const reader = res.body.getReader();
@@ -1324,6 +1346,8 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           }}
         />
       </div>
+
+      <GuestAuthGate open={isGuest && guestGateOpen} />
 
       {/* Delete confirmation */}
       <Modal

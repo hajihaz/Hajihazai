@@ -1,4 +1,4 @@
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq } from "drizzle-orm";
 import { db } from "./index";
 import { conversations, messages } from "./schema";
 
@@ -108,6 +108,15 @@ export async function listMessages(conversationId: string) {
  * Fetches only the rows needed (ORDER BY createdAt DESC LIMIT n) instead of
  * loading the whole conversation and slicing in JS (Phase 9.0 hot-path fix).
  */
+export async function countUserMessagesForUser(userId: string) {
+  const [row] = await db
+    .select({ value: count() })
+    .from(messages)
+    .innerJoin(conversations, eq(messages.conversationId, conversations.id))
+    .where(and(eq(conversations.userId, userId), eq(messages.role, "user")));
+  return row?.value ?? 0;
+}
+
 export async function listRecentMessages(conversationId: string, limit = 20) {
   const rows = await db
     .select()

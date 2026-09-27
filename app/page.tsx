@@ -178,6 +178,7 @@ export default async function Home({
       }))}
       levels={levels}
       isAdmin={admin}
+      isGuest={(profile?.email ?? session.user.email)?.toLowerCase().endsWith("@guest.hajihaz.ai") ?? false}
       openConversationId={openConversationId}
     />
   );

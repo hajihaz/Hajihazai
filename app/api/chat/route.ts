@@ -6,6 +6,7 @@ import { conversationAttachments } from "@/lib/db/schema";
 import {
   addMessage,
   addOwnedMessage,
+  countUserMessagesForUser,
   getConversation,
   getMessage,
   listRecentMessages,
@@ -64,6 +65,8 @@ import { sanitizeQueryForLog } from "@/lib/admin/analytics";
 import { planIntelligence, shouldRequestBrainClarification } from "@/lib/ai/intelligence-planner";
 
 const CHAT_RATE_LIMIT = 30;
+const GUEST_MESSAGE_LIMIT = 5;
+const GUEST_EMAIL_SUFFIX = "@guest.hajihaz.ai";
 const CHAT_RATE_WINDOW_MS = 60_000;
 const MESSAGE_MAX_CHARS = 10_000;
 const TOOL_RESULT_MAX_CHARS = 10_000;
@@ -121,6 +124,7 @@ export async function POST(req: Request) {
   }
 
   const admin = isAdmin(session.user.email);
+  const guest = session.user.email?.toLowerCase().endsWith(GUEST_EMAIL_SUFFIX) ?? false;
 
   // Maintenance mode — block non-admins
   if (!admin) {
@@ -191,6 +195,20 @@ export async function POST(req: Request) {
     return new Response(`message exceeds ${MESSAGE_MAX_CHARS} characters`, {
       status: 413,
     });
+  }
+
+  // Guests get five persisted user turns total across their temporary workspace.
+  // Enforce this server-side so refreshing, opening another chat, or calling the
+  // API directly cannot bypass the product gate. Regeneration does not consume
+  // another turn because it reuses an already-persisted user message.
+  if (guest && !regenerate) {
+    const used = await countUserMessagesForUser(session.user.id);
+    if (used >= GUEST_MESSAGE_LIMIT) {
+      return Response.json(
+        { error: "guest_message_limit", limit: GUEST_MESSAGE_LIMIT, used },
+        { status: 403, headers: { "Cache-Control": "private, no-store, max-age=0" } },
+      );
+    }
   }
 
   // Regeneration is tied to a stable persisted user-message ID. Never infer the
