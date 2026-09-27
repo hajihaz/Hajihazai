@@ -21,6 +21,7 @@ import {
   approveMemory,
   deleteMemory,
   memoryStats,
+  replaceMemory,
 } from "@/lib/db/memory-queries";
 import { rankMemories, matchesQuery } from "@/lib/memory/ranking";
 import { buildMemoryBlock } from "@/lib/memory/context-format";
@@ -44,6 +45,18 @@ async function cleanup(db: any, schema: any, ...userIds: string[]) {
 }
 
 /* ─── SECTION 1: unit tests (no DB needed) ────────────────────────────── */
+
+describe("memory ranking — lifecycle priority", () => {
+  it("uses explicit importance and confidence as bounded tie-breakers", () => {
+    const now = Date.now();
+    const ranked = rankMemories([
+      { type: "fact", content: "Same topic low priority", updatedAt: new Date(now), importance: 1, confidence: 20 },
+      { type: "fact", content: "Same topic high priority", updatedAt: new Date(now), importance: 5, confidence: 95 },
+    ], undefined, now);
+    expect(ranked[0].content).toContain("high priority");
+    expect(ranked[0].score).toBeGreaterThan(ranked[1].score);
+  });
+});
 
 describe("memory ranking — keyword match", () => {
   it("returns all memories when query is undefined", () => {
@@ -150,7 +163,33 @@ describe.skipIf(!hasDb)("memory CRUD (db)", () => {
     await createMemory(userA, { content: "Pending stat test", type: "note", status: "pending" });
     const stats = await memoryStats(userA);
     expect(stats.active).toBeGreaterThanOrEqual(1);
+    expect(stats.retrievable).toBeGreaterThanOrEqual(1);
     expect(stats.pending).toBeGreaterThanOrEqual(1);
+  });
+
+  it("replaces a memory without deleting lifecycle history", async () => {
+    const original = await createMemory(userA, {
+      title: "Office",
+      content: "Office is in Chennai",
+      type: "fact",
+      importance: 4,
+      confidence: 90,
+    });
+    const replacedAt = new Date();
+    const result = await replaceMemory(userA, original.id, {
+      title: "Office",
+      content: "Office is in Bengaluru",
+    }, replacedAt);
+    expect(result).not.toBeNull();
+    expect(result?.previous.supersededBy).toBe(result?.replacement.id);
+    expect(result?.previous.validUntil?.getTime()).toBe(replacedAt.getTime());
+    expect(result?.replacement.content).toBe("Office is in Bengaluru");
+    expect(result?.replacement.importance).toBe(4);
+    expect(result?.replacement.confidence).toBe(90);
+
+    const stats = await memoryStats(userA);
+    expect(stats.superseded).toBeGreaterThanOrEqual(1);
+    expect(stats.expired).toBeGreaterThanOrEqual(1);
   });
 });
 

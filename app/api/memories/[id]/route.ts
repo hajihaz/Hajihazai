@@ -4,6 +4,23 @@ import { embedMemory } from "@/lib/memory/embed-memory";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
 
+
+function finiteNumber(value: unknown, min: number, max: number) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < min || n > max) return false as const;
+  return n;
+}
+
+function optionalDate(value: unknown) {
+  if (value === undefined) return undefined;
+  if (value === null || value === "") return null;
+  if (typeof value !== "string") return false as const;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? false as const : d;
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -22,16 +39,36 @@ export async function PATCH(
   const body = await req.json().catch(() => null);
   const content = body?.content;
   const type = body?.type;
-  if (content === undefined && type === undefined) {
+  const title = body?.title;
+  const importance = finiteNumber(body?.importance, 1, 5);
+  const confidence = finiteNumber(body?.confidence, 0, 100);
+  const validFrom = optionalDate(body?.validFrom);
+  const validUntil = optionalDate(body?.validUntil);
+  if ([content, type, title, body?.importance, body?.confidence, body?.validFrom, body?.validUntil].every((value) => value === undefined)) {
     return new Response("nothing to update", { status: 400 });
   }
   if (content !== undefined && (typeof content !== "string" || !content.trim())) {
     return new Response("content must be a non-empty string", { status: 400 });
   }
+  if (title !== undefined && title !== null && typeof title !== "string") {
+    return new Response("title must be a string or null", { status: 400 });
+  }
+  if (importance === false) return new Response("importance must be between 1 and 5", { status: 400 });
+  if (confidence === false) return new Response("confidence must be between 0 and 100", { status: 400 });
+  if (validFrom === false || validUntil === false) return new Response("validity dates must be ISO dates or null", { status: 400 });
+  if (validFrom === null) return new Response("validFrom cannot be null", { status: 400 });
+  if (validFrom instanceof Date && validUntil instanceof Date && validUntil <= validFrom) {
+    return new Response("validUntil must be after validFrom", { status: 400 });
+  }
 
   const memory = await updateMemory(session.user.id, id, {
-    ...(content !== undefined ? { content: content.trim() } : {}),
-    ...(type !== undefined ? { type: String(type).trim() } : {}),
+    ...(content !== undefined ? { content: content.trim().slice(0, 12000) } : {}),
+    ...(type !== undefined ? { type: String(type).trim().slice(0, 80) } : {}),
+    ...(title !== undefined ? { title: typeof title === "string" ? title.trim().slice(0, 160) || null : null } : {}),
+    ...(body?.importance !== undefined ? { importance: importance as number | null } : {}),
+    ...(body?.confidence !== undefined ? { confidence: confidence as number | null } : {}),
+    ...(validFrom !== undefined ? { validFrom: validFrom as Date } : {}),
+    ...(validUntil !== undefined ? { validUntil: validUntil as Date | null } : {}),
   });
 
   // Null means the memory does not exist OR is not owned by this user.

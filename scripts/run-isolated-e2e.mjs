@@ -198,7 +198,8 @@ try {
   );
   await waitForServer(baseUrl, appServer);
 
-  exitCode = run("npx", ["playwright", "test"]);
+  const requestedTests = process.argv.slice(2);
+  exitCode = run("npx", ["playwright", "test", ...requestedTests]);
 } finally {
   await stopServer(appServer);
 

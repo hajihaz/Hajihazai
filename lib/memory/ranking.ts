@@ -21,6 +21,8 @@ interface Rankable {
   type: string;
   content: string;
   updatedAt: Date | string | number;
+  importance?: number | null;
+  confidence?: number | null;
 }
 
 /**
@@ -31,7 +33,15 @@ export function scoreMemory(m: Rankable, now: number): number {
   const updated = new Date(m.updatedAt).getTime();
   const ageDays = Math.max(0, (now - updated) / 86_400_000);
   const recency = 1 / (1 + ageDays);
-  return Number((typeWeight(m.type) + recency).toFixed(4));
+  // Importance and confidence are deliberately small tie-breakers: explicit user
+  // priority should matter, but never overpower the memory type or freshness.
+  const importanceBias = typeof m.importance === "number"
+    ? (Math.max(1, Math.min(5, m.importance)) - 3) * 0.25
+    : 0;
+  const confidenceBias = typeof m.confidence === "number"
+    ? ((Math.max(0, Math.min(100, m.confidence)) - 50) / 100) * 0.5
+    : 0;
+  return Number((typeWeight(m.type) + recency + importanceBias + confidenceBias).toFixed(4));
 }
 
 /**

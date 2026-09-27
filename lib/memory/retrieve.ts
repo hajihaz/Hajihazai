@@ -23,9 +23,10 @@ function memoryScope(userId: string, projectId?: string | null) {
 export async function getActiveMemories(userId: string, projectId?: string | null) {
   const now = new Date();
   return db.select({
-    id: userMemory.id, type: userMemory.type, content: userMemory.content,
+    id: userMemory.id, type: userMemory.type, title: userMemory.title, content: userMemory.content,
+    importance: userMemory.importance, confidence: userMemory.confidence,
     status: userMemory.status, validFrom: userMemory.validFrom,
-    validUntil: userMemory.validUntil, updatedAt: userMemory.updatedAt,
+    validUntil: userMemory.validUntil, supersededBy: userMemory.supersededBy, updatedAt: userMemory.updatedAt,
   }).from(userMemory).where(and(
     memoryScope(userId, projectId), eq(userMemory.status, "active"),
     lte(userMemory.validFrom, now),
@@ -43,9 +44,10 @@ async function getKeywordCandidates(userId: string, q: string, projectId?: strin
   }
   const now = new Date();
   return db.select({
-    id: userMemory.id, type: userMemory.type, content: userMemory.content,
+    id: userMemory.id, type: userMemory.type, title: userMemory.title, content: userMemory.content,
+    importance: userMemory.importance, confidence: userMemory.confidence,
     status: userMemory.status, validFrom: userMemory.validFrom,
-    validUntil: userMemory.validUntil, updatedAt: userMemory.updatedAt,
+    validUntil: userMemory.validUntil, supersededBy: userMemory.supersededBy, updatedAt: userMemory.updatedAt,
   }).from(userMemory).where(and(
     memoryScope(userId, projectId), eq(userMemory.status, "active"),
     lte(userMemory.validFrom, now),
