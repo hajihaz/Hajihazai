@@ -1,6 +1,8 @@
 import { getLoginProfile } from "@/lib/db/credential-queries";
 import { verifyPassword } from "@/lib/auth/password";
 import { createUserSession, isSecureRequest } from "@/lib/auth/session";
+import { auth } from "@/auth";
+import { transferGuestConversations } from "@/lib/auth/guest-transfer";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rateLimitIdentity, rejectOversizedBody } from "@/lib/auth/request";
 import { isEmailBlocked } from "@/lib/admin/queries";
@@ -53,7 +55,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "This account is not active. Please contact support." }, { status: 403 });
   }
 
+  const previous = await auth();
   await createUserSession(profile.userId, isSecureRequest(req));
+  await transferGuestConversations(previous?.user?.email?.toLowerCase().endsWith("@guest.hajihaz.ai") ? previous.user.id : null, profile.userId);
   syncEventToSheets({ email: profile.email ?? identifier, eventType: "login", detail: "password" });
   return Response.json({ ok: true });
 }

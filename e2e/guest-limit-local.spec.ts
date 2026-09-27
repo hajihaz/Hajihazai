@@ -46,5 +46,17 @@ test.describe("guest five-message gate", () => {
     await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
     await expect(page.getByText("guest message 5", { exact: true })).toBeVisible();
+
+    // Account creation replaces the guest session and transfers the same chat
+    // to the durable user, so the conversation survives the gate.
+    const suffix = crypto.randomUUID().slice(0, 8);
+    const registered = await page.request.post("/api/auth/register", {
+      data: { username: `guestkeep${suffix}`, email: `guestkeep-${suffix}@example.com`, password: "GuestKeep-2026!Pass" },
+    });
+    expect(registered.status()).toBe(200);
+    const preserved = await page.request.get(`/api/conversations/${id}/messages`);
+    expect(preserved.status()).toBe(200);
+    const preservedBody = await preserved.json();
+    expect(preservedBody.messages.filter((message: { role: string }) => message.role === "user")).toHaveLength(5);
   });
 });

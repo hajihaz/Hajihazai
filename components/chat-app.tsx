@@ -1,17 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Bug, Download, Folder, GitFork, Menu, PlusCircle, Share2, Paperclip, X } from "lucide-react";
 import Sidebar from "./sidebar";
 import Chat from "./chat";
 import Modal from "./modal";
 import ProfileMenu from "./profile-menu";
 import type { BrainOption, BrainMode } from "./brain-selector";
-import ImageGenerator from "./image-generator";
-import CanvasWorkspace from "./canvas-workspace";
-import FileLibrary from "./file-library";
 import NotificationCenter from "./notification-center";
 import GuestAuthGate from "./guest-auth-gate";
+
+const ImageGenerator = dynamic(() => import("./image-generator"), { ssr: false });
+const CanvasWorkspace = dynamic(() => import("./canvas-workspace"), { ssr: false });
+const FileLibrary = dynamic(() => import("./file-library"), { ssr: false });
 
 type Conv = { id: string; title: string; projectId?: string | null; updatedAt?: string | null; archived?: boolean; pinned?: boolean; intelligenceLevel?: string };
 type Proj = { id: string; name: string; isSystem?: boolean };

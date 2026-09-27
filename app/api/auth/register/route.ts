@@ -1,6 +1,8 @@
 import { createPasswordUser } from "@/lib/db/credential-queries";
 import { hashPassword, validatePassword } from "@/lib/auth/password";
 import { createUserSession, isSecureRequest } from "@/lib/auth/session";
+import { auth } from "@/auth";
+import { transferGuestConversations } from "@/lib/auth/guest-transfer";
 import { validateUsername } from "@/lib/onboarding/validate";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rateLimitIdentity, rejectOversizedBody } from "@/lib/auth/request";
@@ -64,7 +66,9 @@ export async function POST(req: Request) {
     );
   }
 
+  const previous = await auth();
   await createUserSession(result.userId, isSecureRequest(req));
+  await transferGuestConversations(previous?.user?.email?.toLowerCase().endsWith("@guest.hajihaz.ai") ? previous.user.id : null, result.userId);
 
   // Non-blocking Google Sheets sync — never delays or fails the signup
   syncUserToSheets({ email, name: uname.value, source: "credentials", createdAt: new Date() });

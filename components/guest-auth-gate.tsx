@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import AuthForm from "./auth-form";
+import { signInGuestWithGoogle } from "@/app/actions";
 
 function GoogleIcon() {
   return (
@@ -15,20 +15,7 @@ function GoogleIcon() {
 }
 
 export default function GuestAuthGate({ open }: { open: boolean }) {
-  const [googleBusy, setGoogleBusy] = useState(false);
   if (!open) return null;
-
-  async function google() {
-    if (googleBusy) return;
-    setGoogleBusy(true);
-    try {
-      // Use Auth.js' normal Google initiation endpoint. The current guest cookie
-      // stays in the browser until the provider flow replaces it on success.
-      window.location.href = "/api/auth/signin/google?callbackUrl=/";
-    } catch {
-      setGoogleBusy(false);
-    }
-  }
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/60 p-4 backdrop-blur-sm sm:items-center" role="presentation">
@@ -41,9 +28,11 @@ export default function GuestAuthGate({ open }: { open: boolean }) {
           </p>
         </div>
 
-        <button type="button" onClick={google} disabled={googleBusy} className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-accent disabled:opacity-50">
-          <GoogleIcon /> {googleBusy ? "Opening Google…" : "Continue with Google"}
-        </button>
+        <form action={signInGuestWithGoogle}>
+          <button type="submit" className="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border bg-background px-4 text-sm font-medium hover:bg-accent">
+            <GoogleIcon /> Continue with Google
+          </button>
+        </form>
         <div className="my-4 flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />or<span className="h-px flex-1 bg-border" /></div>
         <AuthForm />
         <p className="mt-4 text-center text-[11px] leading-5 text-muted-foreground">Your guest conversation remains available while you sign in.</p>

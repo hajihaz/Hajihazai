@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import { db } from "./index";
 import { conversations, messages } from "./schema";
 
@@ -226,7 +226,7 @@ export async function deleteMessagesAfter(userId: string, messageId: string) {
   if (idx < 0) return false;
   const ids = rows.slice(idx + 1).map((r) => r.id);
   if (ids.length) {
-    for (const id of ids) await db.delete(messages).where(eq(messages.id, id));
+    await db.delete(messages).where(inArray(messages.id, ids));
   }
   return true;
 }
