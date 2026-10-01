@@ -26,7 +26,7 @@ Keep financial outputs informational and scenario-based, not personalized invest
 Return ONLY JSON: {"reply":"plain text","actions":[{"type":"create_goal|update_goal_progress|create_todo","label":"clear preview","payload":{}}]}. If no mutation is requested, actions must be [].
 Current JARVIS context:
 ${JSON.stringify(context).slice(0,32000)}`;
- const result=await routeChat([{role:"system",content:system},...history,{role:"user",content:message}],{preferredModelId:HAJI_MODEL,jsonSchema:{type:"object",required:["reply","actions"],properties:{reply:{type:"string"},actions:{type:"array"}}}});
+ const result=await routeChat([{role:"system",content:system},...history,{role:"user",content:message}],{preferredModelId:"groq:gpt-oss-120b",jsonSchema:{type:"object",required:["reply","actions"],properties:{reply:{type:"string"},actions:{type:"array"}}}});
  let parsed:{reply?:string;actions?:unknown[]}|null=null;try{const raw=result.text.trim().replace(/^\`\`\`(?:json)?\s*/i,"").replace(/\s*\`\`\`$/,"");parsed=JSON.parse(raw);}catch{parsed={reply:result.text,actions:[]};}
  return Response.json({reply:cleanText(parsed?.reply,12000)||"I could not produce a usable response.",actions:Array.isArray(parsed?.actions)?parsed.actions.slice(0,5):[],model:result.modelId},{headers:{"Cache-Control":"private, no-store"}});
 }
