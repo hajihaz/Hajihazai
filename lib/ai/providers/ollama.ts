@@ -26,7 +26,7 @@ export const ollamaProvider: Provider = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30_000),
+      signal: opts?.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(30_000)]) : AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new Error(`Ollama error ${res.status}`);
     const data = await res.json();

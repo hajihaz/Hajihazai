@@ -80,9 +80,11 @@ export function planRoute(opts: {
 /** Execute the routed chain, falling back until a provider returns text. */
 export async function routeChat(
   messages: ChatMessage[],
-  opts: { preferredModelId?: string; jsonSchema?: Record<string, unknown> } = {},
+  opts: { preferredModelId?: string; jsonSchema?: Record<string, unknown>; signal?: AbortSignal; safeErrors?: boolean } = {},
 ): Promise<GenerateResult> {
+  opts.signal?.throwIfAborted();
   await refreshRoutingHealth();
+  opts.signal?.throwIfAborted();
 
   const available: Record<ProviderName, boolean> = {
     ollama: providers.ollama.isAvailable(),
@@ -100,13 +102,16 @@ export async function routeChat(
   const requestedModelId = opts.preferredModelId ?? chain[0]?.modelId ?? null;
   let lastError: unknown;
   for (let i = 0; i < chain.length; i++) {
+    opts.signal?.throwIfAborted();
     const entry = chain[i];
     console.log(`[ai] selected provider=${entry.provider} model=${entry.modelId}`);
     const start = Date.now();
     try {
       const text = await providers[entry.provider].generate(entry.model, messages, {
         jsonSchema: opts.jsonSchema,
+        signal: opts.signal,
       });
+      opts.signal?.throwIfAborted();
       if (text && text.trim()) {
         const latencyMs = Date.now() - start;
         recordSuccess(entry.modelId, latencyMs);
@@ -129,14 +134,15 @@ export async function routeChat(
       }
       recordFailure(entry.modelId, "empty response");
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
+      opts.signal?.throwIfAborted();
+      const reason = opts.safeErrors ? "provider_request_failed" : error instanceof Error ? error.message : String(error);
       console.warn(`[ai] provider=${entry.provider} failed: ${reason}`);
       recordFailure(entry.modelId, reason);
       lastError = error;
     }
   }
 
-  console.error("[ai] all chat providers failed:", lastError);
+  console.error("[ai] all chat providers failed:", opts.safeErrors ? "provider_request_failed" : lastError);
   return {
     text: "⚠️ HajiHaz could not reach any AI provider right now. Please try again.",
     modelId: "none",

@@ -32,6 +32,8 @@ export interface GenerateResult {
 }
 
 export interface GenerateOptions {
+  /** Caller cancellation; generation must stop before trying another model. */
+  signal?: AbortSignal;
   /** When set, ask the provider to enforce structured JSON output. */
   jsonSchema?: Record<string, unknown>;
 }

@@ -92,7 +92,7 @@ export const groqProvider: Provider = {
         stream: false,
         ...(opts?.jsonSchema ? { response_format: { type: "json_object" } } : {}),
       }),
-      signal: AbortSignal.timeout(20_000),
+      signal: opts?.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`Groq error ${res.status}`);
     const data = await res.json();

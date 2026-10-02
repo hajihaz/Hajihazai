@@ -45,7 +45,7 @@ export const geminiProvider: Provider = {
           ? { generationConfig: { responseMimeType: "application/json" } }
           : {}),
       }),
-      signal: AbortSignal.timeout(20_000),
+      signal: opts?.signal ? AbortSignal.any([opts.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000),
     });
     if (!res.ok) throw new Error(`Gemini error ${res.status}`);
 
