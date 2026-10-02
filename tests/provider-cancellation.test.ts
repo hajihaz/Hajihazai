@@ -22,6 +22,25 @@ describe("non-streaming caller cancellation",()=>{
     await vi.waitFor(()=>expect(spy).toHaveBeenCalledTimes(1));controller.abort();await checked;
     expect(spy).toHaveBeenCalledTimes(1);
   });
+  it("retains a provider HTTP status without logging private error details",async()=>{
+    const warn=vi.spyOn(console,"warn").mockImplementation(()=>{});
+    const errorLog=vi.spyOn(console,"error").mockImplementation(()=>{});
+    vi.spyOn(providers.groq,"generate").mockRejectedValue(new Error("Groq error 429"));
+    await routeChat([{role:"user",content:"private prompt"}],{preferredModelId:"groq:gpt-oss-120b",safeErrors:true});
+    expect(warn.mock.calls.flat().join(" ")).toContain("provider_request_failed status=429");
+    expect([...warn.mock.calls,...errorLog.mock.calls].flat().join(" ")).not.toContain("private prompt");
+  });
+  it("does not retain a status or secret from unrecognized provider error text",async()=>{
+    const warn=vi.spyOn(console,"warn").mockImplementation(()=>{});
+    const errorLog=vi.spyOn(console,"error").mockImplementation(()=>{});
+    vi.spyOn(providers.groq,"generate").mockRejectedValue(new Error("Groq error 429 private-unit-secret"));
+    await routeChat([{role:"user",content:"private prompt"}],{preferredModelId:"groq:gpt-oss-120b",safeErrors:true});
+    const logs=[...warn.mock.calls,...errorLog.mock.calls].flat().join(" ");
+    expect(logs).toContain("provider_request_failed");
+    expect(logs).not.toContain("status=");
+    expect(logs).not.toContain("private-unit-secret");
+    expect(logs).not.toContain("private prompt");
+  });
   for(const name of ["groq","openrouter","gemini","ollama"] as const){
     it(name+" passes caller cancellation to fetch",async()=>{
       vi.stubEnv("GROQ_API_KEY","unit-key");vi.stubEnv("OPENROUTER_API_KEY","unit-key");vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY","unit-key");

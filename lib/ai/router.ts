@@ -135,7 +135,13 @@ export async function routeChat(
       recordFailure(entry.modelId, "empty response");
     } catch (error) {
       opts.signal?.throwIfAborted();
-      const reason = opts.safeErrors ? "provider_request_failed" : error instanceof Error ? error.message : String(error);
+      // Keep only a known provider's numeric HTTP status; never retain error text.
+      const safeStatus = opts.safeErrors && error instanceof Error
+        ? /^(?:Groq|OpenRouter|Gemini) error ([45]\d{2})$/.exec(error.message)?.[1]
+        : undefined;
+      const reason = opts.safeErrors
+        ? "provider_request_failed" + (safeStatus ? " status=" + safeStatus : "")
+        : error instanceof Error ? error.message : String(error);
       console.warn(`[ai] provider=${entry.provider} failed: ${reason}`);
       recordFailure(entry.modelId, reason);
       lastError = error;
