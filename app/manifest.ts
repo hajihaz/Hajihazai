@@ -13,6 +13,7 @@ export default function manifest(): MetadataRoute.Manifest {
     orientation: "any",
     categories: ["productivity", "utilities"],
     icons: [
+      { src: "/branding/hajihaz-mark-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       {
         src: "/branding/hajihaz-mark.png",
         sizes: "512x512",
