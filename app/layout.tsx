@@ -42,6 +42,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       {/* eslint-disable-next-line @next/next/no-sync-scripts */}
       <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
       <body className="min-h-dvh overflow-x-hidden antialiased">{children}<PwaRuntime /></body>
