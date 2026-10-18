@@ -22,7 +22,6 @@ import {
 
 type Conv = { id: string; title: string; projectId?: string | null; updatedAt?: string | null; archived?: boolean; pinned?: boolean };
 type Proj = { id: string; name: string; isSystem?: boolean };
-type BrainEntry = { id: string; name: string; slug: string; icon: string; color: string };
 
 type DateGroup = { label: string; items: Conv[] };
 
@@ -48,7 +47,7 @@ function groupByDate(convs: Conv[]): DateGroup[] {
   return groups.filter((g) => g.items.length > 0);
 }
 
-const SECTION_KEYS = ["projects", "brains", "recent"] as const;
+const SECTION_KEYS = ["projects", "recent"] as const;
 type SectionKey = (typeof SECTION_KEYS)[number];
 
 function useSectionCollapse() {
@@ -181,7 +180,6 @@ const MAX_PINNED = 20;
 const Sidebar = memo(function Sidebar({
   conversations,
   projects,
-  brains,
   activeId,
   onSelect,
   onNew,
@@ -198,7 +196,6 @@ const Sidebar = memo(function Sidebar({
 }: {
   conversations: Conv[];
   projects: Proj[];
-  brains?: BrainEntry[];
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
@@ -568,36 +565,6 @@ const Sidebar = memo(function Sidebar({
               })}
             </ul>
           ) : null}
-
-          {/* Brains */}
-          {brains && brains.length > 0 && (
-            <>
-              <div className="mb-1 flex items-center px-2 pt-1">
-                <button
-                  onClick={() => toggleSection("brains")}
-                  className="flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground hover:text-foreground"
-                >
-                  <ChevronRight className={`size-3 transition-transform ${collapsed.has("brains") ? "" : "rotate-90"}`} />
-                  Brains
-                </button>
-              </div>
-              {!collapsed.has("brains") && (
-                <ul className="mb-2 space-y-0.5">
-                  {brains.map((b) => (
-                    <li key={b.id}>
-                      <a
-                        href={`/?brain=${b.slug}`}
-                        className="flex min-h-9 items-center gap-2 rounded-lg px-3 text-sm active:bg-accent/60 md:hover:bg-accent/60"
-                      >
-                        <span className="text-base leading-none">{b.icon}</span>
-                        <span className="min-w-0 flex-1 truncate">{b.name}</span>
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </>
-          )}
 
           {/* Archived Chats */}
           <div className="mb-2 px-1">

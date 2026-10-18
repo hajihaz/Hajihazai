@@ -7,7 +7,6 @@ import Sidebar from "./sidebar";
 import Chat from "./chat";
 import Modal from "./modal";
 import ProfileMenu from "./profile-menu";
-import type { BrainOption, BrainMode } from "./brain-selector";
 import NotificationCenter from "./notification-center";
 import GuestAuthGate from "./guest-auth-gate";
 
@@ -170,12 +169,6 @@ export default function ChatApp({
 
   // Export dropdown state
 
-  // Brain system state
-  const [brains, setBrains] = useState<BrainOption[]>([]);
-  const [selectedBrainId, setSelectedBrainId] = useState<string | null>(null);
-  // First-time users default to Smart; returning users are restored on mount.
-  const [brainMode, setBrainMode] = useState<BrainMode>("smart");
-
   // Delete confirmation modal
   const [pendingDelete, setPendingDelete] = useState<Conv | null>(null);
 
@@ -275,21 +268,10 @@ export default function ChatApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Restore brain mode (Smart/Manual) after mount; first-time users stay Smart.
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem("hh-brain-mode");
-      if (saved === "smart" || saved === "manual") setBrainMode(saved);
-    } catch {
-      /**/
-    }
-  }, []);
-
   useEffect(() => {
     if (activeId) void openConversation(activeId);
     void refreshLevels();
     void loadProjects();
-    void loadBrains();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -307,44 +289,6 @@ export default function ChatApp({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function loadBrains() {
-    try {
-      const res = await fetch("/api/brains");
-      if (!res.ok) return;
-      const data = await res.json();
-      const loaded: BrainOption[] = (data.brains ?? []).map(
-        (b: {
-          id: string;
-          name: string;
-          slug: string;
-          icon: string;
-          color: string;
-        }) => ({
-          id: b.id,
-          name: b.name,
-          slug: b.slug,
-          icon: b.icon,
-          color: b.color,
-        }),
-      );
-      setBrains(loaded);
-      try {
-        const savedBrainId = localStorage.getItem("hh-brain-id");
-        const match = savedBrainId && loaded.find((b) => b.id === savedBrainId);
-        if (match) {
-          setSelectedBrainId(match.id);
-          return;
-        }
-      } catch {
-        /**/
-      }
-      const hajiCore = loaded.find((b) => b.slug === "haji-core");
-      if (hajiCore) setSelectedBrainId(hajiCore.id);
-    } catch {
-      /**/
-    }
-  }
 
   async function loadProjects() {
     const requestSeq = ++projectLoadSeqRef.current;
@@ -939,8 +883,9 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
             level,
             regenerate: opts.regenerate ?? false,
             userMessageId: opts.regenerateUserMessageId ?? null,
-            brainId: brainMode === "manual" ? selectedBrainId : null,
-            brainMode,
+            // Keep server-side automatic routing; no manual Brain UI.
+            brainId: null,
+            brainMode: "smart",
           }),
           signal: controller.signal,
         });
@@ -1120,25 +1065,6 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     }
   }
 
-  const handleSelectBrain = useCallback((id: string | null) => {
-    setSelectedBrainId(id);
-    try {
-      if (id) localStorage.setItem("hh-brain-id", id);
-      else localStorage.removeItem("hh-brain-id");
-    } catch {
-      /**/
-    }
-  }, []);
-
-  const handleSetBrainMode = useCallback((mode: BrainMode) => {
-    setBrainMode(mode);
-    try {
-      localStorage.setItem("hh-brain-mode", mode);
-    } catch {
-      /**/
-    }
-  }, []);
-
   const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
 
   return (
@@ -1146,7 +1072,6 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
       <Sidebar
         conversations={conversations}
         projects={projects}
-        brains={brains}
         activeId={activeId}
         onSelect={openConversation}
         onNew={() => void newChat(activeProject?.id)}
@@ -1253,11 +1178,6 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           loading={loading}
           isAdmin={isAdmin}
           debug={debug}
-          brains={brains}
-          selectedBrainId={selectedBrainId}
-          brainMode={brainMode}
-          onSelectBrain={handleSelectBrain}
-          onSetBrainMode={handleSetBrainMode}
           onOpenImageGenerator={() => {
             setImageGeneratorOpen(true);
           }}

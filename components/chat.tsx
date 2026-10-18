@@ -24,10 +24,6 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Msg } from "./chat-app";
-import BrainSelector, {
-  type BrainOption,
-  type BrainMode,
-} from "./brain-selector";
 import {
   ProfileCard,
   isProfileCardQuery,
@@ -57,11 +53,6 @@ const Chat = memo(function Chat({
   loading,
   isAdmin,
   debug,
-  brains,
-  selectedBrainId,
-  brainMode,
-  onSelectBrain,
-  onSetBrainMode,
   onOpenImageGenerator,
   onOpenFileLibrary,
 }: {
@@ -83,11 +74,6 @@ const Chat = memo(function Chat({
   loading: boolean;
   isAdmin: boolean;
   debug: boolean;
-  brains: BrainOption[];
-  selectedBrainId: string | null;
-  brainMode: BrainMode;
-  onSelectBrain: (id: string | null) => void;
-  onSetBrainMode: (mode: BrainMode) => void;
   onOpenImageGenerator: () => void;
   onOpenFileLibrary: () => void;
 }) {
@@ -552,7 +538,6 @@ const Chat = memo(function Chat({
                     </div>
                   </>}
                 </div>
-                {brains.length > 0 && <BrainSelector brains={brains} selectedBrainId={selectedBrainId} brainMode={brainMode} onSelectBrain={onSelectBrain} onSetMode={onSetBrainMode} />}
               </div>
               <div className="flex items-center gap-1">
                 <VoiceInput value={input} onChange={setInput} disabled={isGenerating || sending} />

@@ -7,6 +7,34 @@ import { hashPassword } from "@/lib/auth/password";
 test.describe("HajiHaz conversation-first workspace", () => {
   test.skip(process.env.LOCAL_E2E_DB !== "1", "Runs only against a disposable local DB");
 
+  test("hides sidebar brains and composer Smart mode without disabling automatic routing", async ({ page }) => {
+    await ensureE2EAuthenticated(page.request);
+    const brainRequests: string[] = [];
+    page.on("request", (request) => { if (request.url().includes("/api/brains")) brainRequests.push(request.url()); });
+    let chatPayload: { brainId: string | null; brainMode: string; message: string } | null = null;
+    await page.route("**/api/chat", async (route) => {
+      chatPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: 'data: {"t":"chunk","text":"Automatic routing works"}\n\ndata: {"t":"done"}\n\n',
+      });
+    });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
+    await expect(page.getByRole("button", { name: "Brains", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /brain AllBee Brain/ })).toHaveCount(0);
+    await expect(page.getByText("Haji Core", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Smart" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add attachments or tools" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Voice input" })).toBeVisible();
+    await page.getByPlaceholder("Message HajiHaz AI…").fill("Hello from automatic routing");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByText("Automatic routing works", { exact: true })).toBeVisible();
+    expect(chatPayload).toMatchObject({ brainId: null, brainMode: "smart", message: "Hello from automatic routing" });
+    expect(brainRequests).toHaveLength(0);
+  });
+
   test("desktop: fast composer, tools, and reversible sidebar", async ({ page }) => {
     await ensureE2EAuthenticated(page.request);
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -131,7 +159,8 @@ test.describe("Admin entry design", () => {
   test("admin sign-in is readable on mobile", async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto("/admin", { waitUntil: "domcontentloaded" });
-    await expect(page.getByRole("heading", { name: "Admin Portal" })).toBeVisible();
+    // First visit to /admin may compile and load a cold admin-session check.
+    await expect(page.getByRole("heading", { name: "Admin Portal" })).toBeVisible({ timeout: 20000 });
     await expect(page.getByPlaceholder("Admin Username")).toBeVisible();
     await expect(page.getByRole("button", { name: "Show password" })).toBeVisible();
     await page.getByRole("button", { name: "Show password" }).click();
