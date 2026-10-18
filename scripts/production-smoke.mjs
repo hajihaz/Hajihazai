@@ -5,7 +5,7 @@ const requiredHeaders = {
   "x-frame-options": /^DENY$/i,
   "x-content-type-options": /^nosniff$/i,
   "referrer-policy": /^strict-origin-when-cross-origin$/i,
-  "permissions-policy": /camera=\(\), microphone=\(\), geolocation=\(\)/i,
+  "permissions-policy": /camera=\(\), microphone=\(self\), geolocation=\(\)/i,
 };
 
 const checks = [
