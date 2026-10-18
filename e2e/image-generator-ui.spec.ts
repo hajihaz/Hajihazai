@@ -18,11 +18,10 @@ test.describe("image generator UI", () => {
     }
 
     await page.goto("/");
-    await expect(
-      page.getByRole("button", { name: "Create image" }),
-    ).toBeVisible();
-
-    await page.getByRole("button", { name: "Create image" }).click();
+    // In the compact composer, image creation lives in the tools menu.
+    await page.getByRole("button", { name: "Add attachments or tools" }).click();
+    await expect(page.getByRole("menuitem", { name: "Create image" })).toBeVisible();
+    await page.getByRole("menuitem", { name: "Create image" }).click();
     await expect(
       page.getByRole("dialog", { name: "Create image" }),
     ).toBeVisible();

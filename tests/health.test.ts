@@ -29,10 +29,10 @@ describe("model health store", () => {
     const prev = process.env.GROQ_API_KEY;
     process.env.GROQ_API_KEY = "test-key";
     try {
-      recordSuccess("groq:qwen3.6-27b");
-      expect(isModelUsable("groq:qwen3.6-27b")).toBe(true);
-      recordFailure("groq:qwen3.6-27b", "boom");
-      expect(isModelUsable("groq:qwen3.6-27b")).toBe(false);
+      recordSuccess("groq:qwen3.8-27b");
+      expect(isModelUsable("groq:qwen3.8-27b")).toBe(true);
+      recordFailure("groq:qwen3.8-27b", "boom");
+      expect(isModelUsable("groq:qwen3.8-27b")).toBe(false);
     } finally {
       if (prev) process.env.GROQ_API_KEY = prev;
       else delete process.env.GROQ_API_KEY;

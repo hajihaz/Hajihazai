@@ -66,6 +66,8 @@
     "vitest": "^4.1.11"
   },
   "overrides": {
-    "esbuild": "$esbuild"
+    "esbuild": "$esbuild",
+    "postcss-selector-parser": "7.1.6",
+    "argparse": "2.0.1"
   }
 }

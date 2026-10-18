@@ -42,7 +42,10 @@ test.describe("authenticated production smoke", () => {
       response.status() === 200,
     );
     await page.getByRole("button", { name: "New Chat", exact: true }).click();
-    await created;
+    const createdResponse = await created;
+    const createdConversation = await createdResponse.json();
+    const conversationId = createdConversation.id as string;
+    expect(conversationId).toBeTruthy();
     const composer = page.getByPlaceholder("Message HajiHaz AI…");
     await expect(composer).toBeVisible();
     const prompt = "Respond with the exact token E2E_UI_OK and nothing else.";
@@ -50,7 +53,18 @@ test.describe("authenticated production smoke", () => {
     await expect(composer).toHaveValue(prompt);
     await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
     await page.getByRole("button", { name: "Send message" }).click();
-    await expect(page.getByText("E2E_UI_OK", { exact: false }).last()).toBeVisible({ timeout: 90_000 });
+    // The prompt itself contains E2E_UI_OK, so a text-only check can pass
+    // before /api/chat even starts. Wait for the real persisted assistant turn.
+    await expect.poll(() => new URL(page.url()).searchParams.get("c")).toBe(conversationId);
+    await expect.poll(async () => {
+      const response = await page.request.get(`/api/conversations/${conversationId}/messages`);
+      if (!response.ok()) return false;
+      const data = await response.json();
+      return Array.isArray(data.messages) && data.messages.some(
+        (message: { role: string; content: string }) =>
+          message.role === "assistant" && message.content.includes("E2E_UI_OK"),
+      );
+    }, { timeout: 90_000, intervals: [250, 500, 1000, 2000] }).toBe(true);
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await expect(page.getByText("E2E_UI_OK", { exact: false }).last()).toBeVisible({ timeout: 30_000 });

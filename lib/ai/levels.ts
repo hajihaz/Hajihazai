@@ -28,28 +28,28 @@ export const LEVELS: LevelDef[] = [
     label: "Low",
     enabled: true,
     // Lowest-cost first.
-    chain: ["groq:qwen3.6-27b", "groq:compound-mini", "openrouter:qwen-2.5-7b", "gemini:2.0-flash"],
+    chain: ["groq:qwen3.8-27b", "groq:gpt-oss-20b", "openrouter:qwen-2.5-7b", "gemini:2.0-flash"],
   },
   {
     level: "medium",
     label: "Medium",
     enabled: true,
     // Best first.
-    chain: ["groq:compound-mini", "groq:gpt-oss-120b", "groq:qwen3.6-27b", "gemini:2.0-flash", "openrouter:qwen-2.5-7b"],
+    chain: ["groq:gpt-oss-20b", "groq:gpt-oss-120b", "groq:qwen3.8-27b", "gemini:2.0-flash", "openrouter:qwen-2.5-7b"],
   },
   {
     level: "high",
     label: "High",
     enabled: true,
     // Deeper reasoning first, with strong fallback coverage.
-    chain: ["groq:gpt-oss-120b", "groq:compound-mini", "groq:qwen3.6-27b", "gemini:2.0-flash"],
+    chain: ["groq:gpt-oss-120b", "groq:gpt-oss-20b", "groq:qwen3.8-27b", "gemini:2.0-flash"],
   },
   {
     level: "max",
     label: "Max",
     enabled: true,
     // Largest-context model first, then the strongest reasoning fallback.
-    chain: ["gemini:2.0-flash", "groq:gpt-oss-120b", "groq:compound-mini"],
+    chain: ["gemini:2.0-flash", "groq:gpt-oss-120b", "groq:gpt-oss-20b"],
   },
 ];
 

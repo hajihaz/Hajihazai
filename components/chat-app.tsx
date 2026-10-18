@@ -254,6 +254,19 @@ export default function ChatApp({
 
   useEffect(() => { setClientReady(true); }, []);
 
+  // Keep the selected chat in the address bar so refreshes and shared project
+  // search links restore the correct conversation, without a full navigation.
+  useEffect(() => {
+    if (!clientReady) return;
+    const url = new URL(window.location.href);
+    if (activeId) url.searchParams.set("c", activeId);
+    else url.searchParams.delete("c");
+    if (url.href !== window.location.href) {
+      // Preserve Next.js router state rather than replacing it with null.
+      window.history.replaceState(window.history.state, "", url.toString());
+    }
+  }, [activeId, clientReady]);
+
   // Restore level from localStorage after mount
   useEffect(() => {
     try {

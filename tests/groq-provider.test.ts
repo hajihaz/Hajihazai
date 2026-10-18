@@ -55,7 +55,7 @@ describe("Groq provider", () => {
     }), { status: 200, headers: { "content-type": "application/json" } }));
     globalThis.fetch = fetchMock;
     globalThis.fetch = fetchMock;
-    const text = await groqProvider.generate("qwen/qwen3.6-27b", [
+    const text = await groqProvider.generate("qwen/qwen3.8-27b", [
       { role: "user", content: "hello" },
     ]);
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);

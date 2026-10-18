@@ -18,7 +18,7 @@ describe("chat routing order: Groq → OpenRouter → Gemini → Ollama", () => 
 
   it("prefers the reasoning-focused QwQ model within Groq", () => {
     const chain = planRoute({ isProd: true, available: ALL });
-    expect(chain[0]?.modelId).toBe("groq:compound-mini");
+    expect(chain[0]?.modelId).toBe("groq:gpt-oss-20b");
   });
 
   it("falls to Groq when OpenRouter is unavailable", () => {
@@ -56,11 +56,29 @@ describe("chat routing order: Groq → OpenRouter → Gemini → Ollama", () => 
 
   it("honors a preferred Groq model first", () => {
     const chain = planRoute({
+      preferredModelId: "groq:qwen3.8-27b",
+      isProd: true,
+      available: ALL,
+    });
+    expect(chain[0]?.modelId).toBe("groq:qwen3.8-27b");
+  });
+
+  it("routes persisted retired Groq model preferences to live replacements", () => {
+    const retiredCompound = planRoute({
+      preferredModelId: "groq:compound-mini",
+      isProd: true,
+      available: ALL,
+    });
+    expect(retiredCompound[0]?.modelId).toBe("groq:gpt-oss-20b");
+    expect(retiredCompound[0]?.model).toBe("openai/gpt-oss-20b");
+
+    const retiredQwen = planRoute({
       preferredModelId: "groq:qwen3.6-27b",
       isProd: true,
       available: ALL,
     });
-    expect(chain[0]?.modelId).toBe("groq:qwen3.6-27b");
+    expect(retiredQwen[0]?.modelId).toBe("groq:qwen3.8-27b");
+    expect(retiredQwen[0]?.model).toBe("qwen/qwen3.8-27b");
   });
 
   it("returns an empty chain when no provider is available", () => {

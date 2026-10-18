@@ -51,12 +51,12 @@ export function planRoute(opts: {
 
   const pushAllFor = (p: ProviderName) => {
     const entries = enabled.filter((e) => e.provider === p && usable(e));
-    // Keep the strongest legacy Groq model ahead of the other legacy Groq
-    // models, but leave Compound Mini first when it is the selected level.
+    // Keep the small available Groq model ahead of the larger fallback
+    // models unless the caller explicitly requested a different one.
     if (p === "groq") {
       entries.sort((a, b) => {
         const rank = (id: string) =>
-          id === "groq:compound-mini" ? 0 : id === "groq:gpt-oss-120b" ? 1 : 2;
+          id === "groq:gpt-oss-20b" ? 0 : id === "groq:gpt-oss-120b" ? 1 : 2;
         return rank(a.modelId) - rank(b.modelId);
       });
     }
@@ -65,10 +65,20 @@ export function planRoute(opts: {
     }
   };
 
+  // Saved conversations may still request older, retired Groq model IDs.
+  // Route them to equivalent supported models instead of attempting a 404.
+  const legacyModelAliases: Record<string, string> = {
+    "groq:compound-mini": "groq:gpt-oss-20b",
+    "groq:qwen3.6-27b": "groq:qwen3.8-27b",
+  };
+  const preferredId = opts.preferredModelId
+    ? (legacyModelAliases[opts.preferredModelId] ?? opts.preferredModelId)
+    : undefined;
+
   // Preferred model first (if enabled and its provider is available).
   if (opts.preferredModelId) {
     const pref = enabled.find(
-      (e) => e.modelId === opts.preferredModelId && usable(e),
+      (e) => e.modelId === preferredId && usable(e),
     );
     if (pref) chain.push(pref);
   }
