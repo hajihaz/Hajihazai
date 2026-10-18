@@ -1,6 +1,6 @@
-import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "./index";
-import { conversations, messages } from "./schema";
+import { conversations, messages, users } from "./schema";
 
 const PROJECT_LIST_LIMIT = 200;
 
@@ -115,6 +115,26 @@ export async function countUserMessagesForUser(userId: string) {
     .innerJoin(conversations, eq(messages.conversationId, conversations.id))
     .where(and(eq(conversations.userId, userId), eq(messages.role, "user")));
   return row?.value ?? 0;
+}
+
+/**
+ * Atomically reserve one of the five lifetime guest text messages.
+ * A single conditional UPDATE serializes overlapping requests on the user row
+ * and bases legacy guests on their existing persisted turns. A deleted chat
+ * never resets the monotonic meter.
+ */
+export async function reserveGuestMessage(userId: string, limit = 5): Promise<boolean> {
+  const previousTurns = sql<number>`(
+    SELECT count(*) FROM "message" guest_msg
+    JOIN "conversation" guest_conv ON guest_conv."id" = guest_msg."conversationId"
+    WHERE guest_conv."userId" = ${userId} AND guest_msg."role" = 'user'
+  )`;
+  const used = sql<number>`GREATEST(${users.guestMessagesUsed}, ${previousTurns})`;
+  const [claimed] = await db.update(users)
+    .set({ guestMessagesUsed: sql`${used} + 1` })
+    .where(and(eq(users.id, userId), sql`${used} < ${limit}`))
+    .returning({ count: users.guestMessagesUsed });
+  return Boolean(claimed);
 }
 
 export async function listRecentMessages(conversationId: string, limit = 20) {

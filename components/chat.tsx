@@ -31,6 +31,10 @@ import {
 } from "./profile-card";
 import VoiceInput from "./voice-input";
 
+const MAX_ATTACH_BYTES = 5 * 1024 * 1024; // Match the upload API's 5 MB limit.
+const MAX_ATTACH_COUNT = 5;
+const SUPPORTED_ATTACHMENT = /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i;
+
 const NEAR_BOTTOM_PX = 80; // px from bottom to trigger auto-scroll
 
 // Memoized: prevents re-render when only sidebar state changes in ChatApp.
@@ -501,8 +505,9 @@ const Chat = memo(function Chat({
             onDragLeave={() => setIsDragOver(false)}
             onDrop={(event) => {
               event.preventDefault(); setIsDragOver(false);
-              const dropped = Array.from(event.dataTransfer.files ?? []).filter((file) => /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i.test(file.name) && file.size <= 12 * 1024 * 1024);
-              setAttachmentFiles((current) => [...current, ...dropped].slice(0, 5));
+              const dropped = Array.from(event.dataTransfer.files ?? []).filter((file) => SUPPORTED_ATTACHMENT.test(file.name) && file.size <= MAX_ATTACH_BYTES);
+              setAttachmentFiles((current) => [...current, ...dropped].slice(0, MAX_ATTACH_COUNT));
+              if (dropped.length < event.dataTransfer.files.length) window.alert("Some files were skipped. Max 5 MB each; PDF, DOCX, TXT, MD, or images only.");
             }}>
             {isDragOver && <div className="mb-2 rounded-xl border border-dashed bg-accent p-2 text-center text-xs">Drop to attach files</div>}
             {attachmentFiles.length > 0 && (
@@ -515,13 +520,13 @@ const Chat = memo(function Chat({
             )}
             <input ref={attachmentInputRef} type="file" accept="application/pdf,.pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={(event) => {
               const picked = Array.from(event.target.files ?? []);
-              const valid = picked.filter((file) => /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i.test(file.name) && file.size <= 12 * 1024 * 1024);
-              if (valid.length < picked.length) window.alert("Some files could not be attached. Use PDF, DOCX, TXT, or images up to 12 MB.");
-              setAttachmentFiles((current) => [...current, ...valid].slice(0, 5));
+              const valid = picked.filter((file) => SUPPORTED_ATTACHMENT.test(file.name) && file.size <= MAX_ATTACH_BYTES);
+              if (valid.length < picked.length) window.alert("Some files could not be attached. Use PDF, DOCX, TXT, MD, or images up to 5 MB.");
+              setAttachmentFiles((current) => [...current, ...valid].slice(0, MAX_ATTACH_COUNT));
               event.currentTarget.value = "";
             }} />
             <textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)}
-              onPaste={(event) => { const images = Array.from(event.clipboardData.files ?? []).filter((file) => /^image\/(jpeg|png|webp|gif)$/i.test(file.type)); if (images.length) setAttachmentFiles((current) => [...current, ...images].slice(0, 5)); }}
+              onPaste={(event) => { const images = Array.from(event.clipboardData.files ?? []).filter((file) => /^image\/(jpeg|png|webp|gif)$/i.test(file.type)); if (images.length) setAttachmentFiles((current) => [...current, ...images.filter((file) => file.size <= MAX_ATTACH_BYTES)].slice(0, MAX_ATTACH_COUNT)); }}
               onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submitComposer(); } }}
               rows={1} aria-label="Message" placeholder="Message HajiHaz AI…"
               className="max-h-40 min-h-12 w-full resize-none bg-transparent px-3 py-3 text-base leading-6 outline-none placeholder:text-muted-foreground/85 sm:text-[15px]" />

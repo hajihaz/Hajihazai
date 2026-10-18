@@ -14,24 +14,28 @@ function applyTheme(theme: Theme) {
 
 export function useTheme() {
   const [theme, setTheme] = useState<Theme>("system");
+  const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    let selected: Theme = "system";
     try {
-      const saved = localStorage.getItem("hh-theme") as Theme | null;
-      if (saved === "dark" || saved === "light" || saved === "system") {
-        setTheme(saved);
-      }
+      const saved = localStorage.getItem("hh-theme");
+      if (saved === "dark" || saved === "light" || saved === "system") selected = saved;
     } catch { /* ignore */ }
+    setTheme(selected);
+    applyTheme(selected);
+    setInitialized(true);
   }, []);
 
-  // In "system" mode, follow live OS light/dark changes while the app is open.
+  // Avoid the initial default 'system' effect overwriting a restored dark/light
+  // preference before the first localStorage read has completed.
   useEffect(() => {
-    if (theme !== "system") return;
+    if (!initialized || theme !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => applyTheme("system");
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [theme]);
+  }, [initialized, theme]);
 
   function changeTheme(t: Theme) {
     setTheme(t);

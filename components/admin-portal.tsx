@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowLeft, BookOpenText, Eye, EyeOff, LayoutDashboard, LogOut, ShieldCheck, UsersRound } from "lucide-react";
 
 /* ── Types ────────────────────────────────────────────────────── */
@@ -223,6 +223,9 @@ export default function AdminPortal() {
 
   /* admins section */
   const [admins, setAdmins] = useState<AdminRow[]>([]);
+  // React Strict Mode may run mount effects twice; check the admin session
+  // once per mounted dashboard instead of duplicating every initial request.
+  const initialAdminLoadStarted = useRef(false);
   const [newU, setNewU] = useState("");
   const [newP, setNewP] = useState("");
 
@@ -238,6 +241,7 @@ export default function AdminPortal() {
   const [userSearch, setUserSearch] = useState("");
   const [userSearchInput, setUserSearchInput] = useState("");
   const [userLoading, setUserLoading] = useState(false);
+  const userSearchRequestId = useRef(0);
   const [userExporting, setUserExporting] = useState(false);
   const [userExportNotice, setUserExportNotice] = useState<string | null>(null);
 
@@ -360,30 +364,36 @@ export default function AdminPortal() {
     const d = await res.json().catch(() => ({}));
     setAdmins(d.admins ?? []);
     setStatus("dashboard");
-    if (initial) {
-      void loadUsers(1, "");
-      void loadKnowledge();
-      void loadPickers();
-      void loadBrains();
-      void loadAnalytics();
-    }
+    // The dashboard initially needs only its admin session and overview KPIs.
+    // Fetch detailed user/knowledge/brain lists only when their tab is opened.
+    if (initial) void loadAnalytics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => { void loadAdmins(true); }, [loadAdmins]);
+  useEffect(() => {
+    if (initialAdminLoadStarted.current) return;
+    initialAdminLoadStarted.current = true;
+    void loadAdmins(true);
+  }, [loadAdmins]);
 
   async function loadUsers(page = 1, search = userSearch) {
+    const requestId = ++userSearchRequestId.current;
     setUserLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
       if (search) params.set("search", search);
       const res = await fetch(`/api/admin/users?${params}`);
-      if (!res.ok) return;
+      if (!res.ok || requestId !== userSearchRequestId.current) return;
       const d = await res.json().catch(() => ({}));
+      if (requestId !== userSearchRequestId.current) return;
       setUserRows(d.users ?? []);
       setUserTotal(d.total ?? 0);
       setUserPage(page);
-    } finally { setUserLoading(false); }
+    } catch {
+      if (requestId === userSearchRequestId.current) setError("Couldn't load users. Try again.");
+    } finally {
+      if (requestId === userSearchRequestId.current) setUserLoading(false);
+    }
   }
 
   async function exportUsers() {
@@ -564,7 +574,7 @@ export default function AdminPortal() {
   async function loadTab(tab: DataTab) {
     setDataTab(tab);
     if (tab === "overview" || tab === "admins") return;
-    if (tab === "knowledge") { void loadKnowledge(); return; }
+    if (tab === "knowledge") { void loadKnowledge(); void loadPickers(); return; }
     if (tab === "knowledge-gaps") { void loadGaps(); return; }
     if (tab === "quality") { void loadQuality(); return; }
     if (tab === "query-tester") { return; }
@@ -573,9 +583,10 @@ export default function AdminPortal() {
     if (tab === "blocked-emails") { void loadBlockedEmails(); return; }
     if (tab === "knowledge-permissions") { void loadKnowledgePerms(); return; }
     if (tab === "audit-log") { void loadAuditLog(); return; }
-    if (tab === "notifications") { void loadNotifications(); return; }
+    if (tab === "notifications") { void loadNotifications(); void loadPickers(); return; }
     if (tab === "maintenance") { void loadMaintenance(); return; }
     if (tab === "health") { void loadHealth(); return; }
+    if (tab === "projects" || tab === "documents") void loadPickers();
     const res = await fetch(`/api/admin/data?view=${tab}`);
     if (!res.ok) return;
     const d = await res.json().catch(() => ({}));

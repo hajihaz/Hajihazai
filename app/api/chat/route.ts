@@ -7,6 +7,7 @@ import {
   addMessage,
   addOwnedMessage,
   countUserMessagesForUser,
+  reserveGuestMessage,
   getConversation,
   getMessage,
   listRecentMessages,
@@ -359,6 +360,19 @@ export async function POST(req: Request) {
     smartUnrouted && shouldRequestBrainClarification(message, { webIntent, retrieveMemory: wantRetrieval, brainMode: effectiveBrainMode, multiBrains })
       ? 'SYSTEM: The smart router could not confidently pick a knowledge brain for this message. If the message is an ambiguous role or entity reference — e.g. "founder", "CEO", "ownership", "owner" — without naming a company, ask which company or organization they mean (for example: "Founder of what?", "CEO of which company?", "Ownership of which organization?"). If it clearly refers to the user\'s specific businesses (AllBee, Suplaykart), personal/family life, or law, ask which area they mean. Otherwise answer normally from general knowledge.'
       : "";
+
+  // The earlier COUNT is a quick user-facing check; the durable conditional
+  // UPDATE is the final admission gate under simultaneous tabs/API requests.
+  // Do not reserve for regeneration or read-only debug turns.
+  if (guest && !regenerate && !debug) {
+    const accepted = await reserveGuestMessage(session.user.id, GUEST_MESSAGE_LIMIT);
+    if (!accepted) {
+      return Response.json(
+        { error: "guest_message_limit", limit: GUEST_MESSAGE_LIMIT, used: GUEST_MESSAGE_LIMIT },
+        { status: 403, headers: { "Cache-Control": "private, no-store, max-age=0" } },
+      );
+    }
+  }
 
   // ── Phase 2: parallel lookups that depend on convo.projectId + brainId ──
   // addMessage also runs here — ownership is confirmed above, and Phase 2

@@ -1,3 +1,4 @@
+import { auth } from "@/auth";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { users, userProfiles } from "@/lib/db/schema";
@@ -9,6 +10,19 @@ const GUEST_SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** Create a short-lived, non-personal guest workspace. */
 export async function POST(req: Request) {
+  const existing = await auth();
+  if (existing?.user?.id) {
+    // Repeated guest entry must never mint a new identity and reset its quota.
+    // Equally, don't silently replace an authenticated account with a guest.
+    const guest = existing.user.email?.toLowerCase().endsWith("@guest.hajihaz.ai") ?? false;
+    if (!guest) return Response.json({ error: "Already signed in" }, { status: 409 });
+    const redirect = new URL(req.url).searchParams.get("redirect") === "1";
+    if (redirect) return Response.redirect(new URL("/", req.url), 303);
+    return Response.json({ ok: true, guest: true, reused: true }, {
+      headers: { "Cache-Control": "private, no-store, max-age=0" },
+    });
+  }
+
   const limited = await rateLimitResponse(
     rateLimitIdentity(req, "guest-login"),
     5,

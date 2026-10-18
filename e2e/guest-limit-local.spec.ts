@@ -11,6 +11,9 @@ test.describe("guest five-message gate", () => {
   test("allows five messages and then requires sign in without losing the session", async ({ page }) => {
     const guest = await page.request.post("/api/auth/guest");
     expect(guest.status()).toBe(200);
+    const repeat = await page.request.post("/api/auth/guest");
+    expect(repeat.status()).toBe(200);
+    await expect(repeat.json()).resolves.toMatchObject({ guest: true, reused: true });
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
     const composer = page.getByPlaceholder("Message HajiHaz AI…");

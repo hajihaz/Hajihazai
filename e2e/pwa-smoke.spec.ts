@@ -16,6 +16,11 @@ test.describe("PWA shell", () => {
     expect(workerResponse.ok()).toBeTruthy();
     expect(workerResponse.headers()["service-worker-allowed"]).toBe("/");
     expect(workerResponse.headers()["cache-control"]).toContain("max-age=0");
+    const worker = await workerResponse.text();
+    expect(worker).toContain('hajihaz-static-v2');
+    expect(worker).toContain('MAX_STATIC_ASSETS = 150');
+    expect(worker).toContain('immutableNextAsset && cached');
+    expect(worker).toContain('url.pathname.startsWith("/api/")');
   });
 
   test("offline shell is mobile-safe and has a recovery action", async ({ page }) => {

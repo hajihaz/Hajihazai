@@ -143,6 +143,8 @@ export default function ChatApp({
   const [moreOpen, setMoreOpen] = useState(false);
   const [projects, setProjects] = useState<Proj[]>(initialProjects);
   const projectLoadSeqRef = useRef(0);
+  // Prevent delayed chat history responses from replacing a newly opened chat.
+  const conversationLoadSeqRef = useRef(0);
   const activeConversation = activeId ? conversations.find((c) => c.id === activeId) : null;
   const activeProject = activeConversation?.projectId
     ? projects.find((p) => p.id === activeConversation.projectId)
@@ -354,12 +356,17 @@ export default function ChatApp({
   }
 
   const openConversation = useCallback(async (id: string) => {
+    const requestId = ++conversationLoadSeqRef.current;
     setActiveId(id);
     setSidebarOpen(false);
     setLoading(true);
+    setMessages([]);
+    setAttachments([]);
     try {
       const res = await fetch(`/api/conversations/${id}/messages`);
+      if (!res.ok || requestId !== conversationLoadSeqRef.current) return;
       const data = await res.json();
+      if (requestId !== conversationLoadSeqRef.current) return;
       const loaded: Msg[] = (data.messages ?? []).map(
         (m: { id: string; role: Msg["role"]; content: string; metadata?: MsgMeta | null }) => ({
           id: m.id,
@@ -374,9 +381,12 @@ export default function ChatApp({
       const current = conversations.find(c => c.id === id);
       if (current?.intelligenceLevel && initialLevels.some(l => l.level === current.intelligenceLevel && l.available)) setLevel(current.intelligenceLevel);
       const ar = await fetch(`/api/conversations/${id}/attachments`);
-      if (ar.ok) setAttachments((await ar.json()).attachments ?? []);
+      if (ar.ok) {
+        const data = await ar.json();
+        if (requestId === conversationLoadSeqRef.current) setAttachments(data.attachments ?? []);
+      }
     } finally {
-      setLoading(false);
+      if (requestId === conversationLoadSeqRef.current) setLoading(false);
     }
   }, []);
 
@@ -392,6 +402,9 @@ export default function ChatApp({
         return;
       }
       const convo: Conv = await res.json();
+      // A pending old-history fetch must not overwrite this fresh workspace.
+      conversationLoadSeqRef.current++;
+      setLoading(false);
       setConversations((p) => [convo, ...p]);
       setActiveId(convo.id);
       setMessages([]);

@@ -26,6 +26,9 @@ export const users = pgTable("user", {
   email: text("email").unique(),
   emailVerified: timestamp("emailVerified", { mode: "date" }),
   image: text("image"),
+  // Durable, atomic guest-turn meter. Unlike a message COUNT, deleting chats
+  // cannot replenish consumed free messages.
+  guestMessagesUsed: integer("guest_messages_used").notNull().default(0),
 });
 
 export const accounts = pgTable(
@@ -109,6 +112,8 @@ export const conversations = pgTable(
   },
   (t) => [
     index("conversation_user_idx").on(t.userId),
+    // Sidebar pages filter (owner, archived) and sort by updatedAt.
+    index("conversation_user_archived_updated_idx").on(t.userId, t.archived, t.updatedAt),
     index("conversation_project_idx").on(t.projectId),
   ],
 );

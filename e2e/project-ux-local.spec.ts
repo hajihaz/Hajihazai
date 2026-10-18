@@ -127,7 +127,7 @@ test.describe("project chat synchronization", () => {
 
       await page.reload({ waitUntil: "domcontentloaded" });
       await expect(page.getByPlaceholder("Message HajiHaz AI…")).toBeVisible({ timeout: 30_000 });
-      await expect(page.locator('select[aria-label="Switch project"]')).toContainText(
+      await expect(page.locator('select[aria-label="Filter chats by project"]')).toContainText(
         "E2E Sync Project Renamed",
         { timeout: 15_000 },
       );

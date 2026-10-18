@@ -44,10 +44,22 @@ export default function PwaRuntime() {
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
 
+    let lastUpdateCheck = 0;
+    const checkForUpdate = () => {
+      if (!("serviceWorker" in navigator) || !navigator.onLine) return;
+      const now = Date.now();
+      if (now - lastUpdateCheck < 60 * 60_000) return;
+      lastUpdateCheck = now;
+      void navigator.serviceWorker.ready.then((registration) => registration.update()).catch(() => undefined);
+    };
+    const onVisible = () => { if (document.visibilityState === "visible") checkForUpdate(); };
+    const register = () => navigator.serviceWorker.register("/sw.js", { scope: "/" })
+        .then(() => checkForUpdate()).catch(() => undefined);
     if ("serviceWorker" in navigator) {
-      const register = () => navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => undefined);
       if (document.readyState === "complete") void register();
       else window.addEventListener("load", register, { once: true });
+      window.addEventListener("online", checkForUpdate);
+      document.addEventListener("visibilitychange", onVisible);
     }
 
     const onInstallPrompt = (event: Event) => {
@@ -66,6 +78,9 @@ export default function PwaRuntime() {
       window.removeEventListener("appinstalled", onInstalled);
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", checkForUpdate);
+      window.removeEventListener("load", register);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 

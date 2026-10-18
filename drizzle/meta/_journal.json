@@ -211,6 +211,20 @@
       "when": 1790378493668,
       "tag": "0029_schema_ci_consistency",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792290000000,
+      "tag": "0030_guest_turn_quota",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792326000000,
+      "tag": "0031_conversation_sidebar_lookup",
+      "breakpoints": true
     }
   ]
 }

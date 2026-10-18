@@ -22,6 +22,8 @@ test.describe("HajiHaz conversation-first workspace", () => {
     });
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
+    await page.locator("header").getByRole("button", { name: "New chat", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Where should we begin?" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Brains", exact: true })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /brain AllBee Brain/ })).toHaveCount(0);
     await expect(page.getByText("Haji Core", { exact: true })).toHaveCount(0);
@@ -35,12 +37,35 @@ test.describe("HajiHaz conversation-first workspace", () => {
     expect(brainRequests).toHaveLength(0);
   });
 
+  test("slow history cannot overwrite a newly created chat", async ({ page }) => {
+    await ensureE2EAuthenticated(page.request);
+    const first = await page.request.post("/api/conversations", { data: {} });
+    expect(first.status()).toBe(200);
+    const { id } = await first.json();
+    await db.insert(messages).values({ conversationId: id, role: "user", content: "old chat content" });
+    let historyRequested = false;
+    await page.route(`**/api/conversations/${id}/messages`, async (route) => {
+      historyRequested = true;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await route.continue();
+    });
+    await page.goto(`/?c=${id}`, { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
+    await expect.poll(() => historyRequested).toBe(true);
+    await page.locator("header").getByRole("button", { name: "New chat", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Where should we begin?" })).toBeVisible();
+    await page.waitForTimeout(1750);
+    await expect(page.getByText("old chat content", { exact: true })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Where should we begin?" })).toBeVisible();
+  });
+
   test("desktop: fast composer, tools, and reversible sidebar", async ({ page }) => {
     await ensureE2EAuthenticated(page.request);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/", { waitUntil: "domcontentloaded" });
     await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
     await expect(page.getByPlaceholder("Message HajiHaz AI…")).toBeVisible();
+    await page.locator("header").getByRole("button", { name: "New chat", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Where should we begin?" })).toBeVisible();
     await expect(page.getByRole("button", { name: "New chat", exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Collapse sidebar" })).toBeVisible();
@@ -75,6 +100,20 @@ test.describe("HajiHaz conversation-first workspace", () => {
     await expect(page.getByRole("menuitem", { name: "Markdown (.md)" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Text (.txt)" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Print / PDF" })).toBeVisible();
+  });
+
+  test("rejects oversized attachments before uploading", async ({ page }) => {
+    await ensureE2EAuthenticated(page.request);
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
+    let uploads = 0;
+    page.on("request", (request) => { if (request.url().includes("/api/knowledge/upload")) uploads++; });
+    await page.locator('input[type="file"][accept*=".docx"]').setInputFiles({
+      name: "oversized.txt", mimeType: "text/plain", buffer: Buffer.alloc(5 * 1024 * 1024 + 1, "x"),
+    });
+    await expect(page.getByText("oversized.txt", { exact: true })).toHaveCount(0);
+    expect(uploads).toBe(0);
+    await expect(page.getByRole("button", { name: "Send message" })).toBeDisabled();
   });
 
   test("uploaded documents trigger the chat reply exactly once", async ({ page }) => {
@@ -133,6 +172,26 @@ test.describe("HajiHaz conversation-first workspace", () => {
     await page.getByRole("button", { name: "Voice input" }).click();
     await expect(page.getByPlaceholder("Message HajiHaz AI…")).toHaveValue("voice dictation works");
     await expect(page.getByRole("button", { name: "Send message" })).toBeEnabled();
+  });
+
+  test("restores chosen dark and light themes without layout overflow", async ({ page }) => {
+    await ensureE2EAuthenticated(page.request);
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("button", { name: "Dark", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(true);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("hh-theme"))).toBe("dark");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await expect(page.getByRole("button", { name: "Dark", exact: true })).toBeVisible();
+    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(true);
+    await expect.poll(() => page.evaluate(() => localStorage.getItem("hh-theme"))).toBe("dark");
+    await page.getByRole("button", { name: "Light", exact: true }).click();
+    await expect.poll(() => page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(false);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
   });
 
   test("mobile: tools remain usable without horizontal overflow", async ({ page }) => {
@@ -194,6 +253,24 @@ test.describe("Admin control center navigation", () => {
     await expect(page.getByRole("button", { name: "Show detailed metrics" })).toBeVisible();
     await page.getByRole("button", { name: "Show detailed metrics" }).click();
     await expect(page.getByRole("button", { name: "Hide detailed metrics" })).toBeVisible();
+  });
+
+  test("admin overview avoids loading unopened tables", async ({ page }) => {
+    const username = `adminux${crypto.randomUUID().slice(0, 8)}`;
+    const password = "TestAdminOnly!2026";
+    await db.insert(admins).values({ username, passwordHash: await hashPassword(password) });
+    const login = await page.request.post("/api/admin/login", { data: { username, password } });
+    expect(login.status()).toBe(200);
+    const requests: string[] = [];
+    page.on("request", (request) => { if (request.url().includes("/api/admin/")) requests.push(new URL(request.url()).pathname); });
+    await page.goto("/admin", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Dashboard", exact: true })).toBeVisible();
+    await expect.poll(() => requests.includes("/api/admin/analytics")).toBe(true);
+    expect(requests).not.toContain("/api/admin/knowledge");
+    expect(requests).not.toContain("/api/admin/users");
+    expect(requests).not.toContain("/api/admin/projects");
+    await page.getByRole("navigation").getByRole("button", { name: "Users", exact: true }).click();
+    await expect.poll(() => requests.includes("/api/admin/users")).toBe(true);
   });
 
   test("mobile admin navigation stays within the viewport", async ({ page }) => {
