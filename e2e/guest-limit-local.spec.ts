@@ -12,6 +12,7 @@ test.describe("guest five-message gate", () => {
     const guest = await page.request.post("/api/auth/guest");
     expect(guest.status()).toBe(200);
     await page.goto("/", { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
     const composer = page.getByPlaceholder("Message HajiHaz AI…");
     await expect(composer).toBeVisible();
 
@@ -36,7 +37,9 @@ test.describe("guest five-message gate", () => {
     await expect(sixth.json()).resolves.toMatchObject({ error: "guest_message_limit", limit: 5, used: 5 });
 
     await page.goto(`/?c=${id}`, { waitUntil: "domcontentloaded" });
+    await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
     await expect(composer).toBeVisible();
+    await expect(page.getByText("guest message 5", { exact: true })).toBeVisible({ timeout: 15000 });
     await composer.fill("sixth message from UI");
     await page.getByRole("button", { name: "Send message" }).click();
 

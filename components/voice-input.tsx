@@ -123,10 +123,10 @@ export default function VoiceInput({ value, onChange, disabled }: VoiceInputProp
       disabled={disabled}
       aria-label={listening ? "Stop recording" : "Voice input"}
       title={listening ? "Stop recording" : "Voice input"}
-      className={`flex size-11 shrink-0 items-center justify-center rounded-xl border transition-colors disabled:opacity-40 ${
+      className={`flex size-9 shrink-0 items-center justify-center rounded-full transition-colors disabled:opacity-40 ${
         listening
-          ? "border-destructive bg-destructive/10 text-destructive animate-pulse"
-          : "bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
+          ? "bg-destructive/10 text-destructive animate-pulse"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground"
       }`}
     >
       {listening ? <Square className="size-4 fill-current" /> : <Mic className="size-4" />}

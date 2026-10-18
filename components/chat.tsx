@@ -6,13 +6,15 @@ import { memo, useEffect, useLayoutEffect, useRef, useCallback, useState } from 
 import {
   Copy,
   ImagePlus,
+  Plus,
+  ArrowUp,
+  ChevronDown,
   ExternalLink,
   Paperclip,
   X,
   RotateCw,
   Pencil,
   GitFork,
-  Send,
   Square,
   ThumbsDown,
   ThumbsUp,
@@ -96,6 +98,8 @@ const Chat = memo(function Chat({
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [toolMenuOpen, setToolMenuOpen] = useState(false);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
   // True while WE are programmatically scrolling, so the scroll handler doesn't
   // mistake our own auto-scroll for the user scrolling away from the bottom.
   const suppressScrollRef = useRef(false);
@@ -112,6 +116,7 @@ const Chat = memo(function Chat({
     if (!el) return;
     const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
     isNearBottomRef.current = dist < NEAR_BOTTOM_PX;
+    setShowJumpToLatest(dist > 220);
   }, []);
 
   // Instant, guarded scroll to bottom. Always direct scrollTop (never smooth)
@@ -121,6 +126,7 @@ const Chat = memo(function Chat({
     if (!el) return;
     suppressScrollRef.current = true;
     el.scrollTop = el.scrollHeight;
+    setShowJumpToLatest(false);
     requestAnimationFrame(() =>
       requestAnimationFrame(() => {
         suppressScrollRef.current = false;
@@ -132,6 +138,7 @@ const Chat = memo(function Chat({
   useEffect(() => {
     needsJumpRef.current = true;
     isNearBottomRef.current = true;
+    setShowJumpToLatest(false);
   }, [conversationId]);
 
   // Auto-scroll, before paint so the view follows new content with no visible
@@ -159,86 +166,61 @@ const Chat = memo(function Chat({
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [input]);
 
+  useEffect(() => {
+    if (!toolMenuOpen) return;
+    const onEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setToolMenuOpen(false); };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [toolMenuOpen]);
+
   return (
-    <div className="flex h-full min-h-0 flex-1 flex-col">
+    <div className="relative flex h-full min-h-0 flex-1 flex-col">
       <div
         ref={scrollContainerRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
+        className="min-h-0 flex-1 overflow-y-auto overscroll-contain scroll-smooth"
       >
-        <div className="mx-auto max-w-3xl px-3 py-5 sm:px-4 sm:py-6">
+        <div className="mx-auto w-full max-w-[800px] px-4 py-6 sm:px-8 sm:py-8">
           {loading ? (
             <MessagesSkeleton />
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center py-12 text-center sm:py-16">
-              <div className="relative mb-5 flex size-16 items-center justify-center overflow-hidden rounded-2xl border bg-black shadow-sm">
+            <div className="flex min-h-[45vh] flex-col items-center justify-center py-12 text-center sm:py-16">
+              <div className="relative mb-4 flex size-14 items-center justify-center overflow-hidden rounded-2xl border border-border/60 bg-black shadow-sm">
                 <Image
                   src="/branding/hajihaz-mark.png"
                   alt="HajiHaz AI mark"
                   width={512}
                   height={512}
                   priority
-                  className="size-14 object-contain"
+                  className="size-12 object-contain"
                 />
               </div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
                 HajiHaz AI
               </p>
               <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-                What are we building today?
+                Where should we begin?
               </h2>
               <p className="mt-3 max-w-lg text-balance text-sm leading-6 text-muted-foreground sm:text-base">
-                Ask a question, bring a problem, or start with one of your
-                workspaces. HajiHaz can use memory, knowledge and live evidence
-                when the task calls for it.
+                Ask, write, explore or build. Your conversations, knowledge,
+                and projects are right here when you need them.
               </p>
-              <div className="mt-7 grid w-full max-w-2xl gap-3 text-left sm:grid-cols-2">
+              <div className="mt-8 grid w-full max-w-lg grid-cols-2 gap-2.5 text-left sm:gap-3">
                 {[
-                  {
-                    area: "Personal",
-                    prompts: ["Who is Haji?", "What are Haji's goals?"],
-                  },
-                  {
-                    area: "AllBee",
-                    prompts: [
-                      "Who founded AllBee?",
-                      "What services does AllBee provide?",
-                    ],
-                  },
-                  {
-                    area: "Legal",
-                    prompts: ["Explain Article 21.", "What is negligence?"],
-                  },
-                  {
-                    area: "Suplaykart",
-                    prompts: ["What is Suplaykart?", "Who founded Suplaykart?"],
-                  },
-                ].map(({ area, prompts }) => (
-                  <div
-                    key={area}
-                    className="rounded-2xl border bg-background/60 p-3 shadow-sm transition-colors hover:border-foreground/20"
-                  >
-                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      {area}
-                    </p>
-                    <div className="flex flex-col gap-2">
-                      {prompts.map((p) => (
-                        <button
-                          key={p}
-                          onClick={() => onSendPrompt(p)}
-                          className="rounded-xl border bg-background px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent"
-                        >
-                          {p}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  { label: "Explain a concept", prompt: "Explain a complex topic in simple terms." },
+                  { label: "Plan a project", prompt: "Help me break a project into clear actionable steps." },
+                  { label: "Improve my writing", prompt: "Help me make my writing clearer and more effective." },
+                  { label: "Explore an idea", prompt: "Help me develop an idea from scratch." },
+                ].map((suggestion) => (
+                  <button type="button" key={suggestion.label} onClick={() => onSendPrompt(suggestion.prompt)} className="rounded-2xl border border-border/70 bg-card px-4 py-3 text-left text-sm font-medium shadow-sm transition hover:border-foreground/20 hover:bg-accent sm:py-4">
+                    {suggestion.label}<span className="mt-1 block text-xs font-normal text-muted-foreground">↗</span>
+                  </button>
                 ))}
               </div>
             </div>
           ) : (
             <div
-              className="space-y-5"
+              className="space-y-7 pb-4"
               role="log"
               aria-live="polite"
               aria-relevant="additions"
@@ -261,14 +243,14 @@ const Chat = memo(function Chat({
                     key={m.id}
                     className={`group flex flex-col ${isUser ? "items-end" : "items-start"}${m.isNew ? " animate-message" : ""}`}
                   >
-                    <div className="max-w-[85%] sm:max-w-[80%]">
+                    <div className={`min-w-0 ${isUser ? "max-w-[88%] sm:max-w-[78%]" : "w-full"}`}>
                       <div
-                        className={`break-anywhere rounded-2xl px-4 py-2.5 text-sm ${
+                        className={`break-anywhere text-[15px] leading-7 ${
                           isUser
-                            ? "bg-primary text-primary-foreground"
+                            ? "rounded-3xl bg-muted/80 px-4 py-2.5 text-foreground"
                             : m.error
-                              ? "border border-destructive/30 bg-destructive/10 text-foreground"
-                              : "bg-muted"
+                              ? "rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-foreground"
+                              : "py-0.5 text-foreground"
                         }`}
                       >
                         {isUser ? (
@@ -276,7 +258,7 @@ const Chat = memo(function Chat({
                             {m.content}
                           </span>
                         ) : (
-                          <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-relaxed prose-pre:rounded-lg prose-pre:border prose-pre:bg-background/60 prose-code:rounded prose-code:bg-background/60 prose-code:px-1 prose-code:text-[0.8em]">
+                          <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-7 prose-pre:rounded-lg prose-pre:border prose-pre:bg-background/60 prose-code:rounded prose-code:bg-background/60 prose-code:px-1 prose-code:text-[0.8em]">
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                               {m.content}
                             </ReactMarkdown>
@@ -516,129 +498,66 @@ const Chat = memo(function Chat({
         </div>
       </div>
 
-      <div className="border-t">
-        {brains.length > 0 && (
-          <div className="border-b px-1">
-            <BrainSelector
-              brains={brains}
-              selectedBrainId={selectedBrainId}
-              brainMode={brainMode}
-              onSelectBrain={onSelectBrain}
-              onSetMode={onSetBrainMode}
-            />
-          </div>
-        )}
+      {showJumpToLatest && (
+        <button type="button" onClick={scrollToBottom} className="absolute bottom-[160px] left-1/2 z-10 flex -translate-x-1/2 items-center gap-1.5 rounded-full border bg-background px-3 py-2 text-xs font-medium shadow-lg hover:bg-accent" aria-label="Jump to latest message">
+          <ChevronDown className="size-4" /> Latest
+        </button>
+      )}
 
-        <div className="p-3 pb-safe sm:p-4">
-          <div
-            className={`mx-auto max-w-3xl rounded-2xl transition ${isDragOver ? "ring-2 ring-primary/50" : ""}`}
-            onDragOver={(e) => { e.preventDefault(); setIsDragOver(true); }}
+      <div className="shrink-0 bg-background/95 px-3 pb-safe pt-2 backdrop-blur-xl sm:px-6">
+        <div className="mx-auto w-full max-w-[800px]">
+          <div className={`relative rounded-[26px] border border-border/80 bg-card p-2 shadow-[0_5px_30px_-15px_rgba(0,0,0,0.22)] transition focus-within:border-foreground/25 ${isDragOver ? "ring-2 ring-primary/50" : ""}`}
+            onDragOver={(event) => { event.preventDefault(); setIsDragOver(true); }}
             onDragLeave={() => setIsDragOver(false)}
-            onDrop={(e) => {
-              e.preventDefault(); setIsDragOver(false);
-              const dropped = Array.from(e.dataTransfer.files ?? []).filter((f) => /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i.test(f.name));
+            onDrop={(event) => {
+              event.preventDefault(); setIsDragOver(false);
+              const dropped = Array.from(event.dataTransfer.files ?? []).filter((file) => /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i.test(file.name) && file.size <= 12 * 1024 * 1024);
               setAttachmentFiles((current) => [...current, ...dropped].slice(0, 5));
-            }}
-          >
-            {isDragOver ? <div className="mb-2 rounded-xl border border-dashed bg-accent/60 px-3 py-2 text-center text-xs font-medium text-muted-foreground">Drop files to attach</div> : null}
-            {attachmentFiles.length > 0 ? (
-              <div className="mb-2 flex flex-wrap gap-2" aria-label="Attached files">
-                {attachmentFiles.map((file, index) => (
-                  <div key={`${file.name}-${index}`} className="flex max-w-full items-center gap-2 rounded-xl border bg-muted/50 px-2.5 py-1.5 text-xs">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-background font-semibold">{file.name.toLowerCase().endsWith(".pdf") ? "PDF" : file.name.split(".").pop()?.toUpperCase()}</span>
-                    <span className="max-w-56 truncate">{file.name}</span>
-                    {index === 1 ? <span className="hidden rounded-md bg-background px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground sm:inline">Reference</span> : null}
-                    <button type="button" onClick={() => setAttachmentFiles((files) => files.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`} title={`Remove ${file.name}`} className="flex size-6 shrink-0 items-center justify-center rounded-md hover:bg-accent"><X className="size-3.5" /></button>
-                  </div>
-                ))}
+            }}>
+            {isDragOver && <div className="mb-2 rounded-xl border border-dashed bg-accent p-2 text-center text-xs">Drop to attach files</div>}
+            {attachmentFiles.length > 0 && (
+              <div className="flex flex-wrap gap-2 px-2 pt-1 pb-2" aria-label="Attached files">
+                {attachmentFiles.map((file, index) => <span key={`${file.name}-${index}`} className="inline-flex max-w-full items-center gap-1.5 rounded-xl border bg-muted/60 py-1.5 pl-3 pr-1 text-xs">
+                  <Paperclip className="size-3" /><span className="max-w-36 truncate">{file.name}</span>
+                  <button type="button" onClick={() => setAttachmentFiles((files) => files.filter((_, i) => i !== index))} aria-label={`Remove ${file.name}`} className="flex size-6 items-center justify-center rounded-lg hover:bg-accent"><X className="size-3.5" /></button>
+                </span>)}
               </div>
-            ) : null}
-            <input ref={attachmentInputRef} type="file" accept="application/pdf,.pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={(e) => {
-              const picked = Array.from(e.target.files ?? []);
-              const valid = picked.filter((f) => /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i.test(f.name));
-              const tooLarge = valid.find((f) => f.size > 12 * 1024 * 1024);
-              if (tooLarge) window.alert(`${tooLarge.name} is larger than 12MB.`);
-              setAttachmentFiles((current) => [...current, ...valid.filter((f) => f.size <= 12 * 1024 * 1024)].slice(0, 5));
-              e.currentTarget.value = "";
-            }} />
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onPaste={(e) => {
-                const images = Array.from(e.clipboardData.files ?? []).filter((f) => /^image\/(jpeg|png|webp|gif)$/i.test(f.type));
-                if (images.length) setAttachmentFiles((current) => [...current, ...images].slice(0, 5));
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  const files = attachmentFiles;
-                  setAttachmentFiles([]);
-                  onSend(files);
-                }
-              }}
-              rows={1}
-              aria-label="Message"
-              placeholder="Message HajiHaz AI…"
-              className="max-h-40 min-h-11 w-full min-w-0 flex-1 resize-none rounded-xl border bg-background px-4 py-3 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm"
-            />
-            <div className="flex min-w-0 items-center justify-end gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <VoiceInput
-              value={input}
-              onChange={setInput}
-              disabled={isGenerating || sending}
-            />
-            <button
-              type="button"
-              onClick={onOpenFileLibrary}
-              aria-label="Attach from file library"
-              title="Attach from file library"
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <Paperclip className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => attachmentInputRef.current?.click()}
-              aria-label="Attach files"
-              title="Attach files"
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <Paperclip className="size-4" />
-            </button>
-            <button
-              type="button"
-              onClick={onOpenImageGenerator}
-              aria-label="Create image"
-              title="Create image"
-              className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <ImagePlus className="size-4" />
-            </button>
-            {isGenerating ? (
-              <button
-                type="button"
-                onClick={onStop}
-                aria-label="Stop generation"
-                title="Stop generation"
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl border bg-background text-foreground hover:bg-accent"
-              >
-                <Square className="size-4 fill-current" />
-              </button>
-            ) : (
-              <button
-                onClick={() => { const files = attachmentFiles; setAttachmentFiles([]); onSend(files); }}
-                disabled={!input.trim()}
-                aria-label="Send message"
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40"
-              >
-                <Send className="size-4" />
-              </button>
             )}
-            </div>
+            <input ref={attachmentInputRef} type="file" accept="application/pdf,.pdf,.docx,.txt,.md,image/jpeg,image/png,image/webp,image/gif" multiple className="hidden" onChange={(event) => {
+              const picked = Array.from(event.target.files ?? []);
+              const valid = picked.filter((file) => /\.(pdf|docx|txt|md|jpe?g|png|webp|gif)$/i.test(file.name) && file.size <= 12 * 1024 * 1024);
+              if (valid.length < picked.length) window.alert("Some files could not be attached. Use PDF, DOCX, TXT, or images up to 12 MB.");
+              setAttachmentFiles((current) => [...current, ...valid].slice(0, 5));
+              event.currentTarget.value = "";
+            }} />
+            <textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)}
+              onPaste={(event) => { const images = Array.from(event.clipboardData.files ?? []).filter((file) => /^image\/(jpeg|png|webp|gif)$/i.test(file.type)); if (images.length) setAttachmentFiles((current) => [...current, ...images].slice(0, 5)); }}
+              onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); const files = attachmentFiles; setAttachmentFiles([]); onSend(files); } }}
+              rows={1} aria-label="Message" placeholder="Message HajiHaz AI…"
+              className="max-h-40 min-h-12 w-full resize-none bg-transparent px-3 py-3 text-base leading-6 outline-none placeholder:text-muted-foreground/85 sm:text-[15px]" />
+            <div className="flex min-h-10 items-center justify-between gap-2 px-1 pb-0.5">
+              <div className="flex min-w-0 items-center gap-1">
+                <div className="relative">
+                  <button type="button" onClick={() => setToolMenuOpen((value) => !value)} aria-label="Add attachments or tools" title="Add attachments or tools" aria-haspopup="menu" aria-expanded={toolMenuOpen} className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><Plus className="size-5" /></button>
+                  {toolMenuOpen && <>
+                    <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Close attachment tools" onClick={() => setToolMenuOpen(false)} />
+                    <div role="menu" className="absolute bottom-full left-0 z-40 mb-2 w-60 rounded-2xl border bg-popover p-1.5 shadow-xl">
+                      <button type="button" role="menuitem" onClick={() => { setToolMenuOpen(false); attachmentInputRef.current?.click(); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm hover:bg-accent"><Paperclip className="size-4" /> Upload files</button>
+                      <button type="button" role="menuitem" onClick={() => { setToolMenuOpen(false); onOpenFileLibrary(); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm hover:bg-accent"><Paperclip className="size-4" /> File library</button>
+                      <button type="button" role="menuitem" onClick={() => { setToolMenuOpen(false); onOpenImageGenerator(); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm hover:bg-accent"><ImagePlus className="size-4" /> Create image</button>
+                    </div>
+                  </>}
+                </div>
+                {brains.length > 0 && <BrainSelector brains={brains} selectedBrainId={selectedBrainId} brainMode={brainMode} onSelectBrain={onSelectBrain} onSetMode={onSetBrainMode} />}
+              </div>
+              <div className="flex items-center gap-1">
+                <VoiceInput value={input} onChange={setInput} disabled={isGenerating || sending} />
+                {isGenerating ? <button type="button" onClick={onStop} aria-label="Stop generation" title="Stop generation" className="flex size-9 items-center justify-center rounded-full bg-foreground text-background"><Square className="size-3.5 fill-current" /></button>
+                  : <button type="button" onClick={() => { const files = attachmentFiles; setAttachmentFiles([]); onSend(files); }} disabled={!input.trim() && attachmentFiles.length === 0} aria-label="Send message" title="Send message" className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-85 disabled:bg-muted disabled:text-muted-foreground"><ArrowUp className="size-5" /></button>}
+              </div>
             </div>
           </div>
+          <p className="hidden py-2 text-center text-[11px] text-muted-foreground/80 sm:block">HajiHaz AI can make mistakes. Verify important information.</p>
         </div>
       </div>
     </div>

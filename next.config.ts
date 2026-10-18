@@ -3,6 +3,9 @@ import { withSentryConfig } from "@sentry/nextjs/config";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // The Next.js floating dev badge intercepts the mobile composer + button
+  // during isolated browser tests; hide only the development indicator.
+  devIndicators: false,
   // Keep Turbopack rooted at HajiHazai even though a stray user-level
   // package-lock.json exists in ~/; this removes ambiguous workspace detection.
   turbopack: { root: process.cwd() },

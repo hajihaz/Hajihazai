@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Bug, Download, Folder, GitFork, Menu, PlusCircle, Share2, Paperclip, X } from "lucide-react";
+import { Bug, Download, Folder, GitFork, Menu, PlusCircle, Share2, Paperclip, X, PanelLeftClose, PanelLeftOpen, MoreHorizontal, FileText, SquarePen } from "lucide-react";
 import Sidebar from "./sidebar";
 import Chat from "./chat";
 import Modal from "./modal";
@@ -139,6 +139,9 @@ export default function ChatApp({
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [clientReady, setClientReady] = useState(false);
+  const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [projects, setProjects] = useState<Proj[]>(initialProjects);
   const projectLoadSeqRef = useRef(0);
   const activeConversation = activeId ? conversations.find((c) => c.id === activeId) : null;
@@ -166,7 +169,6 @@ export default function ChatApp({
   const sidebarSearchRef = useRef<HTMLInputElement | null>(null);
 
   // Export dropdown state
-  const [isExportOpen, setIsExportOpen] = useState(false);
 
   // Brain system state
   const [brains, setBrains] = useState<BrainOption[]>([]);
@@ -210,6 +212,7 @@ export default function ChatApp({
       if (e.key === "k") {
         e.preventDefault();
         setSidebarOpen(true);
+        setDesktopSidebarOpen(true);
         // rAF x2 to wait for sidebar slide-in before focusing
         requestAnimationFrame(() =>
           requestAnimationFrame(() => {
@@ -223,13 +226,38 @@ export default function ChatApp({
         void newChat();
       } else if (e.key === "b") {
         e.preventDefault();
-        setSidebarOpen((o) => !o);
+        if (window.innerWidth >= 768) {
+          setDesktopSidebarOpen((current) => {
+            const next = !current;
+            try { localStorage.setItem("hh-desktop-sidebar", next ? "open" : "closed"); } catch { /* optional */ }
+            return next;
+          });
+        } else setSidebarOpen((o) => !o);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    try { if (localStorage.getItem("hh-desktop-sidebar") === "closed") setDesktopSidebarOpen(false); } catch { /* private browsing */ }
+  }, []);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const onEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setMoreOpen(false); };
+    window.addEventListener("keydown", onEscape);
+    return () => window.removeEventListener("keydown", onEscape);
+  }, [moreOpen]);
+
+  const toggleDesktopSidebar = () => setDesktopSidebarOpen((current) => {
+    const next = !current;
+    try { localStorage.setItem("hh-desktop-sidebar", next ? "open" : "closed"); } catch { /* optional */ }
+    return next;
+  });
+
+  useEffect(() => { setClientReady(true); }, []);
 
   // Restore level from localStorage after mount
   useEffect(() => {
@@ -550,7 +578,6 @@ export default function ChatApp({
 
   function exportConversation(format: "md" | "txt" | "pdf") {
     if (!activeId || messages.length === 0) return;
-    setIsExportOpen(false);
     const title =
       conversations.find((c) => c.id === activeId)?.title ?? "Conversation";
     const slug = title
@@ -1102,7 +1129,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
   const handleSidebarClose = useCallback(() => setSidebarOpen(false), []);
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <div className="flex h-dvh overflow-hidden" data-app-ready={clientReady ? "true" : "false"}>
       <Sidebar
         conversations={conversations}
         projects={projects}
@@ -1119,166 +1146,62 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
         onArchive={archiveConversation}
         onToast={notify}
         open={sidebarOpen}
+        desktopOpen={desktopSidebarOpen}
         onClose={handleSidebarClose}
         searchRef={sidebarSearchRef}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="pt-safe flex items-center gap-2 border-b px-3 py-2.5 sm:px-4 sm:py-3">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            aria-label="Open conversations"
-            className="flex size-10 shrink-0 items-center justify-center rounded-lg hover:bg-accent md:hidden"
-          >
-            <Menu className="size-5" />
+        <header className="pt-safe relative z-20 flex min-h-[62px] shrink-0 items-center gap-1.5 border-b border-border/60 bg-background/90 px-3 backdrop-blur-xl sm:gap-2 sm:px-5">
+          <button type="button" onClick={() => setSidebarOpen(true)} aria-label="Open conversations" title="Open conversations" className="flex size-10 shrink-0 items-center justify-center rounded-xl hover:bg-accent md:hidden"><Menu className="size-5" /></button>
+          <button type="button" onClick={toggleDesktopSidebar} aria-label={desktopSidebarOpen ? "Collapse sidebar" : "Expand sidebar"} title="Toggle sidebar (⌘B)" className="hidden size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground md:flex">
+            {desktopSidebarOpen ? <PanelLeftClose className="size-[19px]" /> : <PanelLeftOpen className="size-[19px]" />}
           </button>
-          <button
-            type="button"
-            onClick={() => void newChat(activeProject?.id)}
-            aria-label="New chat"
-            className="flex size-10 shrink-0 items-center justify-center rounded-lg hover:bg-accent md:hidden"
-          >
-            <PlusCircle className="size-5" />
-          </button>
-
-          <div className="hidden min-w-0 items-center gap-2 sm:flex">
-            {user.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.image}
-                alt=""
-                className="size-7 shrink-0 rounded-full"
-              />
-            ) : null}
-            <div className="min-w-0 text-sm">
-              <div className="truncate font-medium leading-tight">
-                {user.name}
-              </div>
-              <div className="truncate text-xs leading-tight text-muted-foreground">
-                {user.email}
-              </div>
-            </div>
-          </div>
-
-          <div className="ml-auto flex min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="hidden items-center gap-2 sm:flex">
-              <Folder className="size-3.5 shrink-0 text-muted-foreground" />
-              <select
-                value={activeProject?.id ?? ""}
-                onChange={(e) => void switchProject(e.target.value)}
-                aria-label="Switch project"
-                className="max-w-48 truncate rounded-lg border bg-muted/40 px-2.5 py-1.5 text-xs font-medium outline-none hover:bg-accent"
-              >
-                <option value="">Global chat</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.name}{project.isSystem ? " (Global)" : ""}
-                  </option>
-                ))}
-              </select>
-              {activeProject ? (
-                <a
-                  href={"/projects/" + activeProject.id}
-                  className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-                  title={"Open " + activeProject.name + " workspace"}
-                  aria-label={"Open " + activeProject.name + " workspace"}
-                >
-                  <span className="text-[11px]">↗</span>
-                </a>
-              ) : null}
-            </div>
-            {isAdmin ? (
-              <button
-                type="button"
-                onClick={() => setDebug((d) => !d)}
-                aria-label="Toggle debug mode"
-                aria-pressed={debug}
-                title="Debug mode (admin)"
-                className={`flex size-10 shrink-0 items-center justify-center rounded-lg border sm:size-9 ${
-                  debug ? "bg-accent text-foreground" : "text-muted-foreground"
-                }`}
-              >
-                <Bug className="size-4" />
-              </button>
-            ) : null}
-
-            {activeId && messages.length > 0 ? (
-              <button type="button" onClick={() => void shareConversation()} aria-label="Share conversation" title="Share conversation" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
-                <Share2 className="size-4" />
-              </button>
-            ) : null}
-
-            {activeId && messages.length > 0 ? (
-              <button type="button" onClick={() => void branchConversation()} aria-label="Branch conversation" title="Branch conversation" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
-                <GitFork className="size-4" />
-              </button>
-            ) : null}
-
-            <button type="button" onClick={() => setFileLibraryOpen(true)} aria-label="Open file library" title="File library" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
-              <Paperclip className="size-4" />
-            </button>
-
-            {messages.length > 0 ? (
-              <button type="button" onClick={() => setCanvasOpen(true)} aria-label="Open canvas" title="Open canvas" className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9">
-                <span className="text-xs font-semibold">C</span>
-              </button>
-            ) : null}
-
-            {/* Export button — only when there's a conversation with messages */}
-            {activeId && messages.length > 0 ? (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsExportOpen((o) => !o)}
-                  aria-label="Export conversation"
-                  title="Export conversation"
-                  className="flex size-10 shrink-0 items-center justify-center rounded-lg border text-muted-foreground hover:bg-accent hover:text-foreground sm:size-9"
-                >
-                  <Download className="size-4" />
-                </button>
-                {isExportOpen ? (
-                  <>
-                    <div
-                      className="fixed inset-0 z-40"
-                      aria-hidden="true"
-                      onClick={() => setIsExportOpen(false)}
-                    />
-                    <div className="absolute right-0 z-50 mt-1.5 w-44 overflow-hidden rounded-lg border bg-popover py-1 shadow-lg">
-                      {(["md", "txt", "pdf"] as const).map((fmt) => (
-                        <button
-                          key={fmt}
-                          onClick={() => exportConversation(fmt)}
-                          className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-accent"
-                        >
-                          {fmt === "md" && "Markdown (.md)"}
-                          {fmt === "txt" && "Plain Text (.txt)"}
-                          {fmt === "pdf" && "PDF (print)"}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-
-            <label className="sr-only" htmlFor="level-select">
-              Response quality level
-            </label>
-            <select
-              id="level-select"
-              value={level}
-              onChange={(e) => changeLevel(e.target.value)}
-              className="min-w-0 rounded-lg border bg-background px-2.5 py-2 text-sm outline-none focus:ring-2 focus:ring-ring sm:px-3 sm:py-1.5"
-            >
-              {levels.map((l) => (
-                <option key={l.level} value={l.level} disabled={!l.available}>
-                  {l.label}
-                  {l.comingSoon ? " (Coming Soon)" : ""}
-                </option>
-              ))}
+          <button type="button" onClick={() => void newChat(activeProject?.id)} title="New chat" aria-label="New chat" className="flex size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground"><SquarePen className="size-[19px]" /></button>
+          <div className="ml-1 flex min-w-0 items-center gap-2">
+            <span className="truncate text-[15px] font-semibold tracking-tight">HajiHaz <span className="text-muted-foreground">AI</span></span>
+            <label className="sr-only" htmlFor="level-select">Response quality level</label>
+            <select id="level-select" value={level} onChange={(event) => changeLevel(event.target.value)} className="min-w-0 max-w-[112px] cursor-pointer rounded-lg border border-transparent bg-muted/60 px-2 py-1.5 text-xs font-medium text-muted-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring sm:max-w-[160px]">
+              {levels.map((option) => <option key={option.level} value={option.level} disabled={!option.available}>{option.label}{option.comingSoon ? " (Soon)" : ""}</option>)}
             </select>
-
+          </div>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <div className="relative">
+              <button type="button" onClick={() => setMoreOpen((value) => !value)} aria-label="More chat tools" aria-expanded={moreOpen} aria-haspopup="menu" title="More chat tools" className="flex size-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground"><MoreHorizontal className="size-5" /></button>
+              {moreOpen ? <>
+                <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Close chat tools" onClick={() => setMoreOpen(false)} />
+                <div role="menu" aria-label="Chat tools" className="absolute right-0 top-full z-40 mt-2 w-64 rounded-2xl border bg-popover p-1.5 shadow-xl">
+                  <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Workspace</p>
+                  <label className="block px-3 pb-2 text-xs text-muted-foreground">Active project
+                    <select value={activeProject?.id ?? ""} onChange={(event) => { void switchProject(event.target.value); setMoreOpen(false); }} aria-label="Switch project" className="mt-1 w-full rounded-lg border bg-background px-2 py-2 text-sm text-foreground">
+                      <option value="">Global chat</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}{project.isSystem ? " (Global)" : ""}</option>)}
+                    </select>
+                  </label>
+                  {[
+                    { label: "File library", icon: <Paperclip className="size-4" />, run: () => setFileLibraryOpen(true), visible: true },
+                    { label: "Open canvas", icon: <FileText className="size-4" />, run: () => setCanvasOpen(true), visible: messages.length > 0 },
+                    { label: "Share conversation", icon: <Share2 className="size-4" />, run: () => void shareConversation(), visible: !!activeId && messages.length > 0 },
+                    { label: "Branch conversation", icon: <GitFork className="size-4" />, run: () => void branchConversation(), visible: !!activeId && messages.length > 0 },
+                    { label: "Diagnostics", icon: <Bug className="size-4" />, run: () => setDebug((v) => !v), visible: isAdmin },
+                  ].filter((item) => item.visible).map((item) => (
+                    <button key={item.label} role="menuitem" type="button" onClick={() => { setMoreOpen(false); item.run(); }} className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm hover:bg-accent">{item.icon}{item.label}</button>
+                  ))}
+                  {activeId && messages.length > 0 && (
+                    <details className="group border-t border-border/70 pt-1">
+                      <summary className="flex min-h-10 cursor-pointer list-none items-center gap-3 rounded-lg px-3 text-sm hover:bg-accent">
+                        <Download className="size-4" /> Export conversation <span className="ml-auto text-xs text-muted-foreground group-open:rotate-180">⌄</span>
+                      </summary>
+                      <div className="pb-1 pl-7">
+                        {([ ["md", "Markdown (.md)"], ["txt", "Text (.txt)"], ["pdf", "Print / PDF"] ] as const).map(([format, title]) => (
+                          <button type="button" role="menuitem" key={format} onClick={() => { setMoreOpen(false); exportConversation(format); }} className="flex min-h-9 w-full items-center rounded-lg px-3 text-left text-sm hover:bg-accent">{title}</button>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  <p className="border-t px-3 py-2 text-[11px] text-muted-foreground">⌘K Search · ⌘B Sidebar · ⌘N New chat</p>
+                </div>
+              </> : null}
+            </div>
             <NotificationCenter />
             <ProfileMenu name={user.name} image={user.image} />
           </div>

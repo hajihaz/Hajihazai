@@ -1,11 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, ArrowLeft, BookOpenText, Eye, EyeOff, LayoutDashboard, LogOut, ShieldCheck, UsersRound } from "lucide-react";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
 type AdminRow = { id: string; username: string; createdAt: string; createdBy: string | null };
 type DataTab =
+  | "overview"
+  | "admins"
   | "users"
   | "projects"
   | "documents"
@@ -20,6 +23,14 @@ type DataTab =
   | "knowledge-gaps"
   | "query-tester"
   | "quality";
+
+const ADMIN_NAV_GROUPS: Array<{ title: string; icon: typeof LayoutDashboard; entries: Array<{ tab: DataTab; label: string }> }> = [
+  { title: "Overview", icon: LayoutDashboard, entries: [{ tab: "overview", label: "Dashboard" }, { tab: "health", label: "System health" }] },
+  { title: "People & access", icon: UsersRound, entries: [{ tab: "users", label: "Users" }, { tab: "admins", label: "Admin accounts" }, { tab: "blocked-emails", label: "Blocked emails" }, { tab: "knowledge-permissions", label: "Knowledge permissions" }] },
+  { title: "Intelligence", icon: BookOpenText, entries: [{ tab: "knowledge", label: "Knowledge base" }, { tab: "documents", label: "Documents" }, { tab: "brains", label: "Brains" }, { tab: "projects", label: "Projects" }, { tab: "query-tester", label: "Query tester" }, { tab: "knowledge-gaps", label: "Knowledge gaps" }] },
+  { title: "Operations", icon: ShieldCheck, entries: [{ tab: "quality", label: "Quality" }, { tab: "notifications", label: "Notifications" }, { tab: "audit-log", label: "Security activity" }, { tab: "maintenance", label: "Maintenance" }] },
+];
+const ADMIN_TAB_LABELS: Record<DataTab, string> = Object.fromEntries(ADMIN_NAV_GROUPS.flatMap((group) => group.entries.map((entry) => [entry.tab, entry.label]))) as Record<DataTab, string>;
 
 type NotificationRow = {
   id: string;
@@ -205,6 +216,7 @@ export default function AdminPortal() {
   /* login form */
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   /* shared */
   const [error, setError] = useState<string | null>(null);
@@ -215,8 +227,9 @@ export default function AdminPortal() {
   const [newP, setNewP] = useState("");
 
   /* data tab */
-  const [dataTab, setDataTab] = useState<DataTab>("users");
+  const [dataTab, setDataTab] = useState<DataTab>("overview");
   const [dataRows, setDataRows] = useState<Record<string, unknown>[]>([]);
+  const [showDetailedAnalytics, setShowDetailedAnalytics] = useState(false);
 
   /* users tab */
   const [userRows, setUserRows] = useState<UserRow[]>([]);
@@ -550,6 +563,7 @@ export default function AdminPortal() {
 
   async function loadTab(tab: DataTab) {
     setDataTab(tab);
+    if (tab === "overview" || tab === "admins") return;
     if (tab === "knowledge") { void loadKnowledge(); return; }
     if (tab === "knowledge-gaps") { void loadGaps(); return; }
     if (tab === "quality") { void loadQuality(); return; }
@@ -847,10 +861,6 @@ export default function AdminPortal() {
   /* ── style helpers ──────────────────────────────────────────── */
 
   const input = "w-full rounded-lg border bg-background px-3 py-2.5 text-base outline-none focus:ring-2 focus:ring-ring sm:text-sm";
-  const tabBtn = (active: boolean) =>
-    `px-4 py-2 text-sm capitalize transition-colors border-b-2 whitespace-nowrap ${
-      active ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"
-    }`;
 
   function userStatus(u: UserRow) {
     if (u.isTerminated) return { label: "Terminated", cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400" };
@@ -861,39 +871,80 @@ export default function AdminPortal() {
 
   /* ── render ─────────────────────────────────────────────────── */
 
-  if (status === "loading") return <p className="p-8 text-sm text-muted-foreground">Loading…</p>;
+  if (status === "loading") return (
+    <main className="flex min-h-dvh items-center justify-center bg-muted/25 px-6" role="status">
+      <div className="flex items-center gap-3 text-sm text-muted-foreground"><span className="size-5 animate-spin rounded-full border-2 border-current border-r-transparent" />Opening HajiHaz administration…</div>
+    </main>
+  );
 
   if (status === "login") {
     return (
-      <main className="flex min-h-dvh flex-col items-center justify-center px-6">
-        <form onSubmit={doLogin} className="w-full max-w-sm space-y-3">
-          <h1 className="text-center text-2xl font-semibold">Admin Portal</h1>
-          <p className="text-center text-sm text-muted-foreground">Sign in with admin credentials.</p>
-          <input className={input} placeholder="Admin Username" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} />
-          <input className={input} type="password" placeholder="Admin Password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          {error && <p className="text-sm text-destructive">{error}</p>}
-          <button className="min-h-11 w-full rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">Enter</button>
-          <div className="text-right text-xs text-muted-foreground"><a href="/" className="hover:text-foreground">← Back to chat</a></div>
-        </form>
+      <main className="flex min-h-dvh flex-col items-center justify-center bg-muted/25 px-4 py-12 sm:px-6">
+        <div className="w-full max-w-md rounded-[28px] border bg-card px-6 py-8 shadow-[0_20px_70px_-35px_rgba(0,0,0,0.25)] sm:px-9 sm:py-10">
+          <div className="mb-8 text-center">
+            <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-foreground text-background shadow-sm"><ShieldCheck className="size-7" /></div>
+            <p className="text-xs font-medium tracking-wide text-muted-foreground">HAJIHAZ AI</p>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">Admin Portal</h1>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">Sign in to manage users, intelligence, and platform operations.</p>
+          </div>
+          <form onSubmit={doLogin} className="space-y-4">
+            <label className="block text-sm font-medium">Admin username
+              <input className={`${input} mt-1.5`} placeholder="Admin Username" autoComplete="username" autoCapitalize="none" autoCorrect="off" value={username} onChange={(event) => setUsername(event.target.value)} required />
+            </label>
+            <label className="block text-sm font-medium">Password
+              <span className="relative mt-1.5 block">
+                <input className={`${input} pr-12`} type={showPassword ? "text" : "password"} placeholder="Admin Password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+                <button type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground">{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button>
+              </span>
+            </label>
+            {error && <p role="alert" className="rounded-xl bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</p>}
+            <button className="min-h-11 w-full rounded-xl bg-foreground px-4 text-sm font-medium text-background transition hover:opacity-90">Sign in securely</button>
+          </form>
+          <a href="/" className="mt-6 flex items-center justify-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> Back to HajiHaz AI</a>
+        </div>
+        <p className="mt-6 max-w-sm text-center text-xs text-muted-foreground">Admin access is separate from your regular HajiHaz AI account.</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto min-h-dvh w-full max-w-5xl px-4 py-8">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
-        <div className="flex gap-2">
-          <a href="/" className="rounded-lg border px-3 py-1.5 text-sm hover:bg-accent">Back to chat</a>
-          <button onClick={logout} className="rounded-lg border px-3 py-1.5 text-sm hover:bg-accent">Log out</button>
-        </div>
-      </div>
-
+    <main className="min-h-dvh bg-muted/20 px-3 py-4 sm:px-6 sm:py-6">
+      <div className="mx-auto w-full max-w-[1480px]">
+        <header className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card px-4 py-3 shadow-sm sm:px-5">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-foreground text-background"><Activity className="size-5" /></div>
+            <div className="min-w-0"><p className="text-[11px] font-medium text-muted-foreground">HajiHaz AI / Control center</p><h1 className="truncate text-lg font-semibold tracking-tight">Administration</h1></div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href="/" className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-3 text-sm hover:bg-accent"><ArrowLeft className="size-4" /><span className="hidden sm:inline">Back to chat</span><span className="sm:hidden">Chat</span></a>
+            <button type="button" onClick={logout} className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border px-3 text-sm hover:bg-accent"><LogOut className="size-4" /> Log out</button>
+          </div>
+        </header>
+        <div className="grid items-start gap-5 lg:grid-cols-[226px_minmax(0,1fr)]">
+          <aside className="rounded-2xl border bg-card p-2 shadow-sm lg:sticky lg:top-6" aria-label="Admin sections">
+            <label htmlFor="admin-mobile-section" className="block px-2 pb-1 pt-2 text-xs font-semibold text-muted-foreground lg:hidden">Choose section</label>
+            <select id="admin-mobile-section" value={dataTab} onChange={(event) => void loadTab(event.target.value as DataTab)} className="mb-1 w-full rounded-xl border bg-background px-3 py-3 text-sm lg:hidden" aria-label="Admin section">
+              {ADMIN_NAV_GROUPS.flatMap((group) => group.entries.map((entry) => <option key={entry.tab} value={entry.tab}>{group.title} / {entry.label}</option>))}
+            </select>
+            <nav className="hidden space-y-3 lg:block">
+              {ADMIN_NAV_GROUPS.map((group) => {
+                const Icon = group.icon;
+                return <div key={group.title}>
+                  <p className="flex items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"><Icon className="size-3.5" />{group.title}</p>
+                  <div className="space-y-0.5">{group.entries.map((entry) => <button type="button" key={entry.tab} aria-current={dataTab === entry.tab ? "page" : undefined} onClick={() => void loadTab(entry.tab)} className={`flex min-h-9 w-full items-center rounded-xl px-3 text-left text-sm transition ${dataTab === entry.tab ? "bg-foreground font-medium text-background" : "text-muted-foreground hover:bg-accent hover:text-foreground"}`}>{entry.label}</button>)}</div>
+                </div>;
+              })}
+            </nav>
+          </aside>
+          <div className="min-w-0">
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-2">
+              <div><p className="text-xs text-muted-foreground">Control center</p><h2 className="text-xl font-semibold tracking-tight">{ADMIN_TAB_LABELS[dataTab]}</h2></div>
+              {dataTab === "overview" && <button type="button" onClick={() => setShowDetailedAnalytics((value) => !value)} className="rounded-xl border bg-card px-3 py-2 text-sm hover:bg-accent">{showDetailedAnalytics ? "Hide detailed metrics" : "Show detailed metrics"}</button>}
+            </div>
       {/* Analytics stats */}
-      {analytics && (
+      {dataTab === "overview" && analytics && (
         <div className="mb-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
             {[
               { label: "Total Users", value: analytics.totalUsers },
               { label: "Active (30d)", value: analytics.activeUsers ?? "—" },
@@ -906,15 +957,15 @@ export default function AdminPortal() {
               { label: "Memories", value: analytics.totalMemories },
               { label: "Projects", value: analytics.totalProjects ?? "—" },
               { label: "Admins", value: analytics.totalAdmins ?? "—" },
-            ].map(({ label, value }) => (
-              <div key={label} className="rounded-xl border p-3 text-center">
-                <p className="text-xl font-semibold tabular-nums">{typeof value === "number" ? value.toLocaleString() : value}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{label}</p>
+            ].slice(0, showDetailedAnalytics ? undefined : 6).map(({ label, value }) => (
+              <div key={label} className="rounded-2xl border bg-card p-4 shadow-sm">
+                <p className="text-2xl font-semibold tracking-tight tabular-nums">{typeof value === "number" ? value.toLocaleString() : value}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{label}</p>
               </div>
             ))}
           </div>
 
-          {analytics.charts && (
+          {showDetailedAnalytics && analytics.charts && (
             <div className="grid gap-4 sm:grid-cols-3">
               <BarChart data={analytics.charts.dailySignups} label="Daily Signups (7d)" />
               <BarChart data={analytics.charts.dailyMessages} label="Daily Messages (7d)" />
@@ -922,7 +973,7 @@ export default function AdminPortal() {
             </div>
           )}
 
-          {analytics.retrieval && (
+          {showDetailedAnalytics && analytics.retrieval && (
             <section className="rounded-xl border p-4">
               <h2 className="mb-3 text-sm font-semibold">
                 Retrieval Analytics{" "}
@@ -1047,8 +1098,8 @@ export default function AdminPortal() {
       {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
 
       {/* Admins card */}
-      <section className="mb-8 rounded-xl border p-4">
-        <h2 className="mb-3 text-sm font-semibold">Admins ({admins.length})</h2>
+      {dataTab === "admins" && <section className="mb-8 rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+        <h2 className="mb-3 text-sm font-semibold">Admin accounts ({admins.length})</h2>
         <div className="mb-3 overflow-hidden rounded-lg border">
           {admins.map((a) => (
             <div key={a.id} className="flex items-center justify-between border-b px-3 py-2 text-sm last:border-0">
@@ -1065,26 +1116,7 @@ export default function AdminPortal() {
           <input className={input} type="password" placeholder="Password (min 8 chars)" value={newP} onChange={(e) => setNewP(e.target.value)} />
           <button className="min-h-11 shrink-0 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90">Create</button>
         </form>
-      </section>
-
-      {/* Data tab bar */}
-      <div className="mb-0 flex gap-0 overflow-x-auto border-b">
-        {(["users", "projects", "documents", "knowledge", "knowledge-gaps", "quality", "query-tester", "brains", "blocked-emails", "knowledge-permissions", "audit-log", "notifications", "maintenance", "health"] as DataTab[]).map((t) => (
-          <button key={t} onClick={() => loadTab(t)} className={tabBtn(dataTab === t)}>
-            {t === "knowledge" ? "Knowledge Base"
-              : t === "knowledge-gaps" ? "Knowledge Gaps"
-              : t === "quality" ? "Quality"
-              : t === "query-tester" ? "Query Tester"
-              : t === "blocked-emails" ? "Blocked Emails"
-              : t === "knowledge-permissions" ? "K. Permissions"
-              : t === "audit-log" ? "Audit Log"
-              : t === "notifications" ? "Notifications"
-              : t === "maintenance" ? "Maintenance"
-              : t === "health" ? "Health"
-              : t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
+      </section>}
 
       {/* ── Users tab ── */}
       {dataTab === "users" && (
@@ -1134,7 +1166,7 @@ export default function AdminPortal() {
           ) : userRows.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No users found.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border">
+            <div className="overflow-x-auto rounded-xl border bg-card">
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-2 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <span>User</span>
                 <span className="w-20 text-center">Status</span>
@@ -1236,7 +1268,7 @@ export default function AdminPortal() {
           {blockedEmails.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No blocked emails.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border">
+            <div className="overflow-x-auto rounded-xl border bg-card">
               <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <span>Email</span>
                 <span className="w-28 text-right">Blocked On</span>
@@ -1288,7 +1320,7 @@ export default function AdminPortal() {
           {knowledgePerms.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No additional permissions configured.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border">
+            <div className="overflow-x-auto rounded-xl border bg-card">
               <div className="grid grid-cols-[1fr_auto_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <span>Email</span>
                 <span className="w-28 text-right">Granted On</span>
@@ -1317,7 +1349,7 @@ export default function AdminPortal() {
           {auditLog.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No audit entries yet.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border">
+            <div className="overflow-x-auto rounded-xl border bg-card">
               <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <span className="w-16">Action</span>
                 <span>Document</span>
@@ -1378,7 +1410,7 @@ export default function AdminPortal() {
             {securityAuditLog.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">No security activity recorded yet.</p>
             ) : (
-              <div className="overflow-hidden rounded-xl border">
+              <div className="overflow-x-auto rounded-xl border bg-card">
                 <div className="grid grid-cols-[auto_1fr_auto_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <span>Action</span>
                   <span>Target</span>
@@ -1444,7 +1476,7 @@ export default function AdminPortal() {
           {notifications.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">No notifications yet.</p>
           ) : (
-            <div className="overflow-hidden rounded-xl border">
+            <div className="overflow-x-auto rounded-xl border bg-card">
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <span>Title</span>
                 <span className="w-20 text-center">Target</span>
@@ -2031,7 +2063,7 @@ export default function AdminPortal() {
             </button>
           )}
 
-          <div className="overflow-hidden rounded-xl border">
+          <div className="overflow-x-auto rounded-xl border bg-card">
             <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               <span>Icon</span><span>Brain</span><span className="w-16 text-center">Docs</span><span className="w-16 text-center">Chunks</span><span className="w-16 text-right">Type</span><span className="w-20 text-right">Actions</span>
             </div>
@@ -2158,7 +2190,7 @@ export default function AdminPortal() {
               {knowledge.length === 0 ? 'No knowledge documents yet. Click "+ Add Knowledge" to get started.' : "No results match your filters."}
             </div>
           ) : (
-            <div className="overflow-hidden rounded-xl border">
+            <div className="overflow-x-auto rounded-xl border bg-card">
               <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] gap-3 border-b bg-muted/40 px-4 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 <span>Title</span>
                 <span className="w-20 text-center">Visibility</span>
@@ -2200,6 +2232,9 @@ export default function AdminPortal() {
           <p className="mt-1.5 text-xs text-muted-foreground">{filteredKnowledge.length} of {knowledge.length} document(s)</p>
         </section>
       )}
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

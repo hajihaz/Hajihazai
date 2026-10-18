@@ -192,6 +192,7 @@ const Sidebar = memo(function Sidebar({
   onArchive,
   onToast,
   open,
+  desktopOpen = true,
   onClose,
   searchRef,
 }: {
@@ -208,6 +209,7 @@ const Sidebar = memo(function Sidebar({
   onArchive: (id: string, archived: boolean) => void;
   onToast: (msg: string) => void;
   open: boolean;
+  desktopOpen?: boolean;
   onClose: () => void;
   searchRef?: React.RefObject<HTMLInputElement | null>;
 }) {
@@ -398,9 +400,7 @@ const Sidebar = memo(function Sidebar({
           if (dx > 50) onClose();
           touchStartXRef.current = null;
         }}
-        className={`fixed inset-y-0 left-0 z-40 flex w-[82%] max-w-xs flex-col border-r bg-background transition-transform duration-200 ease-out md:static md:z-auto md:w-72 md:translate-x-0 ${
-          open ? "translate-x-0" : "-translate-x-full"
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 flex w-[82%] max-w-xs flex-col border-r border-border/60 bg-muted/35 transition-transform duration-200 ease-out md:static md:z-auto md:max-w-none md:translate-x-0 md:transition-[width,opacity] ${desktopOpen ? "md:w-72 md:opacity-100" : "md:w-0 md:invisible md:overflow-hidden md:border-r-0 md:opacity-0 md:pointer-events-none"} ${open ? "translate-x-0" : "-translate-x-full"}`}
       >
         {/* Header */}
         <div className="p-3 pb-2">
@@ -416,7 +416,7 @@ const Sidebar = memo(function Sidebar({
           <div className="flex items-center gap-2">
           <button
             onClick={onNew}
-            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90"
+            className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border bg-background px-4 text-sm font-medium shadow-sm transition hover:bg-accent"
           >
             <Plus className="size-4" /> New Chat
           </button>
@@ -441,7 +441,7 @@ const Sidebar = memo(function Sidebar({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search… ⌘K"
               aria-label="Search conversations"
-              className="w-full rounded-lg border bg-muted/40 py-2 pl-8 pr-9 text-base outline-none focus:bg-background focus:ring-2 focus:ring-ring sm:text-sm"
+              className="w-full rounded-xl border border-transparent bg-muted/70 py-2.5 pl-8 pr-9 text-base outline-none focus:border-border focus:bg-background focus:ring-2 focus:ring-ring sm:text-sm"
             />
             {searchQuery ? <button type="button" onClick={() => setSearchQuery("")} aria-label="Clear search" title="Clear search" className="absolute right-1.5 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"><X className="size-3.5" /></button> : null}
           </div>
