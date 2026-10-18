@@ -726,21 +726,25 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
     });
   }
 
-  async function send(files: File[] = []) {
+  // Synchronous acceptance lets the composer keep attachments and unsent text
+  // whenever the guest gate or an active generation prevents sending.
+  function send(files: File[] = []): boolean {
     const text = input.trim();
-    if ((!text && files.length === 0) || generatingRef.current) return;
+    if ((!text && files.length === 0) || generatingRef.current) return false;
     if (isGuest && messages.filter((message) => message.role === "user").length >= 5) {
       setGuestGateOpen(true);
-      return;
+      return false;
     }
     setInput("");
     if (files.length > 0) {
-      await sendAttachments(files, text);
-      return;
+      generatingRef.current = true;
+      void sendAttachments(files, text);
+      return true;
     }
     const localId = uuid();
     setMessages((p) => [...p, { id: localId, role: "user", content: text, isNew: true }]);
     void runChat(text, { userLocalId: localId });
+    return true;
   }
 
   async function detachAttachment(documentId: string) {
@@ -838,6 +842,10 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           }
         }
         const attachmentPrompt = `${prompt || "Analyze the attached files and summarize the most important information."}\n\nUse these newly attached files as the primary source for this response: ${uploaded.join(", ")}. If the request asks for facts from the files, distinguish file content from general knowledge.`;
+        // File ingestion holds the generation lock to prevent duplicate sends.
+        // Hand that lock to runChat now that ingestion is complete, otherwise
+        // runChat rejects its own attachment-based follow-up as a duplicate.
+        generatingRef.current = false;
         await runChat(attachmentPrompt, { userLocalId: localId });
       }
     } catch (error) {
@@ -944,7 +952,12 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
           const data = await res.clone().json().catch(() => null);
           if (data?.error === "guest_message_limit") {
             setGuestGateOpen(true);
-            if (opts.userLocalId) setMessages((current) => current.filter((item) => item.id !== opts.userLocalId));
+            // Restore the unsent draft when a limit was reached in another chat
+            // or browser tab after the local optimistic message was shown.
+            if (opts.userLocalId) {
+              setInput((current) => current || text);
+              setMessages((current) => current.filter((item) => item.id !== opts.userLocalId));
+            }
             return;
           }
         }
@@ -1169,7 +1182,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
             <div className="relative">
               <button type="button" onClick={() => setMoreOpen((value) => !value)} aria-label="More chat tools" aria-expanded={moreOpen} aria-haspopup="menu" title="More chat tools" className="flex size-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground"><MoreHorizontal className="size-5" /></button>
               {moreOpen ? <>
-                <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Close chat tools" onClick={() => setMoreOpen(false)} />
+                <button type="button" className="fixed inset-0 z-30 cursor-default" tabIndex={-1} aria-label="Close chat tools" onClick={() => setMoreOpen(false)} />
                 <div role="menu" aria-label="Chat tools" className="absolute right-0 top-full z-40 mt-2 w-64 rounded-2xl border bg-popover p-1.5 shadow-xl">
                   <p className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Workspace</p>
                   <label className="block px-3 pb-2 text-xs text-muted-foreground">Active project

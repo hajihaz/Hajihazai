@@ -45,3 +45,11 @@ ChatGPT-inspired interaction patterns for **existing HajiHaz AI features only**.
 ## Explicit exclusions
 
 No fictional plugins, new API keys, paid providers, additional model entitlements, live voice-to-voice assistant, or image-provider promises were added. HajiHaz AI's voice input is speech-to-text using supported browsers, **not a full realtime voice conversation engine**. Existing external provider billing/quota blockers remain separate from this frontend delivery.
+
+## Follow-up refinement — 18 October 2026
+
+- Guest auth gate **does not consume or clear a blocked draft**. Local sixth-turn rejection keeps text and selected files; if a concurrent browser tab reaches the server-side limit first, the 403 handler restores the text before showing login.
+- Chat composer admission is synchronous. It only clears selected attachments when submission was accepted, and guards rapid duplicate attachment submissions using the generation ref.
+- Sidebar conversation titles are actual keyboard-selectable buttons. Inactive mobile/desktop navigation is marked inert and `aria-hidden`, avoiding invisible keyboard and screen-reader destinations.
+- The first-party microphone permission is allowed (`microphone=(self)`) so browser-supported speech-to-text can request user consent. Camera and geolocation remain disabled, and no voice data is collected without the user's browser permission.
+- Expanded 11-test isolated E2E coverage includes simulated speech recognition, header policy, hidden sidebar accessibility, and guest text-plus-file preservation.

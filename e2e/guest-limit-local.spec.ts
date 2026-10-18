@@ -40,6 +40,10 @@ test.describe("guest five-message gate", () => {
     await expect(page.locator('[data-app-ready="true"]')).toBeVisible();
     await expect(composer).toBeVisible();
     await expect(page.getByText("guest message 5", { exact: true })).toBeVisible({ timeout: 15000 });
+    await page.locator('input[type="file"][accept*=".docx"]').setInputFiles({
+      name: "unsent-note.txt", mimeType: "text/plain", buffer: Buffer.from("Preserve this attachment at the guest login gate."),
+    });
+    await expect(page.getByText("unsent-note.txt", { exact: true })).toBeVisible();
     await composer.fill("sixth message from UI");
     await page.getByRole("button", { name: "Send message" }).click();
 
@@ -48,6 +52,8 @@ test.describe("guest five-message gate", () => {
     await expect(dialog.getByText(/used all 5 guest messages/i)).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Continue with Google" })).toBeVisible();
     await expect(dialog.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
+    await expect(composer).toHaveValue("sixth message from UI");
+    await expect(page.getByText("unsent-note.txt", { exact: true })).toBeVisible();
     await expect(page.getByText("guest message 5", { exact: true })).toBeVisible();
 
     // Account creation replaces the guest session and transfers the same chat

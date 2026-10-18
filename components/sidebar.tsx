@@ -132,9 +132,9 @@ function ConvRow({
         />
       ) : (
         <>
-          <span onClick={onSelect} className="min-w-0 flex-1 truncate">
+          <button type="button" onClick={onSelect} aria-current={isActive ? "page" : undefined} className="min-w-0 flex-1 truncate rounded-md py-2 text-left focus-visible:outline-offset-0">
             {c.title}
-          </span>
+          </button>
           {projectName ? (
             <span className="hidden max-w-24 shrink-0 truncate rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground sm:inline" title={projectName}>
               {projectName}
@@ -237,6 +237,21 @@ const Sidebar = memo(function Sidebar({
 
   // Touch for swipe-to-close
   const touchStartXRef = useRef<number | null>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 767px)");
+    const update = () => {
+      const sidebar = sidebarRef.current;
+      if (!sidebar) return;
+      const hidden = mobile.matches ? !open : !desktopOpen;
+      sidebar.inert = hidden;
+      if (hidden) sidebar.setAttribute("aria-hidden", "true");
+      else sidebar.removeAttribute("aria-hidden");
+    };
+    update();
+    mobile.addEventListener("change", update);
+    return () => mobile.removeEventListener("change", update);
+  }, [open, desktopOpen]);
 
   // Body scroll lock when sidebar open on mobile
   useEffect(() => {
@@ -393,6 +408,7 @@ const Sidebar = memo(function Sidebar({
       ) : null}
 
       <aside
+        ref={sidebarRef}
         onTouchStart={(e) => { touchStartXRef.current = e.touches[0].clientX; }}
         onTouchEnd={(e) => {
           if (touchStartXRef.current === null) return;

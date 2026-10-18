@@ -69,7 +69,7 @@ const Chat = memo(function Chat({
   conversationId: string | null;
   input: string;
   setInput: (v: string) => void;
-  onSend: (files?: File[]) => void;
+  onSend: (files?: File[]) => boolean;
   onSendPrompt: (text: string) => void;
   onFeedback: (msg: Msg, value: "helpful" | "not_helpful") => void;
   onCopy: (text: string) => void;
@@ -165,6 +165,10 @@ const Chat = memo(function Chat({
     ta.style.height = "auto";
     ta.style.height = `${Math.min(ta.scrollHeight, 160)}px`;
   }, [input]);
+
+  const submitComposer = () => {
+    if (onSend(attachmentFiles)) setAttachmentFiles([]);
+  };
 
   useEffect(() => {
     if (!toolMenuOpen) return;
@@ -532,7 +536,7 @@ const Chat = memo(function Chat({
             }} />
             <textarea ref={textareaRef} value={input} onChange={(event) => setInput(event.target.value)}
               onPaste={(event) => { const images = Array.from(event.clipboardData.files ?? []).filter((file) => /^image\/(jpeg|png|webp|gif)$/i.test(file.type)); if (images.length) setAttachmentFiles((current) => [...current, ...images].slice(0, 5)); }}
-              onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); const files = attachmentFiles; setAttachmentFiles([]); onSend(files); } }}
+              onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submitComposer(); } }}
               rows={1} aria-label="Message" placeholder="Message HajiHaz AI…"
               className="max-h-40 min-h-12 w-full resize-none bg-transparent px-3 py-3 text-base leading-6 outline-none placeholder:text-muted-foreground/85 sm:text-[15px]" />
             <div className="flex min-h-10 items-center justify-between gap-2 px-1 pb-0.5">
@@ -540,7 +544,7 @@ const Chat = memo(function Chat({
                 <div className="relative">
                   <button type="button" onClick={() => setToolMenuOpen((value) => !value)} aria-label="Add attachments or tools" title="Add attachments or tools" aria-haspopup="menu" aria-expanded={toolMenuOpen} className="flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"><Plus className="size-5" /></button>
                   {toolMenuOpen && <>
-                    <button type="button" className="fixed inset-0 z-30 cursor-default" aria-label="Close attachment tools" onClick={() => setToolMenuOpen(false)} />
+                    <button type="button" className="fixed inset-0 z-30 cursor-default" tabIndex={-1} aria-label="Close attachment tools" onClick={() => setToolMenuOpen(false)} />
                     <div role="menu" className="absolute bottom-full left-0 z-40 mb-2 w-60 rounded-2xl border bg-popover p-1.5 shadow-xl">
                       <button type="button" role="menuitem" onClick={() => { setToolMenuOpen(false); attachmentInputRef.current?.click(); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm hover:bg-accent"><Paperclip className="size-4" /> Upload files</button>
                       <button type="button" role="menuitem" onClick={() => { setToolMenuOpen(false); onOpenFileLibrary(); }} className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 text-sm hover:bg-accent"><Paperclip className="size-4" /> File library</button>
@@ -553,7 +557,7 @@ const Chat = memo(function Chat({
               <div className="flex items-center gap-1">
                 <VoiceInput value={input} onChange={setInput} disabled={isGenerating || sending} />
                 {isGenerating ? <button type="button" onClick={onStop} aria-label="Stop generation" title="Stop generation" className="flex size-9 items-center justify-center rounded-full bg-foreground text-background"><Square className="size-3.5 fill-current" /></button>
-                  : <button type="button" onClick={() => { const files = attachmentFiles; setAttachmentFiles([]); onSend(files); }} disabled={!input.trim() && attachmentFiles.length === 0} aria-label="Send message" title="Send message" className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-85 disabled:bg-muted disabled:text-muted-foreground"><ArrowUp className="size-5" /></button>}
+                  : <button type="button" onClick={() => { submitComposer(); }} disabled={!input.trim() && attachmentFiles.length === 0} aria-label="Send message" title="Send message" className="flex size-9 items-center justify-center rounded-full bg-foreground text-background transition hover:opacity-85 disabled:bg-muted disabled:text-muted-foreground"><ArrowUp className="size-5" /></button>}
               </div>
             </div>
           </div>
