@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { db } from "@/lib/db";
-import { hhcCommands, hhcDevices, users } from "@/lib/db/schema";
+import { hhcCommands, hhcDevices, hhcPairings, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import {
   startPairing, completePairing, authenticateDevice, touchDevice, listOwnerDevices,
-  queueOwnerCommand, claimCommand, finishCommand, actOnOwnerCommand, revokeOwnerDevice,
+  queueOwnerCommand, claimCommand, finishCommand, actOnOwnerCommand, revokeOwnerDevice, listOwnerCommands,
 } from "@/lib/hhc/customer-bridge";
 
 test.describe("customer HHC isolation and authorization", () => {
@@ -55,6 +55,10 @@ test.describe("customer HHC isolation and authorization", () => {
       await expect(finishCommand(macB.device.id, read.commandId, true, {})).rejects.toThrow();
       await finishCommand(macA.device.id, read.commandId, true, { output:"A computer only" });
       await expect(finishCommand(macA.device.id, read.commandId, true, {})).rejects.toThrow();
+      const historyA = await listOwnerCommands(a);
+      const historyB = await listOwnerCommands(b);
+      expect(historyA.some(c => c.id === read.commandId && c.status === "succeeded")).toBe(true);
+      expect(historyB.some(c => c.id === read.commandId)).toBe(false);
 
       const restricted = await queueOwnerCommand(a, {deviceId:macA.device.id,tool:"run_command",args:{command:"pwd"}});
       expect(restricted.status).toBe("pending_approval");
@@ -75,6 +79,43 @@ test.describe("customer HHC isolation and authorization", () => {
       await db.delete(users).where(eq(users.id, a));
       await db.delete(users).where(eq(users.id, b));
       await db.delete(users).where(eq(users.id, guest));
+    }
+  });
+
+  test("expired pairing, expired approvals, and revoked queued commands fail closed", async () => {
+    const userId = crypto.randomUUID();
+    await db.insert(users).values({ id:userId, email:"expires-"+userId+"@example.test" });
+    try {
+      const expired = await startPairing(userId);
+      const { createHash } = await import("node:crypto");
+      const hash = createHash("sha256").update(expired.pairingCode).digest("hex");
+      await db.update(hhcPairings).set({ expiresAt:new Date(Date.now() - 3000) })
+        .where(eq(hhcPairings.codeHash, hash));
+      await expect(completePairing(expired.pairingCode, "Too late")).rejects.toThrow(/expired/i);
+
+      const code = await startPairing(userId);
+      const mac = await completePairing(code.pairingCode, "Safe private Mac");
+      await touchDevice(mac.device.id);
+
+      const risky = await queueOwnerCommand(userId, {
+        deviceId:mac.device.id, tool:"run_command", args:{command:"git status"},
+      });
+      expect(risky.status).toBe("pending_approval");
+      await db.update(hhcCommands).set({expiresAt:new Date(Date.now() - 3000)})
+        .where(eq(hhcCommands.id, risky.commandId));
+      await expect(actOnOwnerCommand(userId, risky.commandId, true)).rejects.toThrow();
+      expect(await claimCommand(mac.device.id)).toBeNull();
+
+      const queued = await queueOwnerCommand(userId, {
+        deviceId:mac.device.id, tool:"system_info",args:{},
+      });
+      await revokeOwnerDevice(userId, mac.device.id);
+      expect(await authenticateDevice(mac.device.id,"Bearer "+mac.deviceToken)).toBeNull();
+      expect(await claimCommand(mac.device.id)).toBeNull();
+      const [record] = await db.select().from(hhcCommands).where(eq(hhcCommands.id, queued.commandId));
+      expect(record.status).toBe("denied");
+    } finally {
+      await db.delete(users).where(eq(users.id,userId));
     }
   });
 
