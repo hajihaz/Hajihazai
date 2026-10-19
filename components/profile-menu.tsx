@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut, Shield, User } from "lucide-react";
+import { Laptop, LogOut, Shield, User } from "lucide-react";
 import { signOutAction } from "@/app/actions";
 import ThemeToggle from "./theme-toggle";
 
@@ -51,6 +51,7 @@ export default function ProfileMenu({
             >
               <User className="size-4" /> My Profile
             </a>
+            <a href="/devices" className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"><Laptop className="size-4" /> My Computers</a>
             <a
               href="/admin"
               className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-accent"

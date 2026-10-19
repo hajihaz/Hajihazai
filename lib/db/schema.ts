@@ -935,3 +935,43 @@ export const notificationTargets = pgTable(
 );
 
 export type NotificationTarget = typeof notificationTargets.$inferSelect;
+
+/* Customer-owned HHC devices: never reuse the owner's tunnel identity. */
+export const hhcDevices = pgTable("hhc_customer_devices", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  tokenHash: text("token_hash").notNull(),
+  capabilities: jsonb("capabilities").$type<string[]>().notNull().default([]),
+  lastSeenAt: timestamp("last_seen_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  revokedAt: timestamp("revoked_at", { mode: "date" }),
+}, (t) => [
+  index("hhc_devices_owner_idx").on(t.userId),
+]);
+
+export const hhcPairings = pgTable("hhc_customer_pairings", {
+  codeHash: text("code_hash").primaryKey(),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  usedAt: timestamp("used_at", { mode: "date" }),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (t) => [
+  index("hhc_pairings_owner_idx").on(t.userId),
+]);
+
+export const hhcCommands = pgTable("hhc_customer_commands", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceId: text("device_id").notNull().references(() => hhcDevices.id, { onDelete: "cascade" }),
+  tool: text("tool").notNull(),
+  args: jsonb("args").$type<Record<string, unknown>>().notNull().default({}),
+  status: text("status").notNull().default("pending_approval"),
+  result: jsonb("result").$type<Record<string, unknown> | null>(),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+  expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+  finishedAt: timestamp("finished_at", { mode: "date" }),
+}, (t) => [
+  index("hhc_commands_owner_created_idx").on(t.userId, t.createdAt),
+  index("hhc_commands_agent_queue_idx").on(t.deviceId, t.status, t.expiresAt),
+]);

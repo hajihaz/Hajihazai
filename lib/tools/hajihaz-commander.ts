@@ -1,108 +1,52 @@
 import { z } from "zod";
 import type { Tool } from "./types";
 import { ToolError } from "./types";
-
-const COMMANDER_TUNNEL_ID = process.env.HHJZ_COMMANDER_TUNNEL_ID || "tunnel_6ab41d9403848191af41352aafaf55d2";
-const COMMANDER_MODEL = process.env.HHJZ_COMMANDER_MODEL || "gpt-6-astra";
-const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
+import { queueOwnerCommand } from "@/lib/hhc/customer-bridge";
 
 /**
- * HajiHaz AI -> OpenAI Responses API -> Secure MCP Tunnel -> HajiHaz Commander.
- * The OpenAI API is used only as the MCP-tunnel client; the user's normal
- * HajiHaz model remains responsible for deciding when this tool is needed.
+ * Customer HHC execution is always routed through an account-owned paired
+ * device. No shared MCP tunnel ID, credential or fallback is permitted.
+ * A requested command is an audited queue entry, not proof of execution.
  */
 export const hajihazCommanderTool: Tool = {
   name: "hajihaz_commander",
   description:
-    "Control HajiHaz Commander on Haji's Mac through the secure OpenAI MCP tunnel. Use this for real Mac work: files, terminal, processes, apps, UI automation, screenshots, Git, PDFs, documents, and other Commander tools. Give a precise natural-language instruction describing the work to perform and verify.",
+    "Use the signed-in user's own paired HHC computer, never any other Mac. For information choose tool=system_info (empty arguments); for workspace tasks choose git_status, list_directory or read_file with explicit paths. run_command needs account approval AND local Mac approval. Commands may be queued; do not claim execution until a confirmed result is received. Require deviceId when multiple computers are paired.",
   inputSchema: z.object({
-    instruction: z
-      .string()
-      .min(1, "instruction is required")
-      .max(12_000, "instruction is too long"),
+    instruction: z.string().min(1).max(12_000),
+    deviceId: z.string().uuid().optional(),
+    tool: z.enum(["system_info", "git_status", "list_directory", "read_file", "run_command"]).optional(),
+    arguments: z.record(z.string(), z.unknown()).optional(),
   }),
-  async execute(_userId, input) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
+  async execute(userId, input) {
+    const { instruction, deviceId, tool, arguments: args } = input as {
+      instruction: string;
+      deviceId?: string;
+      tool?: string;
+      arguments?: Record<string, unknown>;
+    };
+    // Only simple, non-destructive informational intents may be inferred.
+    const operation = tool || (/\b(system info|system information|mac status|computer status|mac specs)\b/i.test(instruction)
+      ? "system_info"
+      : undefined);
+    if (!operation) {
       throw new ToolError(
-        "HajiHaz Commander is configured, but HajiHaz AI is missing OPENAI_API_KEY for the Secure MCP Tunnel bridge.",
-        "execution_error",
+        "Select a concrete computer operation and its required arguments. No computer was accessed.",
+        "invalid_input",
       );
     }
-
-    const instruction = (input as { instruction?: unknown })?.instruction;
-    if (typeof instruction !== "string" || !instruction.trim()) {
-      throw new ToolError("input.instruction must be a non-empty string", "invalid_input");
+    try {
+      const queued = await queueOwnerCommand(userId, { deviceId, tool: operation, args: args ?? {} });
+      return {
+        success: true,
+        executed: false,
+        ...queued,
+        message: queued.status === "pending_approval"
+          ? "Awaiting account approval in Devices; the Mac must also approve locally."
+          : "Sent only to your paired device. Check Devices for a verified result.",
+      };
+    } catch (error) {
+      throw new ToolError(error instanceof Error ? error.message : "Device command denied", "execution_error");
     }
-
-    console.info("[commander-bridge] starting Responses API MCP request", {
-      model: COMMANDER_MODEL,
-      tunnelId: COMMANDER_TUNNEL_ID,
-    });
-    const response = await fetch(OPENAI_RESPONSES_URL, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: COMMANDER_MODEL,
-        input: [
-          {
-            role: "developer",
-            content:
-              "You are the HajiHaz Commander execution worker. Perform the user's requested Mac operation using the private HajiHaz Commander MCP server. Use the available Commander tools directly; do not merely explain how to do the task. Verify important operations and report the concrete result. Respect any approval/error response from the Commander instead of bypassing it.",
-          },
-          { role: "user", content: instruction },
-        ],
-        tools: [
-          {
-            type: "mcp",
-            server_label: "hajihaz_commander",
-            tunnel_id: COMMANDER_TUNNEL_ID,
-            require_approval: "never",
-          },
-        ],
-        // An explicit Commander request is already an execution request.
-        // Force the nested Responses turn to use a tool instead of replying
-        // with instructions for the user to operate the Mac manually.
-        tool_choice: "required",
-      }),
-      cache: "no-store",
-    });
-
-    console.info("[commander-bridge] Responses API HTTP status", response.status);
-    const data = (await response.json()) as {
-      output_text?: string;
-      error?: { message?: string };
-      output?: Array<{ type?: string; name?: string; error?: string; output?: string }>;
-    };
-
-    if (!response.ok) {
-      console.error("[commander-bridge] Responses API error", {
-        status: response.status,
-        message: data.error?.message ?? "unknown error",
-      });
-      throw new ToolError(
-        data.error?.message || `OpenAI Commander bridge failed with HTTP ${response.status}`,
-        "execution_error",
-      );
-    }
-
-    const text = typeof data.output_text === "string" ? data.output_text.trim() : "";
-    if (text) return { success: true, tunnelId: COMMANDER_TUNNEL_ID, result: text };
-
-    const errors = (data.output || [])
-      .filter((item) => item.type === "mcp_call" && item.error)
-      .map((item) => `${item.name || "MCP tool"}: ${item.error}`);
-    if (errors.length) {
-      throw new ToolError(errors.join("; "), "execution_error");
-    }
-
-    return {
-      success: true,
-      tunnelId: COMMANDER_TUNNEL_ID,
-      result: "Commander completed the request but returned no textual summary.",
-    };
   },
 };
