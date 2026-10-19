@@ -112,9 +112,44 @@ export async function listOwnerCommands(userId: string) {
   const rows = await db.select().from(hhcCommands).where(eq(hhcCommands.userId, userId))
     .orderBy(desc(hhcCommands.createdAt)).limit(40);
   return rows.map(c => ({
-    id: c.id, deviceId: c.deviceId, tool: c.tool, args: c.args, status: c.status,
+    id: c.id, deviceId: c.deviceId, tool: c.tool, args: c.args,
+    status: c.expiresAt.getTime() <= Date.now() && ["pending_approval", "queued", "running"].includes(c.status)
+      ? "expired" : c.status,
     result: c.result, createdAt: c.createdAt.toISOString(), expiresAt: c.expiresAt.toISOString(),
   }));
+}
+
+/** Return a single authenticated owner's command, never another account's. */
+export async function getOwnerCommand(userId: string, commandId: string) {
+  await assertRealUser(userId);
+  const [c] = await db.select().from(hhcCommands).where(and(
+    eq(hhcCommands.id, commandId), eq(hhcCommands.userId, userId),
+  )).limit(1);
+  if (!c) return null;
+  const expired = c.expiresAt.getTime() <= Date.now() &&
+    (c.status === "pending_approval" || c.status === "queued" || c.status === "running");
+  return {
+    id: c.id, deviceId: c.deviceId, tool: c.tool, args: c.args,
+    status: expired ? "expired" : c.status,
+    result: c.result, createdAt: c.createdAt.toISOString(),
+    expiresAt: c.expiresAt.toISOString(), finishedAt: c.finishedAt?.toISOString() ?? null,
+  };
+}
+
+/** Cancellation can prevent a queued command only. A running OS action
+ * may already have changed the customer's Mac and cannot be rolled back. */
+export async function cancelOwnerCommand(userId: string, commandId: string) {
+  requirePilot();
+  await assertRealUser(userId);
+  const [c] = await db.update(hhcCommands).set({
+    status: "cancelled", finishedAt: new Date(),
+  }).where(and(
+    eq(hhcCommands.id, commandId), eq(hhcCommands.userId, userId),
+    inArray(hhcCommands.status, ["pending_approval", "queued"]),
+    gt(hhcCommands.expiresAt, new Date()),
+  )).returning({ id: hhcCommands.id });
+  if (!c) throw Error("Request no longer cancellable; it may already be running");
+  return { id: c.id, status: "cancelled" };
 }
 
 export async function actOnOwnerCommand(userId: string, commandId: string, approve: boolean) {

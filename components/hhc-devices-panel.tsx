@@ -172,9 +172,12 @@ export default function HhcDevicesPanel() {
           {pilotEnabled && c.status==="pending_approval" && new Date(c.expiresAt)>new Date() &&
           <div className="flex gap-2"><button disabled={working} onClick={()=>void request("/api/hhc/commands/"+c.id,"POST",{action:"approve"})} className="rounded-lg bg-primary px-3 py-1 text-xs text-primary-foreground">Approve</button>
           <button disabled={working} onClick={()=>void request("/api/hhc/commands/"+c.id,"POST",{action:"deny"})} className="rounded-lg border px-3 py-1 text-xs">Deny</button></div>}
+          {pilotEnabled && (c.status==="queued" || c.status==="pending_approval") && new Date(c.expiresAt)>new Date() &&
+          <button disabled={working} onClick={()=>void request("/api/hhc/commands/"+c.id,"POST",{action:"cancel"})} className="rounded-lg border px-3 py-1 text-xs">Cancel before execution</button>}
         </div>
         <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted p-2 text-xs" aria-label="Full command arguments">{JSON.stringify(c.args,null,2)}</pre>
         {c.result && <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-all rounded-md bg-muted p-2 text-xs">{JSON.stringify(c.result,null,2)}</pre>}
+        {(c.status==="failed" || c.status==="expired") && <p className="mt-2 text-xs text-muted-foreground">A failed request is never replayed automatically. Send a new instruction to retry.</p>}
       </div>)}</div>
     </section>}
 

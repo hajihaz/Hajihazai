@@ -675,6 +675,60 @@ export async function POST(req: Request) {
     });
   }
 
+  // HHC is an asynchronous real-world action, not an LLM answer.
+  // Never let a model hallucinate completion after merely queuing a request.
+  const hhcQueued = tool.toolRequested?.tool === "hajihaz_commander"
+    && tool.toolExecuted && tool.toolResult
+    && typeof tool.toolResult === "object"
+    && "commandId" in tool.toolResult
+    ? tool.toolResult as { commandId: string; status: string; deviceName: string }
+    : null;
+  if (hhcQueued && /^[0-9a-f-]{36}$/i.test(hhcQueued.commandId)) {
+    const initial = hhcQueued.status === "pending_approval"
+      ? "Your computer request is waiting for your approval. Review it below; your Mac will ask for local approval too."
+      : "Request queued for your own connected Mac. It has **not** executed yet. I'll show the verified result below when the device responds.";
+    const metadata = {
+      hhcCommandId: hhcQueued.commandId,
+      hhcCommandStatus: hhcQueued.status,
+      hhcDeviceName: hhcQueued.deviceName,
+    };
+    const body = new ReadableStream({
+      async start(controller) {
+        controller.enqueue(sse({ t: "chunk", text: initial }));
+        let assistantMsgId: string | null = null;
+        let title = convo.title;
+        if (!debug) {
+          try {
+            const saved = await addMessage({
+              conversationId, role: "assistant", content: initial,
+              modelId: "hajihaz-commander-queued",
+              metadata: { ...metadata, ...retrievalMeta },
+            });
+            assistantMsgId = saved.id;
+            if (convo.title === "New chat") {
+              title = message.trim().slice(0, 60);
+              await setConversationTitle(session.user.id, conversationId, title);
+            }
+          } catch (error) {
+            console.error("[chat] HHC queued response persistence failed", error);
+          }
+        }
+        controller.enqueue(sse({
+          t: "done", conversationId, userMessageId: userMsg?.id ?? null,
+          assistantMessageId: assistantMsgId, title,
+          modelId: "hajihaz-commander-queued", meta: metadata, clarify: null,
+        }));
+        controller.close();
+      },
+    });
+    return new Response(body, { headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "private, no-store",
+      "X-Accel-Buffering": "no",
+      "X-Request-ID": requestId,
+    } });
+  }
+
   const writeIntentBlock =
     hasWriteIntent && !writePermitted
       ? 'SYSTEM NOTICE: This user does NOT have permission to update system knowledge. If they ask you to save, remember, update, or store any information to your knowledge base or memory, respond with: "You do not have permission to update system knowledge. Please contact an admin." Do not pretend to save anything.'

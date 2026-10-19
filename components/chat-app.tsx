@@ -24,6 +24,9 @@ type LevelOption = {
   available?: boolean;
 };
 export type MsgMeta = {
+  hhcCommandId?: string | null;
+  hhcCommandStatus?: string | null;
+  hhcDeviceName?: string | null;
   provider?: string;
   model?: string;
   requestedModelId?: string | null;

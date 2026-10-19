@@ -24,6 +24,7 @@ import {
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Msg } from "./chat-app";
+import HhcJobStatus from "./hhc-job-status";
 import {
   ProfileCard,
   isProfileCardQuery,
@@ -262,6 +263,13 @@ const Chat = memo(function Chat({
                           </div>
                         )}
                       </div>
+
+                      {!isUser && !m.streaming && m.meta?.hhcCommandId && (
+                        <HhcJobStatus
+                          commandId={m.meta.hhcCommandId}
+                          deviceName={m.meta.hhcDeviceName}
+                        />
+                      )}
 
                       {/* Clarification quick actions (Phase 7) — pick an area to disambiguate. */}
                       {!isUser &&

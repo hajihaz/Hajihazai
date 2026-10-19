@@ -4,7 +4,7 @@ import { hhcCommands, hhcDevices, hhcPairings, users } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import {
   startPairing, completePairing, authenticateDevice, touchDevice, listOwnerDevices,
-  queueOwnerCommand, claimCommand, finishCommand, actOnOwnerCommand, revokeOwnerDevice, listOwnerCommands,
+  queueOwnerCommand, claimCommand, finishCommand, actOnOwnerCommand, revokeOwnerDevice, listOwnerCommands, getOwnerCommand, cancelOwnerCommand,
 } from "@/lib/hhc/customer-bridge";
 
 test.describe("customer HHC isolation and authorization", () => {
@@ -55,11 +55,20 @@ test.describe("customer HHC isolation and authorization", () => {
       await expect(finishCommand(macB.device.id, read.commandId, true, {})).rejects.toThrow();
       await finishCommand(macA.device.id, read.commandId, true, { output:"A computer only" });
       await expect(finishCommand(macA.device.id, read.commandId, true, {})).rejects.toThrow();
+      expect((await getOwnerCommand(a, read.commandId))?.result).toEqual({ output:"A computer only" });
+      expect(await getOwnerCommand(b, read.commandId)).toBeNull();
+      await expect(cancelOwnerCommand(a, read.commandId)).rejects.toThrow(/no longer cancellable/i);
       const historyA = await listOwnerCommands(a);
       const historyB = await listOwnerCommands(b);
       expect(historyA.some(c => c.id === read.commandId && c.status === "succeeded")).toBe(true);
       expect(historyB.some(c => c.id === read.commandId)).toBe(false);
 
+      const cancelled = await queueOwnerCommand(a, {deviceId:macA.device.id,tool:"run_command",args:{command:"git status"}});
+      await expect(cancelOwnerCommand(b, cancelled.commandId)).rejects.toThrow();
+      expect((await cancelOwnerCommand(a, cancelled.commandId)).status).toBe("cancelled");
+      expect((await getOwnerCommand(a, cancelled.commandId))?.status).toBe("cancelled");
+      await expect(cancelOwnerCommand(a, cancelled.commandId)).rejects.toThrow();
+      expect(await claimCommand(macA.device.id)).toBeNull();
       const restricted = await queueOwnerCommand(a, {deviceId:macA.device.id,tool:"run_command",args:{command:"pwd"}});
       expect(restricted.status).toBe("pending_approval");
       expect(await claimCommand(macA.device.id)).toBeNull();
@@ -128,5 +137,12 @@ test.describe("customer HHC isolation and authorization", () => {
     expect(bad.status()).toBe(403);
     const unknown = await request.get("/api/hhc/agent/00000000-0000-4000-8000-000000000001", { headers:{authorization:"Bearer invalid"} });
     expect(unknown.status()).toBe(401);
+    const id = "00000000-0000-4000-8000-000000000001";
+    const detail = await request.get("/api/hhc/commands/" + id,{headers:{cookie:""}});
+    expect(detail.status()).toBe(401);
+    const cancel = await request.post("/api/hhc/commands/" + id,{
+      headers:{cookie:""}, data:{action:"cancel"},
+    });
+    expect(cancel.status()).toBe(401);
   });
 });
