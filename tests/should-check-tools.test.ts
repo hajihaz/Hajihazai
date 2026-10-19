@@ -32,6 +32,14 @@ describe("shouldCheckTools (fast path)", () => {
     expect(shouldCheckTools("search my notes for the policy")).toBe(true);
   });
 
+  it("detects customer-computer intent in natural language without saying HHC", () => {
+    for (const q of ["show my Mac system info", "check my computer status",
+      "read a file on my computer", "run git status on my laptop",
+      "list files on my Mac", "inspect my terminal"]) {
+      expect(shouldCheckTools(q), q).toBe(true);
+    }
+  });
+
   it("returns false for empty / non-string input", () => {
     expect(shouldCheckTools("")).toBe(false);
     expect(shouldCheckTools("   ")).toBe(false);

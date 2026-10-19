@@ -150,7 +150,8 @@ type SelectFn = (
 const CALCULATOR_INTENT = /\b(calculate|computed?|compute|what(?:'s| is)\b.*(?:\d.*[+\-*/×x].*\d|\d.*\b(?:plus|minus|times|multiplied|divided by)\b)|how much is\b.*\d.*[+\-*/×x].*\d)\b/i;
 const CALCULATOR_EXPRESSION = /[\d().+\-*/×x\s]+/g;
 
-const COMMANDER_INTENT = /\bhajihaz\s+commander\b|\b(?:run|execute|open|create|delete|move|read|write|check|inspect|control)\b.{0,100}\b(?:my|the)\s+mac\b/i;
+// Only deterministic read-only device status is safe to infer from free text.
+const LOCAL_SYSTEM_INTENT = /\b(?:show|check|tell|what(?:'s| is)|get|inspect)\b.{0,90}\b(?:my|the)\s+(?:mac|computer|laptop)(?:'s)?\s+(?:system\s+)?(?:status|specs|information|info)\b|\b(?:my|the)\s+(?:mac|computer|laptop)\s+(?:system\s+)?(?:status|specs|information|info)\b/i;
 
 function extractDeterministicCalculatorExpression(message: string): string | null {
   if (!CALCULATOR_INTENT.test(message)) return null;
@@ -241,20 +242,13 @@ export async function selectAndRunTool(
   const deterministicExpression = !opts.selectTools
     ? extractDeterministicCalculatorExpression(userMessage)
     : null;
-  if (!opts.selectTools && COMMANDER_INTENT.test(userMessage)) {
-    // Explicit Commander requests are deterministic: do not leave the decision
-    // to a second model, because that can silently decline a real Mac operation.
-    console.info("[tool-calling] explicit Commander intent matched");
-    const result = await finishToolExecution(
-      userId,
-      { tool: "hajihaz_commander", input: { instruction: userMessage } },
-      opts,
-    );
-    console.info("[tool-calling] Commander execution finished", {
-      status: result.run?.status,
-      success: result.toolExecuted,
-    });
-    return result;
+  if (!opts.selectTools && LOCAL_SYSTEM_INTENT.test(userMessage)) {
+    // No device ID is assumed: queueOwnerCommand enforces account ownership,
+    // online presence, and ambiguity rejection for multiple paired devices.
+    return finishToolExecution(userId, {
+      tool: "hajihaz_commander",
+      input: { instruction: userMessage, tool: "system_info", arguments: {} },
+    }, opts);
   }
   if (deterministicExpression) {
     // Arithmetic is deterministic: use the local calculator directly instead

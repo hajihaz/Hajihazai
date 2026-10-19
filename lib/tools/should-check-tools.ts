@@ -36,7 +36,9 @@ const TOOL_SIGNALS: RegExp[] = [
   /\b(document|handbook|policy|knowledge base|in my (docs|files|notes)|according to (my|the) )\b/,
   // HajiHaz Commander / Mac execution intent
   /\bhajihaz\s+commander\b/,
-  /\b(?:run|execute|open|create|delete|move|read|write|check|inspect|control)\b.{0,80}\b(?:my|the)\s+mac\b/i,
+  /\b(?:run|execute|open|create|delete|move|read|write|check|inspect|control|show|get|list)\b.{0,100}\b(?:my|the)\s+(?:mac|computer|laptop|terminal|desktop)\b/i,
+  /\b(?:my|the)\s+(?:mac|computer|laptop)\s+(?:system\s+)?(?:status|specs|information|info)\b/i,
+  /\b(?:in|on|from)\s+my\s+(?:mac|computer|laptop|desktop|terminal)\b/i,
   // explicit search intent
   /\bsearch\b/,
 ];

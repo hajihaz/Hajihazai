@@ -29,6 +29,16 @@ describe("validateToolInput (zod)", () => {
   });
 });
 
+describe("natural customer Mac prompt handling", () => {
+  it("routes explicit safe Mac system status to HHC without requiring a tool dropdown", async () => {
+    const r = await selectAndRunTool("test-user", "show my Mac system info");
+    expect(r.toolRequested?.tool).toBe("hajihaz_commander");
+    // No pilot enablement/no device => fail closed, never pretend execution.
+    expect(r.toolExecuted).toBe(false);
+    expect(r.run?.status).toBe("error");
+  });
+});
+
 describe("withTimeout", () => {
   it("resolves a fast promise", async () => {
     await expect(withTimeout(Promise.resolve(42), 1000)).resolves.toBe(42);

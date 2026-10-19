@@ -69,3 +69,23 @@ connector Terminal. To permanently revoke access, select Revoke in My Computers.
 - Production release is gated on verified two-user isolation, complete tests,
   controlled second-device acceptance and any required Apple signing/notarization.
   A simulated test is not a genuine second physical device.
+
+
+## Auto reconnect and prompt-first experience
+
+For an **already enrolled** Mac, the Devices page recognizes the customer-owned
+device on page load. One online device is selected implicitly. Chat prompts such
+as "show my Mac system info" route directly to the authorized HHC tool without a
+manual tool switch; broader computer operations use the native AI tool selector.
+Results must never be claimed as executed until a signed-in customer's HHC agent
+reports an actual command result.
+
+The Mac owner can optionally run customer:autostart:install from the HHC source
+workspace on their OWN Mac after its first authorized enrollment. This adds two
+customer-only launchd jobs, allowing the existing device to reconnect on
+subsequent macOS logins without a new pairing code. Initial Mac installation
+and account authorization are still mandatory; web login cannot bypass OS
+permissions or install an agent on someone else's device.
+
+The production feature flag remains disabled until approved physical
+second-device acceptance; do not turn it on merely because UI tests pass.
