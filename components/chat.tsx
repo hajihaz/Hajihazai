@@ -25,6 +25,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Msg } from "./chat-app";
 import HhcJobStatus from "./hhc-job-status";
+import ChatCodeBlock from "./chat-code-block";
 import {
   ProfileCard,
   isProfileCardQuery,
@@ -254,7 +255,7 @@ const Chat = memo(function Chat({
                           </span>
                         ) : (
                           <div className="prose prose-sm dark:prose-invert max-w-none prose-p:leading-7 prose-pre:rounded-lg prose-pre:border prose-pre:bg-background/60 prose-code:rounded prose-code:bg-background/60 prose-code:px-1 prose-code:text-[0.8em]">
-                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]} components={{ pre: ChatCodeBlock }}>
                               {m.content}
                             </ReactMarkdown>
                             {m.streaming && (

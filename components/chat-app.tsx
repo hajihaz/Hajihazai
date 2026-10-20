@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Bug, Download, Folder, GitFork, Menu, PlusCircle, Share2, Paperclip, X, PanelLeftClose, PanelLeftOpen, MoreHorizontal, FileText, SquarePen } from "lucide-react";
+import { Bug, Download, Folder, GitFork, Menu, PlusCircle, Share2, Paperclip, X, PanelLeftClose, PanelLeftOpen, MoreHorizontal, FileText, SquarePen, Search } from "lucide-react";
 import Sidebar from "./sidebar";
+import ChatCommandMenu from "./chat-command-menu";
 import Chat from "./chat";
 import Modal from "./modal";
 import ProfileMenu from "./profile-menu";
@@ -144,6 +145,7 @@ export default function ChatApp({
   const [clientReady, setClientReady] = useState(false);
   const [desktopSidebarOpen, setDesktopSidebarOpen] = useState(true);
   const [moreOpen, setMoreOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
   const [projects, setProjects] = useState<Proj[]>(initialProjects);
   const projectLoadSeqRef = useRef(0);
   // Prevent delayed chat history responses from replacing a newly opened chat.
@@ -201,23 +203,26 @@ export default function ChatApp({
     abortRef.current = null;
   }, []);
 
-  // Keyboard shortcuts
+  // Search/navigation shortcuts work without opening the sidebar.
+  // Plain "/" focuses the composer only when the user isn't typing elsewhere.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
+      if (e.defaultPrevented || e.isComposing) return;
+      const element = e.target as HTMLElement | null;
+      const typing = element?.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(element?.tagName ?? "");
       const meta = e.metaKey || e.ctrlKey;
+      if (!meta && e.key === "/" && !e.altKey && !e.shiftKey && !typing && !commandOpen) {
+        e.preventDefault();
+        document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus();
+        return;
+      }
       if (!meta) return;
 
-      if (e.key === "k") {
+      if (e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setSidebarOpen(true);
-        setDesktopSidebarOpen(true);
-        // rAF x2 to wait for sidebar slide-in before focusing
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            sidebarSearchRef.current?.focus();
-          }),
-        );
-      } else if (e.key === "n") {
+        setMoreOpen(false);
+        setCommandOpen(true);
+      } else if (e.key.toLowerCase() === "n") {
         const tag = (e.target as HTMLElement).tagName;
         if (tag === "INPUT" || tag === "TEXTAREA") return;
         e.preventDefault();
@@ -236,7 +241,7 @@ export default function ChatApp({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [commandOpen]);
 
   useEffect(() => {
     try { if (localStorage.getItem("hh-desktop-sidebar") === "closed") setDesktopSidebarOpen(false); } catch { /* private browsing */ }
@@ -1133,6 +1138,9 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
             </select>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            <button type="button" onClick={() => setCommandOpen(true)} title="Search chats and actions (⌘K)" aria-label="Search chats and actions" className="hidden size-10 shrink-0 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground lg:flex">
+              <Search className="size-[19px]" />
+            </button>
             <div className="relative">
               <button type="button" onClick={() => setMoreOpen((value) => !value)} aria-label="More chat tools" aria-expanded={moreOpen} aria-haspopup="menu" title="More chat tools" className="flex size-10 items-center justify-center rounded-xl text-muted-foreground hover:bg-accent hover:text-foreground"><MoreHorizontal className="size-5" /></button>
               {moreOpen ? <>
@@ -1145,6 +1153,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
                     </select>
                   </label>
                   {[
+                    { label: "Search chats and actions", icon: <Search className="size-4" />, run: () => setCommandOpen(true), visible: true },
                     { label: "File library", icon: <Paperclip className="size-4" />, run: () => setFileLibraryOpen(true), visible: true },
                     { label: "Open canvas", icon: <FileText className="size-4" />, run: () => setCanvasOpen(true), visible: messages.length > 0 },
                     { label: "Share conversation", icon: <Share2 className="size-4" />, run: () => void shareConversation(), visible: !!activeId && messages.length > 0 },
@@ -1165,7 +1174,7 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
                       </div>
                     </details>
                   )}
-                  <p className="border-t px-3 py-2 text-[11px] text-muted-foreground">⌘K Search · ⌘B Sidebar · ⌘N New chat</p>
+                  <p className="border-t px-3 py-2 text-[11px] text-muted-foreground">⌘K Quick search · ⌘B Sidebar · ⌘N New chat · / Write</p>
                 </div>
               </> : null}
             </div>
@@ -1234,6 +1243,19 @@ h1{font-size:1.4rem;margin-bottom:24px;border-bottom:1px solid #e5e7eb;padding-b
         />
       </div>
 
+      <ChatCommandMenu
+        open={commandOpen}
+        onOpenChange={setCommandOpen}
+        conversations={conversations}
+        projects={projects}
+        onNewChat={() => { void newChat(activeProject?.id); }}
+        onOpenChat={(id) => { void openConversation(id); }}
+        onOpenProject={(id) => { void switchProject(id); }}
+        onFiles={() => setFileLibraryOpen(true)}
+        onImages={() => setImageGeneratorOpen(true)}
+        onComputer={() => { window.location.assign("/devices"); }}
+        onFocusComposer={() => { requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message"]')?.focus()); }}
+      />
       <GuestAuthGate open={isGuest && guestGateOpen} />
 
       {/* Delete confirmation */}
