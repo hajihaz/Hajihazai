@@ -46,6 +46,7 @@ export default function HhcDevicesPanel() {
   const effectiveId = online.length === 1 ? online[0].id :
     online.some(d => d.id === selectedId) ? selectedId : "";
   const connected = online.length > 0 && pilotEnabled;
+  const pilotPaused = !pilotEnabled && active.length > 0;
 
   async function request(url: string, method: "POST" | "DELETE", payload?: Record<string, unknown>) {
     setWorking(true);
@@ -87,7 +88,7 @@ export default function HhcDevicesPanel() {
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">My Computer</h1>
         <p className="mt-1 text-sm text-muted-foreground">Ask HajiHaz AI to work with your own Mac.</p>
       </div>
-      <button onClick={() => void refresh()} aria-label="Refresh connection" className="rounded-full border p-2.5 hover:bg-accent"><RefreshCw className="size-4"/></button>
+      <button onClick={() => void refresh()} aria-label="Refresh connection" className="flex min-h-11 min-w-11 items-center justify-center rounded-full border p-2.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 hover:bg-accent"><RefreshCw className="size-4"/></button>
     </header>
 
     <section className="rounded-2xl border bg-card p-5" aria-label="Computer connection status">
@@ -95,13 +96,14 @@ export default function HhcDevicesPanel() {
         <div className="rounded-xl bg-muted p-3"><Laptop className="size-6"/></div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-semibold">{!ready ? "Checking your computer…" : connected ? "Your Mac is connected" : active.length ? "Your Mac is offline" : "No computer connected"}</h2>
+            <h2 role="status" aria-live="polite" className="font-semibold">{!ready ? "Checking your computer…" : connected ? "Your Mac is connected" : pilotPaused ? "Customer HHC pilot is paused" : active.length ? "Your Mac is offline" : "No computer connected"}</h2>
             {connected ? <CheckCircle2 className="size-4 text-emerald-600"/> : <WifiOff className="size-4 text-muted-foreground"/>}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {connected ? "HHC is available automatically whenever this authorized Mac is running."
-              : active.length ? "Start the installed HHC connector on your Mac. You do not need to pair it again."
-              : "The first connection requires installing and authorizing HHC on your own Mac. After that, it reconnects automatically."}
+            {connected ? "HHC is available automatically on your authorized Mac. File and terminal actions still require approval."
+              : pilotPaused ? "Your Mac remains registered, but the private pilot is disabled. Computer execution cannot start."
+              : active.length ? "Your Mac is already authorized but has not checked in recently. Start its HHC connector; no new pairing code is needed."
+              : "The first connection requires the owner of that Mac to install and authorize HHC. Future logins can reconnect automatically."}
           </p>
         </div>
       </div>
@@ -122,7 +124,7 @@ export default function HhcDevicesPanel() {
       <p className="mt-2 text-sm text-muted-foreground">Only once per Mac. Install the HHC companion on that computer, authorize it to use this account, then enable its automatic startup. No pairing again after future logins.</p>
       {!pilotEnabled && <p className="mt-3 rounded-lg bg-muted p-3 text-sm text-muted-foreground" role="status">Customer HHC is being verified in a private Mac pilot. First-time connections are not yet enabled for public accounts.</p>}
       {pilotEnabled && <>
-        <button onClick={() => setSetupOpen(v => !v)} className="mt-3 rounded-lg border px-4 py-2 text-sm font-medium hover:bg-accent">{setupOpen ? "Hide first-time setup" : "Set up HHC on my Mac"}</button>
+        <button onClick={() => setSetupOpen(v => !v)} aria-expanded={setupOpen} className="mt-3 min-h-11 rounded-lg border px-4 py-2 text-sm font-medium focus-visible:outline focus-visible:outline-2 hover:bg-accent">{setupOpen ? "Hide first-time setup" : "Set up HHC on my Mac"}</button>
         {setupOpen && <div className="mt-3 space-y-3 rounded-xl bg-muted p-4">
           <p className="text-sm">On your own Mac, install the HHC companion first. A secure one-time authorization connects it to this account.</p>
           <button disabled={working} onClick={() => void createLink()} className="rounded-lg bg-primary px-3 py-2 text-sm text-primary-foreground disabled:opacity-50">Create one-time connection key</button>
@@ -134,6 +136,19 @@ export default function HhcDevicesPanel() {
       </>}
     </section>}
 
+    {!!active.length && !connected && <section className="rounded-2xl border bg-card p-5" aria-label="Computer connection troubleshooting">
+      <h2 className="font-semibold">Connection help</h2>
+      <p className="mt-2 text-sm text-muted-foreground">{pilotPaused
+        ? "The private pilot is locked by the platform. Reinstalling or pairing will not bypass this restriction."
+        : "Your Mac may be asleep, offline or not running the customer connector. You do not need to pair again."}</p>
+      <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
+        <li>Wake and sign in on your <strong>own previously authorized Mac</strong>.</li>
+        <li>Verify internet access and the HHC companion on that Mac.</li>
+        <li>On that Mac, run <code className="break-all rounded bg-muted px-1">npm run customer:doctor</code> to diagnose without executing commands.</li>
+        <li>Check optional startup with <code className="break-all rounded bg-muted px-1">npm run customer:autostart:status</code>.</li>
+      </ol>
+      <p className="mt-3 text-xs text-muted-foreground">Do not share credentials or pairing codes. A revoked Mac requires fresh authorization from its owner.</p>
+    </section>}
     {!!active.length && <section className="rounded-2xl border bg-card p-5">
       <h2 className="mb-3 text-sm font-semibold">Your authorized devices</h2>
       <div className="space-y-3">{active.map(d => <div key={d.id} className="flex items-center justify-between gap-3">
