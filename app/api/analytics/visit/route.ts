@@ -4,12 +4,12 @@ import { db } from "@/lib/db";
 import { productTrafficEvents } from "@/lib/db/schema";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
+import {analyticsProductPath,analyticsProductAction} from "@/lib/analytics-traffic-path";
 
 export const runtime = "nodejs";
 
 const ID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$/;
 const KINDS = new Set(["visit", "view", "tap", "active_time"]);
-const BLOCKED = /^\/(?:admin|api|settings|account|billing|payment|vault)(?:\/|$)/i;
 
 /** Strictly voluntary, first-party usage telemetry; no chat contents or form values. */
 export async function POST(request: Request) {
@@ -32,8 +32,8 @@ export async function POST(request: Request) {
       typeof sessionId !== "string" || !ID.test(sessionId) ||
       typeof kind !== "string" || !KINDS.has(kind) ||
       typeof path !== "string" || path.length < 1 || path.length > 300 ||
-      !path.startsWith("/") || path.includes("?") || path.includes("#") || BLOCKED.test(path) ||
-      (target !== undefined && target !== null && (typeof target !== "string" || target.length > 80 || !/^[a-zA-Z0-9/_:-]*$/.test(target))) ||
+      analyticsProductPath(path) !== path ||
+      (target !== undefined && target !== null && (typeof target !== "string" || target.length > 80 || analyticsProductAction(target) !== target)) ||
       (durationSeconds !== undefined && durationSeconds !== null && (!Number.isInteger(durationSeconds) || durationSeconds < 0 || durationSeconds > 180))) {
     return new Response("Invalid event", { status: 400 });
   }

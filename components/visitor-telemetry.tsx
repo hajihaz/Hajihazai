@@ -2,18 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import {analyticsProductPath,analyticsProductAction} from "@/lib/analytics-traffic-path";
 
 const CHOICE = "hhai-usage-consent-v1";
 const VISITOR = "hhai-usage-visitor-v1";
 const SESSION = "hhai-usage-session-v1";
 const SESSION_IDLE = 30 * 60 * 1000;
 
-function safePath(path: string) {
-  const clean = path.split(/[?#]/)[0].replace(/[0-9a-f]{8}-[0-9a-f-]{27,}/gi, ":id");
-  if (!clean.startsWith("/") || clean.length > 300) return null;
-  if (/^\/(admin|api|settings|account|billing|payment|vault)(\/|$)/i.test(clean)) return null;
-  return clean;
-}
+const safePath=analyticsProductPath;
 
 function ids() {
   let visitorId = localStorage.getItem(VISITOR);
@@ -83,14 +79,17 @@ export default function VisitorTelemetry() {
       const el = event.target.closest("a,button,[data-analytics]");
       if (!el || el.closest("form,[data-analytics-consent]") || Date.now() - lastTap < 400) return;
       lastTap = Date.now();
-      let target = el.getAttribute("data-analytics") || "";
-      if (!target && el instanceof HTMLAnchorElement) {
+      let target='button';
+      if (el instanceof HTMLAnchorElement) {
         try {
           const url = new URL(el.href);
-          target = url.origin === location.origin ? "link:" + (safePath(url.pathname) || "other") : "external-link";
-        } catch { target = "link"; }
+          if (url.origin !== location.origin) target = 'external-link';
+          else if (url.pathname.startsWith('/projects/')) target = 'project-link';
+          else if (url.pathname.startsWith('/tools')) target = 'tool-link';
+          else target = 'nav';
+        } catch { target = 'button'; }
       }
-      target = (target || "button").replace(/[^a-zA-Z0-9/_:-]/g, "_").slice(0, 80);
+      target = analyticsProductAction(target);
       send("tap", target);
     };
     document.addEventListener("click", onClick, true);
