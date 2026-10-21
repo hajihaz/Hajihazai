@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Activity, ArrowLeft, BookOpenText, Eye, EyeOff, LayoutDashboard, LogOut, ShieldCheck, UsersRound } from "lucide-react";
+import VisitorTrafficPanel from "@/components/admin-visitor-traffic";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -22,13 +23,14 @@ type DataTab =
   | "health"
   | "knowledge-gaps"
   | "query-tester"
-  | "quality";
+  | "quality"
+  | "traffic";
 
 const ADMIN_NAV_GROUPS: Array<{ title: string; icon: typeof LayoutDashboard; entries: Array<{ tab: DataTab; label: string }> }> = [
   { title: "Overview", icon: LayoutDashboard, entries: [{ tab: "overview", label: "Dashboard" }, { tab: "health", label: "System health" }] },
   { title: "People & access", icon: UsersRound, entries: [{ tab: "users", label: "Users" }, { tab: "admins", label: "Admin accounts" }, { tab: "blocked-emails", label: "Blocked emails" }, { tab: "knowledge-permissions", label: "Knowledge permissions" }] },
   { title: "Intelligence", icon: BookOpenText, entries: [{ tab: "knowledge", label: "Knowledge base" }, { tab: "documents", label: "Documents" }, { tab: "brains", label: "Brains" }, { tab: "projects", label: "Projects" }, { tab: "query-tester", label: "Query tester" }, { tab: "knowledge-gaps", label: "Knowledge gaps" }] },
-  { title: "Operations", icon: ShieldCheck, entries: [{ tab: "quality", label: "Quality" }, { tab: "notifications", label: "Notifications" }, { tab: "audit-log", label: "Security activity" }, { tab: "maintenance", label: "Maintenance" }] },
+  { title: "Operations", icon: ShieldCheck, entries: [{ tab: "quality", label: "Quality" }, { tab: "traffic", label: "Customer activity" }, { tab: "notifications", label: "Notifications" }, { tab: "audit-log", label: "Security activity" }, { tab: "maintenance", label: "Maintenance" }] },
 ];
 const ADMIN_TAB_LABELS: Record<DataTab, string> = Object.fromEntries(ADMIN_NAV_GROUPS.flatMap((group) => group.entries.map((entry) => [entry.tab, entry.label]))) as Record<DataTab, string>;
 
@@ -577,6 +579,7 @@ export default function AdminPortal() {
     if (tab === "knowledge") { void loadKnowledge(); void loadPickers(); return; }
     if (tab === "knowledge-gaps") { void loadGaps(); return; }
     if (tab === "quality") { void loadQuality(); return; }
+    if (tab === "traffic") return;
     if (tab === "query-tester") { return; }
     if (tab === "brains") { void loadBrains(); return; }
     if (tab === "users") { void loadUsers(1, ""); setUserSearch(""); setUserSearchInput(""); return; }
@@ -1769,6 +1772,8 @@ export default function AdminPortal() {
           )}
         </section>
       )}
+
+      {dataTab === "traffic" && <VisitorTrafficPanel />}
 
       {/* ── Quality tab (observability sprint) ── */}
       {dataTab === "quality" && (
