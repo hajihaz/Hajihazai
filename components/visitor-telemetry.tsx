@@ -135,7 +135,7 @@ export default function VisitorTelemetry() {
     {(consent === null || open) && <aside data-analytics-consent="true" role="dialog" aria-label="Optional product usage analytics"
       className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-md rounded-2xl border bg-background p-4 text-sm text-foreground shadow-xl">
       <p className="font-semibold">Optional product analytics</p>
-      <p className="mt-1 text-xs text-muted-foreground">Can we count anonymous visits, pages opened, button taps and time spent to improve HajiHaz AI? We never record prompts, messages, passwords or form input.</p>
+      <p className="mt-1 text-xs text-muted-foreground">May we count visits, pages opened, button taps and active time to improve HajiHaz AI? When you are signed in, activity is linked to your account for the administrator’s usage report. We never record prompts, messages, passwords or form input.</p>
       <div className="mt-3 flex gap-2">
         <button type="button" onClick={() => save("yes")} className="rounded-lg bg-foreground px-3 py-2 text-xs text-background">Allow analytics</button>
         <button type="button" onClick={() => save("no")} className="rounded-lg border px-3 py-2 text-xs">No thanks</button>
