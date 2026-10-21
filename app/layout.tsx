@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import PwaRuntime from "@/components/pwa-runtime";
+import VisitorTelemetry from "@/components/visitor-telemetry";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -45,7 +46,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
       </head>
-      <body className="min-h-dvh overflow-x-hidden antialiased">{children}<PwaRuntime /></body>
+      <body className="min-h-dvh overflow-x-hidden antialiased">{children}<PwaRuntime /><VisitorTelemetry /></body>
     </html>
   );
 }
