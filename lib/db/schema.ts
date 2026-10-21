@@ -975,3 +975,24 @@ export const hhcCommands = pgTable("hhc_customer_commands", {
   index("hhc_commands_owner_created_idx").on(t.userId, t.createdAt),
   index("hhc_commands_agent_queue_idx").on(t.deviceId, t.status, t.expiresAt),
 ]);
+
+
+/**
+ * Consent-based visitor analytics (never stores prompts, input values or URLs
+ * containing search parameters). Kept separate from security/audit logging.
+ */
+export const productTrafficEvents = pgTable("product_traffic_event", {
+  id: text("id").primaryKey().$defaultFn(() => crypto.randomUUID()),
+  visitorId: text("visitor_id").notNull(),
+  sessionId: text("session_id").notNull(),
+  userId: text("user_id").references(() => users.id, { onDelete: "set null" }),
+  kind: text("kind").notNull(),
+  path: text("path").notNull(),
+  target: text("target"),
+  durationSeconds: integer("duration_seconds"),
+  createdAt: timestamp("created_at", { mode: "date" }).notNull().defaultNow(),
+}, (t) => [
+  index("product_traffic_created_idx").on(t.createdAt),
+  index("product_traffic_visitor_created_idx").on(t.visitorId, t.createdAt),
+  index("product_traffic_user_created_idx").on(t.userId, t.createdAt),
+]);
