@@ -9,9 +9,9 @@ const count = (v: unknown) => Number(v ?? 0) || 0;
 
 /** Authenticated admin-only, read-only aggregation. Never returns raw clickstreams. */
 export async function GET() {
-  const admin = await requireAdmin();
-  if (!admin) return new Response("Unauthorized", { status: 401 });
-  const limited = await rateLimitResponse("admin-traffic:" + admin.adminId, 40, 60_000);
+  const sess = await requireAdmin();
+  if (!sess) return new Response("Unauthorized", { status: 401 });
+  const limited = await rateLimitResponse("admin-traffic:" + sess.adminId, 40, 60_000);
   if (limited) return limited;
 
   try {
