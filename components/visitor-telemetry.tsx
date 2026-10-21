@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 
 const CHOICE = "hhai-usage-consent-v1";
@@ -37,10 +37,15 @@ export default function VisitorTelemetry() {
   const pathname = usePathname();
   const [consent, setConsent] = useState<"yes" | "no" | null>(null);
   const [ready, setReady] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [privacyBlocked, setPrivacyBlocked] = useState(false);
+  const consentRef = useRef<"yes" | "no" | null>(null);
+  useEffect(() => { consentRef.current = consent; }, [consent]);
 
   useEffect(() => {
     try {
       const gpc = (navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl;
+      setPrivacyBlocked(Boolean(gpc || navigator.doNotTrack === "1"));
       setConsent(gpc || navigator.doNotTrack === "1" ? "no" :
         localStorage.getItem(CHOICE) === "yes" ? "yes" :
         localStorage.getItem(CHOICE) === "no" ? "no" : null);
@@ -55,7 +60,7 @@ export default function VisitorTelemetry() {
     try { ({ visitorId, sessionId, isNew } = ids()); } catch { return; }
     let enabled = true;
     const send = (kind: "visit" | "view" | "tap" | "active_time", target?: string, durationSeconds?: number) => {
-      if (!enabled) return;
+      if (!enabled || consentRef.current !== "yes") return;
       void fetch("/api/analytics/visit", {
         method: "POST", credentials: "same-origin", keepalive: true,
         headers: { "Content-Type": "application/json" },
@@ -76,7 +81,7 @@ export default function VisitorTelemetry() {
     const onClick = (event: MouseEvent) => {
       if (!(event.target instanceof Element)) return;
       const el = event.target.closest("a,button,[data-analytics]");
-      if (!el || el.closest("form") || Date.now() - lastTap < 400) return;
+      if (!el || el.closest("form,[data-analytics-consent]") || Date.now() - lastTap < 400) return;
       lastTap = Date.now();
       let target = el.getAttribute("data-analytics") || "";
       if (!target && el instanceof HTMLAnchorElement) {
@@ -111,7 +116,7 @@ export default function VisitorTelemetry() {
     };
   }, [pathname, consent]);
 
-  if (!ready || consent !== null || !safePath(pathname || "")) return null;
+  if (!ready || privacyBlocked || !safePath(pathname || "")) return null;
   function save(v: "yes" | "no") {
     try {
       localStorage.setItem(CHOICE, v);
@@ -120,10 +125,15 @@ export default function VisitorTelemetry() {
         sessionStorage.removeItem(SESSION);
       }
     } catch { /* no storage available */ }
+    consentRef.current = v;
+    setOpen(false);
     setConsent(v);
   }
   return (
-    <aside role="dialog" aria-label="Optional product usage analytics"
+    <>
+    <button type="button" data-analytics-consent="true" aria-label="Change optional product analytics consent" onClick={() => setOpen(true)}
+      className="fixed bottom-3 left-3 z-[99] rounded-lg border bg-background px-2 py-1 text-xs text-foreground">Privacy settings</button>
+    {(consent === null || open) && <aside data-analytics-consent="true" role="dialog" aria-label="Optional product usage analytics"
       className="fixed bottom-4 left-4 right-4 z-[100] mx-auto max-w-md rounded-2xl border bg-background p-4 text-sm text-foreground shadow-xl">
       <p className="font-semibold">Optional product analytics</p>
       <p className="mt-1 text-xs text-muted-foreground">Can we count anonymous visits, pages opened, button taps and time spent to improve HajiHaz AI? We never record prompts, messages, passwords or form input.</p>
@@ -131,6 +141,7 @@ export default function VisitorTelemetry() {
         <button type="button" onClick={() => save("yes")} className="rounded-lg bg-foreground px-3 py-2 text-xs text-background">Allow analytics</button>
         <button type="button" onClick={() => save("no")} className="rounded-lg border px-3 py-2 text-xs">No thanks</button>
       </div>
-    </aside>
+    </aside>}
+    </>
   );
 }
