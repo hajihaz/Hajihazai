@@ -19,6 +19,7 @@ const CARDS: Array<[string,string]> = [
   ["Page views · 7 days","views7d"],
   ["Page views · 30 days","views30d"],
   ["Unique visitors · 7 days","visitors7d"],
+  ["Returning visitors · 7 days","returningVisitors7d"],
   ["Taps · 7 days","taps7d"],
   ["Active minutes · 7 days","activeMinutes7d"],
 ];
@@ -116,7 +117,7 @@ export default function VisitorTrafficPanel() {
             {!data.customerDaily.length && <p className="py-3 text-sm text-muted-foreground">No consenting signed-in customer visits yet.</p>}
           </div>
         </article>
-        <p className="text-xs text-muted-foreground">Visits are 30-minute-inactivity sessions, not unique people. Consent and browser privacy settings can reduce counts. No chats, prompts, private text, passwords, IP addresses or payment content are collected.</p>
+        <p className="text-xs text-muted-foreground">Returning visitors are browser IDs seen in at least two distinct consenting visit sessions within seven days; they are not unique people. Daily chart dates use UTC. Visits are 30-minute-inactivity sessions, not unique people. Consent and browser privacy settings can reduce counts. No chats, prompts, private text, passwords, IP addresses or payment content are collected.</p>
       </>}
     </section>
   );
