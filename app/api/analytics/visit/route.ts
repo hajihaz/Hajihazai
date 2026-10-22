@@ -4,7 +4,7 @@ import { db } from "@/lib/db";
 import { productTrafficEvents } from "@/lib/db/schema";
 import { rateLimitResponse } from "@/lib/ratelimit";
 import { rejectOversizedBody } from "@/lib/auth/request";
-import {analyticsProductPath,analyticsProductAction} from "@/lib/analytics-traffic-path";
+import {analyticsProductPath,analyticsProductAction,analyticsTrustedOrigin} from "@/lib/analytics-traffic-path";
 
 export const runtime = "nodejs";
 
@@ -13,11 +13,8 @@ const KINDS = new Set(["visit", "view", "tap", "active_time"]);
 
 /** Strictly voluntary, first-party usage telemetry; no chat contents or form values. */
 export async function POST(request: Request) {
-  const origin = request.headers.get("origin");
-  try {
-    if (origin && new URL(origin).host !== new URL(request.url).host)
-      return Response.json({ error: "Invalid origin" }, { status: 403 });
-  } catch { return new Response("Invalid origin", { status: 403 }); }
+  if(!analyticsTrustedOrigin(request.headers.get("origin"),request.url))
+    return Response.json({error:"Invalid origin"},{status:403});
 
   const oversized = rejectOversizedBody(request, 2048);
   if (oversized) return oversized;
