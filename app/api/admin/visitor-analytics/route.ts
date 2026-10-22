@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin/session";
 import { rateLimitResponse } from "@/lib/ratelimit";
+import { fillVisitorDays } from "@/lib/analytics/visitor-daily-series";
 
 export const runtime = "nodejs";
 
@@ -15,7 +16,7 @@ export async function GET() {
   if (limited) return limited;
 
   try {
-    const [overall, days, pages, actions, customerDays] = await Promise.all([
+    const [overall, days, pages, actions, customerDays, returning] = await Promise.all([
       db.execute(sql`
         SELECT
           count(*) FILTER (WHERE kind='view' AND created_at>=now()-interval '24 hours') as views_24h,
@@ -64,6 +65,14 @@ export async function GET() {
         GROUP BY date_trunc('day',t.created_at), t.user_id
         ORDER BY date_trunc('day',t.created_at) DESC, visits DESC LIMIT 150
       `),
+      db.execute(sql`
+        SELECT count(*) AS returning_visitors_7d FROM (
+          SELECT visitor_id FROM product_traffic_event
+          WHERE kind='visit' AND created_at>=now()-interval '7 days'
+          GROUP BY visitor_id
+          HAVING count(DISTINCT session_id)>=2
+        ) recent_repeat_browsers
+      `),
     ]);
     const r = overall.rows[0] ?? {};
     return Response.json({
@@ -73,12 +82,13 @@ export async function GET() {
         views24h: count(r.views_24h), views7d: count(r.views_7d), views30d: count(r.views_30d),
         visits24h: count(r.visits_24h), visits7d: count(r.visits_7d), visits30d: count(r.visits_30d),
         visitors7d: count(r.visitors_7d), visitors30d: count(r.visitors_30d),
+        returningVisitors7d: count(returning.rows[0]?.returning_visitors_7d),
         taps7d: count(r.taps_7d), activeMinutes7d: Math.round(count(r.active_seconds_7d)/60),
       },
-      daily: days.rows.map(x => ({
+      daily: fillVisitorDays(days.rows.map(x => ({
         date: String(x.date), views: count(x.views), visits: count(x.visits), taps: count(x.taps),
         visitors: count(x.visitors), activeMinutes: Math.round(count(x.active_seconds)/60),
-      })),
+      }))),
       topPages: pages.rows.map(x=>({path:String(x.path),views:count(x.views)})),
       topTaps: actions.rows.map(x=>({target:String(x.target),taps:count(x.taps)})),
       customerDaily: customerDays.rows.map(x=>({
