@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Folder, FolderPlus, Search, Trash2, Pencil, ArrowRight, X } from "lucide-react";
+import { discoverProjects, type ProjectSort } from "@/lib/projects/project-discovery";
 
 type Project = {
   id: string;
@@ -15,6 +16,7 @@ type Project = {
 export default function ProjectsDashboard({ initialProjects }: { initialProjects: Project[] }) {
   const [projects, setProjects] = useState(initialProjects);
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<ProjectSort>("recent");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Project | null>(null);
   const [name, setName] = useState("");
@@ -22,11 +24,7 @@ export default function ProjectsDashboard({ initialProjects }: { initialProjects
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return projects;
-    return projects.filter((p) => (p.name + " " + (p.description ?? "")).toLowerCase().includes(q));
-  }, [projects, query]);
+  const filtered = useMemo(() => discoverProjects(projects, query, sort), [projects, query, sort]);
 
   function openCreate() {
     setEditing(null);
@@ -115,11 +113,29 @@ export default function ProjectsDashboard({ initialProjects }: { initialProjects
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search projects…"
+            onKeyDown={(e) => { if (e.key === "Escape") setQuery(""); }}
+            placeholder="Search projects and instructions…"
             aria-label="Search projects"
             className="min-h-11 min-w-0 flex-1 bg-transparent text-sm outline-none"
           />
           {query ? <button onClick={() => setQuery("")} aria-label="Clear project search" className="rounded-md p-1.5 hover:bg-accent"><X className="size-4" /></button> : null}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+          <p role="status" aria-live="polite">{filtered.length} {filtered.length === 1 ? "project" : "projects"} found</p>
+          <label className="flex items-center gap-2">
+            <span>Sort by</span>
+            <select
+              aria-label="Sort projects"
+              value={sort}
+              onChange={(event) => setSort(event.target.value as ProjectSort)}
+              className="min-h-10 rounded-lg border bg-background px-3 text-foreground"
+            >
+              <option value="recent">Recently updated</option>
+              <option value="name">Name A–Z</option>
+              <option value="name-desc">Name Z–A</option>
+            </select>
+          </label>
         </div>
 
         {message ? <p className="mt-3 text-sm text-destructive">{message}</p> : null}
