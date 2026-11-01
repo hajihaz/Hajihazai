@@ -11,6 +11,9 @@ const baseURL = process.env.E2E_BASE_URL ?? "https://hajihazai.vercel.app";
 const writeCapable = process.env.E2E_ALLOW_WRITE === "true";
 const localE2E = /^https?:\/\/(127\.0\.0\.1|localhost)(?::\d+)?$/i.test(baseURL);
 if (localE2E) process.env.AUTH_URL = baseURL;
+// Reuse an already installed Chrome for isolated Mac E2E when Playwright's
+// matching bundled headless shell has been deliberately cleaned from disk.
+const useSystemChrome = localE2E && process.env.E2E_SYSTEM_CHROME === "1";
 
 // Write-capable E2E must be physically isolated. This guard intentionally fails
 // before Playwright starts if someone accidentally points it at production.
@@ -38,7 +41,7 @@ export default defineConfig({
     storageState: localE2E ? "test-results/.auth/e2e-user.json" : undefined,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: useSystemChrome ? "off" : "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"], ...(useSystemChrome ? { channel: "chrome" as const } : {}) } }],
 });
