@@ -7,6 +7,9 @@ import { fillVisitorDays } from "@/lib/analytics/visitor-daily-series";
 export const runtime = "nodejs";
 
 const count = (v: unknown) => Number(v ?? 0) || 0;
+// The 30 displayed chart dates run from 00:00 UTC 29 calendar days ago.
+// Using rolling 720h here made summary totals disagree with the plotted days.
+const firstDayUtc = sql`((date_trunc('day',now() AT TIME ZONE 'UTC') - interval '29 days') AT TIME ZONE 'UTC')`;
 
 /** Authenticated admin-only, read-only aggregation. Never returns raw clickstreams. */
 export async function GET() {
@@ -21,26 +24,27 @@ export async function GET() {
         SELECT
           count(*) FILTER (WHERE kind='view' AND created_at>=now()-interval '24 hours') as views_24h,
           count(*) FILTER (WHERE kind='view' AND created_at>=now()-interval '7 days') as views_7d,
-          count(*) FILTER (WHERE kind='view' AND created_at>=now()-interval '30 days') as views_30d,
+          count(*) FILTER (WHERE kind='view' AND created_at>=${firstDayUtc}) as views_30d,
           count(*) FILTER (WHERE kind='visit' AND created_at>=now()-interval '24 hours') as visits_24h,
           count(*) FILTER (WHERE kind='visit' AND created_at>=now()-interval '7 days') as visits_7d,
-          count(*) FILTER (WHERE kind='visit' AND created_at>=now()-interval '30 days') as visits_30d,
+          count(*) FILTER (WHERE kind='visit' AND created_at>=${firstDayUtc}) as visits_30d,
           count(distinct visitor_id) FILTER (WHERE created_at>=now()-interval '7 days') as visitors_7d,
-          count(distinct visitor_id) FILTER (WHERE created_at>=now()-interval '30 days') as visitors_30d,
+          count(distinct visitor_id) FILTER (WHERE created_at>=${firstDayUtc}) as visitors_30d,
           count(*) FILTER (WHERE kind='tap' AND created_at>=now()-interval '7 days') as taps_7d,
           coalesce(sum(duration_seconds) FILTER (WHERE kind='active_time' AND created_at>=now()-interval '7 days'),0) as active_seconds_7d
         FROM product_traffic_event
-        WHERE created_at>=now()-interval '30 days'
+        WHERE created_at>=${firstDayUtc}
       `),
       db.execute(sql`
-        SELECT to_char(date_trunc('day',created_at),'YYYY-MM-DD') as date,
+        SELECT to_char(date_trunc('day',created_at AT TIME ZONE 'UTC'),'YYYY-MM-DD') as date,
           count(*) FILTER (WHERE kind='view') as views,
           count(*) FILTER (WHERE kind='visit') as visits,
           count(*) FILTER (WHERE kind='tap') as taps,
           count(distinct visitor_id) as visitors,
           coalesce(sum(duration_seconds) FILTER (WHERE kind='active_time'),0) as active_seconds
-        FROM product_traffic_event WHERE created_at>=now()-interval '30 days'
-        GROUP BY date_trunc('day',created_at) ORDER BY date_trunc('day',created_at)
+        FROM product_traffic_event WHERE created_at>=${firstDayUtc}
+        GROUP BY date_trunc('day',created_at AT TIME ZONE 'UTC')
+        ORDER BY date_trunc('day',created_at AT TIME ZONE 'UTC')
       `),
       db.execute(sql`
         SELECT path,count(*) as views
@@ -55,15 +59,15 @@ export async function GET() {
         GROUP BY target ORDER BY taps DESC LIMIT 20
       `),
       db.execute(sql`
-        SELECT to_char(date_trunc('day',t.created_at),'YYYY-MM-DD') as date,
+        SELECT to_char(date_trunc('day',t.created_at AT TIME ZONE 'UTC'),'YYYY-MM-DD') as date,
           t.user_id, coalesce(max(u.name),max(u.email),'Customer') as customer,
           count(*) FILTER (WHERE t.kind='visit') as visits,
           count(*) FILTER (WHERE t.kind='view') as views
         FROM product_traffic_event t
         LEFT JOIN "user" u ON u.id=t.user_id
         WHERE t.created_at>=now()-interval '7 days' AND t.user_id IS NOT NULL
-        GROUP BY date_trunc('day',t.created_at), t.user_id
-        ORDER BY date_trunc('day',t.created_at) DESC, visits DESC LIMIT 150
+        GROUP BY date_trunc('day',t.created_at AT TIME ZONE 'UTC'), t.user_id
+        ORDER BY date_trunc('day',t.created_at AT TIME ZONE 'UTC') DESC, visits DESC LIMIT 150
       `),
       db.execute(sql`
         SELECT count(*) AS returning_visitors_7d FROM (
