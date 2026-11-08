@@ -86,6 +86,14 @@ test.describe("project chat synchronization", () => {
       await expect(page.getByText("Recent activity", { exact: true })).toBeVisible();
       await expect(page.getByText("E2E Project Search Artifact", { exact: true }).first()).toBeVisible();
       await expect(page.getByRole("navigation", { name: "Project sections" })).toBeVisible();
+      const activitySection = page.locator("#activity");
+      await page.getByRole("combobox", { name: "Filter project activity" }).selectOption("automation");
+      await expect(activitySection.getByText("E2E Project Search Automation", { exact: true })).toBeVisible();
+      await expect(activitySection.getByText("E2E Project Search Artifact", { exact: true })).toHaveCount(0);
+      await page.getByRole("combobox", { name: "Filter project activity" }).selectOption("all");
+      await expect(activitySection.getByText("E2E Project Search Artifact", { exact: true })).toBeVisible();
+      await page.getByRole("button", { name: "Refresh activity" }).click();
+      await expect(activitySection.getByText("E2E Project Search Artifact", { exact: true })).toBeVisible();
 
       const projectSearch = page.getByRole("textbox", { name: "Search this project" });
       await projectSearch.fill("project-v5-needle");

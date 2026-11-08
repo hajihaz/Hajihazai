@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { selectProjectActivity, type ActivityFilter } from "@/lib/projects/project-activity-ui";
 import {
   Activity,
   ArrowLeft,
@@ -120,6 +121,10 @@ export default function ProjectWorkspace({
   const [memories, setMemories] = useState(initialMemories);
   const [automations, setAutomations] = useState(initialAutomations);
   const [activity, setActivity] = useState(initialActivity);
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>("all");
+  const [activityLimit, setActivityLimit] = useState(12);
+  const [activityRefreshing, setActivityRefreshing] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
   const [availableMemories, setAvailableMemories] = useState<Memory[]>([]);
   const [showMemoryPicker, setShowMemoryPicker] = useState(false);
   const [memorySearch, setMemorySearch] = useState("");
@@ -127,6 +132,8 @@ export default function ProjectWorkspace({
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const searchRequestId = useRef(0);
   const [instructions, setInstructions] = useState(project.instructions ?? "");
   const [projectName, setProjectName] = useState(project.name);
   const [projectDescription, setProjectDescription] = useState(project.description ?? "");
@@ -154,6 +161,7 @@ export default function ProjectWorkspace({
   });
   const [editForm, setEditForm] = useState(form);
   const fileRef = useRef<HTMLInputElement>(null);
+  const displayedActivity = selectProjectActivity(activity, activityFilter, activityLimit);
 
   useEffect(() => {
     const refreshMemoryState = async () => {
@@ -173,30 +181,44 @@ export default function ProjectWorkspace({
   }, [project.id]);
 
   async function refreshActivity() {
-    const res = await fetch("/api/projects/" + project.id, { cache: "no-store" });
-    if (!res.ok) return;
-    const data = await res.json();
-    setActivity(data.activity ?? []);
+    setActivityRefreshing(true);
+    setActivityError(null);
+    try {
+      const res = await fetch("/api/projects/" + project.id, { cache: "no-store" });
+      if (!res.ok) throw new Error("Activity refresh failed");
+      const data = await res.json();
+      setActivity(Array.isArray(data.activity) ? data.activity : []);
+    } catch {
+      setActivityError("Couldn't refresh project activity. Your existing timeline is unchanged.");
+    } finally {
+      setActivityRefreshing(false);
+    }
   }
 
   async function runProjectSearch(e?: React.FormEvent) {
     e?.preventDefault();
     const q = projectSearch.trim();
-    setHasSearched(true);
+    const requestId = ++searchRequestId.current;
+    setSearchError(null);
+    setSearchResults([]);
+    setHasSearched(false);
     if (!q) {
-      setSearchResults([]);
+      setSearching(false);
       return;
     }
     setSearching(true);
     try {
       const res = await fetch("/api/projects/" + project.id + "/search?q=" + encodeURIComponent(q), { cache: "no-store" });
-      if (!res.ok) {
-        setSearchResults([]);
-        return;
-      }
-      setSearchResults((await res.json()).results ?? []);
+      if (!res.ok) throw new Error("Project search failed");
+      const data = await res.json();
+      if (requestId !== searchRequestId.current) return;
+      setSearchResults(Array.isArray(data.results) ? data.results : []);
+      setHasSearched(true);
+    } catch {
+      if (requestId !== searchRequestId.current) return;
+      setSearchError("Project search is temporarily unavailable. Try again.");
     } finally {
-      setSearching(false);
+      if (requestId === searchRequestId.current) setSearching(false);
     }
   }
 
@@ -597,18 +619,26 @@ export default function ProjectWorkspace({
         <form onSubmit={runProjectSearch} className="flex gap-2">
           <input
             value={projectSearch}
-            onChange={(e) => { setProjectSearch(e.target.value); if (hasSearched) setHasSearched(false); }}
+            onChange={(e) => {
+              searchRequestId.current += 1;
+              setProjectSearch(e.target.value);
+              setSearchResults([]);
+              setHasSearched(false);
+              setSearchError(null);
+              setSearching(false);
+            }}
             aria-label="Search this project"
             placeholder="Search this project…"
             className="min-w-0 flex-1 rounded-lg border bg-background px-3 py-2 text-sm"
           />
           <button disabled={searching} className="min-w-20 rounded-lg border px-3 text-sm hover:bg-accent disabled:opacity-50">{searching ? "Searching…" : "Search"}</button>
         </form>
-        {hasSearched && searchResults.length === 0 ? (
+        {searchError ? <p role="alert" className="text-sm text-destructive">{searchError}</p> : null}
+        {hasSearched && !searchError && searchResults.length === 0 ? (
           <div className="rounded-lg border border-dashed px-3 py-5 text-center text-sm text-muted-foreground">No matching project content found.</div>
         ) : null}
         {searchResults.length > 0 ? (
-          <div className="overflow-hidden rounded-lg border" aria-live="polite">
+          <div className="overflow-hidden rounded-lg border" aria-live="polite" aria-label={searchResults.length + " project search results"}>
             {searchResults.map((r) => (
               <a href={r.href ?? "#"} key={r.kind + "-" + r.id} className="block border-b px-3 py-2.5 text-xs last:border-0 hover:bg-accent">
                 <span className="mr-2 rounded bg-muted px-1.5 py-0.5">{r.kind}</span>
@@ -641,17 +671,45 @@ export default function ProjectWorkspace({
       </section>
 
       <section id="activity" className="mt-8 scroll-mt-4 space-y-3">
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="flex items-center gap-2 text-sm font-semibold"><Activity className="size-4" /> Recent activity</h2>
             <p className="mt-1 text-xs text-muted-foreground">Latest project chats, files, memories, artifacts, and automations in one timeline.</p>
           </div>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{activity.length}</span>
+          <span role="status" aria-live="polite" className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+            {displayedActivity.matchingCount} {displayedActivity.matchingCount === 1 ? "event" : "events"}
+          </span>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="flex items-center gap-2 text-xs text-muted-foreground">
+            <span>Show</span>
+            <select
+              aria-label="Filter project activity"
+              value={activityFilter}
+              onChange={(e) => { setActivityFilter(e.target.value as ActivityFilter); setActivityLimit(12); }}
+              className="min-h-10 rounded-lg border bg-background px-2 text-sm text-foreground"
+            >
+              <option value="all">All activity</option>
+              <option value="chat">Chats</option>
+              <option value="file">Files</option>
+              <option value="memory">Memories</option>
+              <option value="artifact">Artifacts</option>
+              <option value="automation">Automations</option>
+              <option value="automation_run">Automation runs</option>
+            </select>
+          </label>
+          <button type="button" onClick={() => void refreshActivity()} disabled={activityRefreshing}
+            className="min-h-10 rounded-lg border px-3 text-xs hover:bg-accent disabled:opacity-50">
+            {activityRefreshing ? "Refreshing…" : "Refresh activity"}
+          </button>
+        </div>
+        {activityError ? <p role="alert" className="text-sm text-destructive">{activityError}</p> : null}
         <div className="overflow-hidden rounded-lg border">
-          {activity.length === 0 ? (
-            <p className="px-3 py-4 text-sm text-muted-foreground">Project activity will appear here as you work.</p>
-          ) : activity.slice(0, 12).map((event) => (
+          {displayedActivity.matchingCount === 0 ? (
+            <p className="px-3 py-4 text-sm text-muted-foreground">
+              {activity.length === 0 ? "Project activity will appear here as you work." : "No activity of this type yet."}
+            </p>
+          ) : displayedActivity.entries.map((event) => (
             <a key={event.id} href={event.href ?? "#"} className="flex items-start gap-3 border-b px-3 py-2.5 text-sm last:border-0 hover:bg-accent">
               <span className="mt-0.5 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase text-muted-foreground">{event.kind.replace("_", " ")}</span>
               <span className="min-w-0 flex-1">
@@ -662,6 +720,12 @@ export default function ProjectWorkspace({
             </a>
           ))}
         </div>
+        {displayedActivity.hasMore ? (
+          <button type="button" onClick={() => setActivityLimit((n) => Math.min(100, n + 12))}
+            className="min-h-10 rounded-lg border px-3 text-sm hover:bg-accent">
+            Show more activity
+          </button>
+        ) : null}
       </section>
 
       <section id="files" className="mt-8 scroll-mt-4 space-y-2">
