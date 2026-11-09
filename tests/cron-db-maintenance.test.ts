@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCronAuthorized } from "@/app/api/cron/db-maintenance/route";
+import { isCronAuthorized } from "@/lib/cron-authorization";
 
 describe("database maintenance cron authorization", () => {
   it("requires an exact bearer secret", () => {

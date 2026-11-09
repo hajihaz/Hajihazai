@@ -12,12 +12,15 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "HajiHaz AI", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
-  openGraph: { title: "HajiHaz AI", description: "Personal intelligence with memory, live evidence, and specialized AI brains.", type: "website", images: [{ url: "/branding/hajihaz-logo.png", alt: "HajiHaz AI" }] },
-  twitter: { card: "summary_large_image", title: "HajiHaz AI", description: "Personal intelligence with memory, live evidence, and specialized AI brains.", images: ["/branding/hajihaz-logo.png"] },
+  openGraph: { title: "HajiHaz AI", description: "Personal intelligence with memory, live evidence, and specialized AI brains.", type: "website", images: [{ url: "/branding/hajihaz-ai-wordmark-v2.png", alt: "HajiHaz AI" }] },
+  twitter: { card: "summary_large_image", title: "HajiHaz AI", description: "Personal intelligence with memory, live evidence, and specialized AI brains.", images: ["/branding/hajihaz-ai-wordmark-v2.png"] },
   icons: {
-    icon: "/branding/hajihaz-mark.png",
-    shortcut: "/branding/hajihaz-mark.png",
-    apple: "/branding/hajihaz-mark.png",
+    icon: [
+      { url: "/branding/hajihaz-ai-mark-v2-32.png", sizes: "32x32", type: "image/png" },
+      { url: "/branding/hajihaz-ai-mark-v2-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: "/branding/hajihaz-ai-mark-v2-32.png",
+    apple: [{ url: "/branding/hajihaz-ai-mark-v2-180.png", sizes: "180x180", type: "image/png" }],
   },
 };
 

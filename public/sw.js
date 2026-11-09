@@ -2,11 +2,15 @@
  * Dynamic/authenticated pages remain network-only. Only the offline shell and
  * immutable same-origin static assets are cached.
  */
-const SHELL_CACHE = "hajihaz-shell-v2";
-const STATIC_CACHE = "hajihaz-static-v2";
+const SHELL_CACHE = "hajihaz-shell-v3";
+const STATIC_CACHE = "hajihaz-static-v3";
 const MAX_STATIC_ASSETS = 150;
 const OFFLINE_URL = "/offline";
-const PRECACHE = [OFFLINE_URL, "/branding/hajihaz-mark.png", "/branding/hajihaz-logo.png"];
+const PRECACHE = [
+  OFFLINE_URL,
+  "/branding/hajihaz-ai-mark-v2-512.png",
+  "/branding/hajihaz-ai-wordmark-v2.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(

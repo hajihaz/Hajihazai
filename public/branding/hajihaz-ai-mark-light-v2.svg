@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="HajiHaz AI signature H">
+<rect width="1024" height="1024" fill="#FFF9EF"/>
+<rect x="221" y="219" width="166" height="586" rx="82" fill="#080A0F"/>
+<rect x="637" y="219" width="166" height="586" rx="82" fill="#080A0F"/>
+<path d="M332 461 C410 461 410 398 512 398 C614 398 614 461 692 461 L692 563 C614 563 614 626 512 626 C410 626 410 563 332 563 Z" fill="#080A0F"/>
+<circle cx="512" cy="512" r="89" fill="#FFF9EF"/>
+<circle cx="512" cy="512" r="56" fill="#DBB15D"/>
+</svg>

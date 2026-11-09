@@ -50,15 +50,18 @@ export default async function Home({
         <div className="relative flex w-full max-w-2xl flex-col items-center gap-8 text-center">
           <div className="pointer-events-none absolute -top-32 size-72 rounded-full bg-primary/10 blur-3xl" aria-hidden="true" />
           {/* Brand */}
-          <div className="relative overflow-hidden rounded-2xl border bg-black shadow-sm">
-            <Image
-              src="/branding/hajihaz-logo.png"
-              alt="HajiHaz AI"
-              width={607}
-              height={481}
-              priority
-              className="h-auto w-52 sm:w-64"
-            />
+          <div className="flex flex-col items-center gap-3">
+            <div className="relative overflow-hidden rounded-[22%] bg-[#080A0F] shadow-lg ring-1 ring-border">
+              <Image
+                src="/branding/hajihaz-ai-mark-v2-512.png"
+                alt="HajiHaz AI"
+                width={512}
+                height={512}
+                priority
+                className="size-24 sm:size-28"
+              />
+            </div>
+            <p className="text-xs font-bold uppercase tracking-[0.22em]">HajiHaz AI</p>
           </div>
 
           {/* Headline + sub-copy: make it clear this is sign-in AND sign-up */}
