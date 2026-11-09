@@ -17,7 +17,7 @@ export default async function SharedConversation({ params }: { params: Promise<{
     <main className="min-h-dvh bg-background px-4 py-8 text-foreground sm:px-6">
       <div className="mx-auto max-w-3xl">
         <div className="mb-8 flex items-center gap-3 border-b pb-5">
-          <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-black"><img src="/branding/hajihaz-mark.png" alt="HajiHaz AI" className="size-9 object-contain" /></div>
+          <div className="flex size-10 items-center justify-center overflow-hidden rounded-xl bg-black"><img src="/branding/hajihaz-ai-mark-v2-512.png" alt="HajiHaz AI" className="size-9 object-contain" /></div>
           <div><p className="text-sm font-semibold">HajiHaz AI</p><p className="text-xs text-muted-foreground">Shared conversation · read only</p></div>
         </div>
         <h1 className="mb-7 text-2xl font-semibold tracking-tight">{conversation.title}</h1>

@@ -9,7 +9,7 @@ test.describe("PWA shell", () => {
     expect(manifest.start_url).toBe("/");
     expect(manifest.display).toBe("standalone");
     expect(manifest.icons).toEqual(expect.arrayContaining([
-      expect.objectContaining({ src: "/branding/hajihaz-mark.png", sizes: "512x512" }),
+      expect.objectContaining({ src: "/branding/hajihaz-ai-mark-v2-512.png", sizes: "512x512" }),
     ]));
 
     const workerResponse = await request.get("/sw.js");
@@ -17,7 +17,7 @@ test.describe("PWA shell", () => {
     expect(workerResponse.headers()["service-worker-allowed"]).toBe("/");
     expect(workerResponse.headers()["cache-control"]).toContain("max-age=0");
     const worker = await workerResponse.text();
-    expect(worker).toContain('hajihaz-static-v2');
+    expect(worker).toContain('hajihaz-static-v3');
     expect(worker).toContain('MAX_STATIC_ASSETS = 150');
     expect(worker).toContain('immutableNextAsset && cached');
     expect(worker).toContain('url.pathname.startsWith("/api/")');

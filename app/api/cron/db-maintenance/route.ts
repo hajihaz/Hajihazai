@@ -1,17 +1,10 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { isCronAuthorized } from "@/lib/cron-authorization";
 
 const BATCH_SIZE = 500;
 const TOOL_RETENTION_DAYS = 90;
 const GUEST_ACCOUNT_RETENTION_DAYS = 2;
-
-export function isCronAuthorized(
-  req: Request,
-  secret = process.env.CRON_SECRET,
-): boolean {
-  if (!secret) return false;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
 
 async function runCleanup() {
   const now = new Date();

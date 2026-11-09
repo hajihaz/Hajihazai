@@ -1,5 +1,5 @@
 import { runDueAutomations } from "@/lib/automation/runner";
-import { isCronAuthorized } from "@/app/api/cron/db-maintenance/route";
+import { isCronAuthorized } from "@/lib/cron-authorization";
 
 export async function GET(req: Request) {
   if (!isCronAuthorized(req)) return Response.json({ error: "Unauthorized" }, { status: 401 });
